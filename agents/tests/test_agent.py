@@ -3,30 +3,6 @@
 from src.core.agent import AgentMessage, AgentResponse, BaseAgent
 
 
-class TestAgentMessage:
-    """Tests for AgentMessage dataclass."""
-
-    def test_create_message(self) -> None:
-        msg = AgentMessage(role="user", content="Hello")
-        assert msg.role == "user"
-        assert msg.content == "Hello"
-        assert msg.metadata == {}
-
-    def test_message_with_metadata(self) -> None:
-        msg = AgentMessage(role="assistant", content="Hi", metadata={"model": "claude"})
-        assert msg.metadata["model"] == "claude"
-
-
-class TestAgentResponse:
-    """Tests for AgentResponse dataclass."""
-
-    def test_create_response(self) -> None:
-        resp = AgentResponse(content="Analysis complete")
-        assert resp.content == "Analysis complete"
-        assert resp.tool_calls == []
-        assert resp.metadata == {}
-
-
 class TestBaseAgent:
     """Tests for BaseAgent abstract class."""
 

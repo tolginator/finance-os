@@ -146,10 +146,13 @@ expect(() => fetchQuote(invalidTicker)).not.toThrow();
 | Anti-pattern | Why it's bad |
 |---|---|
 | Tautology (`assert True`) | Tests nothing |
+| Language validation (constructor/property tests) | Tests that the language works, not that your code works. `expect(new Foo(1).x).toBe(1)` is a tautology — the language guarantees this. |
 | Mirror (reimplements production logic) | Breaks when logic changes |
 | Duplicate (same behavior twice) | Noise; keep the more expressive one |
-| Subsumed (A ⊂ B) | Keep B, remove A |
+| Subsumed (A ⊂ B) | A is already covered by B. Keep B, remove A |
 | Error-code/message matching | Couples to internals |
+
+**Every test must validate behavior the code implements, not behavior the language guarantees.** If a test would pass with an empty implementation, it's not testing anything. If the same behavior is already asserted in another test, don't assert it again.
 
 #### Test Pruning
 

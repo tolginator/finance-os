@@ -19,7 +19,7 @@ dev = [
 quant = [
     "numpy>=2.0",
     "pandas>=2.2",
-    "scipy>=1.14",
+    "scipy>=1.17.1",
 ]
 
 [build-system]

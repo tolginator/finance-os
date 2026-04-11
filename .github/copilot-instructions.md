@@ -60,6 +60,8 @@ Research Output (memos, alerts, signals)
 ### General
 - **ES Modules**: All TypeScript and JavaScript uses ESM (`"type": "module"`)
 - **Dependencies**: Minimize. Justify every new dependency.
+- **Dependency versions**: Always use the latest stable version. No legacy compatibility — legacy systems must fail. When a dependency ships a breaking change, update all consuming code to work with the new version. Never pin to old versions to avoid migration work.
+- **No secrets**: Do not store PATs or secrets in GitHub Secrets. Use only the built-in `GITHUB_TOKEN` and native GitHub features (e.g., Project auto-add workflows).
 - **Error handling**: Graceful degradation. Never crash on malformed input — log warnings and continue.
 - **Privacy**: All portfolio/personal data stays local. No PII sent to external APIs unless explicitly configured.
 
@@ -96,7 +98,15 @@ These rules exist because this is financial software. Violations produce incorre
 - **Agents**: `cd agents && pytest`
 - **Full suite**: `npm test` (from root, runs workspace tests)
 - **Python type checking**: `cd agents && mypy src/`
-- **Linting**: `npm run lint` (root), `cd agents && ruff check src/`
+- **Linting**: `npm run lint` (root), `cd agents && ruff check src/ tests/`
+
+### Pre-Push Preflight
+
+**Always run `npm run preflight` from the repo root before pushing.** This mirrors CI exactly: build → test → lint (TypeScript), then ruff → pytest (Python). A push that fails CI is a wasted round-trip. Fix locally first.
+
+```bash
+npm run preflight   # must pass before every push
+```
 
 ### Testing Philosophy
 
@@ -136,10 +146,13 @@ expect(() => fetchQuote(invalidTicker)).not.toThrow();
 | Anti-pattern | Why it's bad |
 |---|---|
 | Tautology (`assert True`) | Tests nothing |
+| Language validation (constructor/property tests) | Tests that the language works, not that your code works. `expect(new Foo(1).x).toBe(1)` is a tautology — the language guarantees this. |
 | Mirror (reimplements production logic) | Breaks when logic changes |
 | Duplicate (same behavior twice) | Noise; keep the more expressive one |
-| Subsumed (A ⊂ B) | Keep B, remove A |
+| Subsumed (A ⊂ B) | A is already covered by B. Keep B, remove A |
 | Error-code/message matching | Couples to internals |
+
+**Every test must validate behavior the code implements, not behavior the language guarantees.** If a test would pass with an empty implementation, it's not testing anything. If the same behavior is already asserted in another test, don't assert it again.
 
 #### Test Pruning
 
@@ -165,7 +178,8 @@ Examples: `tolginator/AddEdgarPipeline`, `copilot/RefactorAgentFramework`
 0. **Never commit to main.** Main is only for PRs and production builds.
 1. `git worktree add <path> -b <username>/<task> origin/main`
 2. Work exclusively in the worktree.
-3. Commit, push, create PR targeting `main`.
+3. Run `npm run preflight` — fix any failures before pushing.
+4. Commit, push, create PR targeting `main`.
 
 ### After PR Merge
 

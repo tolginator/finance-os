@@ -7,8 +7,8 @@ and capex from 10-K/10-Q filings.
 from __future__ import annotations
 
 import json
-import urllib.request
 import urllib.error
+import urllib.request
 from dataclasses import dataclass
 from typing import Any
 

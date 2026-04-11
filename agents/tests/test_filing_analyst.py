@@ -5,8 +5,6 @@ import pytest
 from src.agents.filing_analyst import (
     Filing,
     FilingAnalystAgent,
-    get_company_filings,
-    search_company,
 )
 from src.core.agent import AgentResponse
 

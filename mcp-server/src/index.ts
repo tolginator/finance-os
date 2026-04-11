@@ -3,6 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { registerEchoTool } from "./tools/echo.js";
 import { registerFinancialDataTool } from "./tools/financial-data.js";
 import { registerQifTool } from "./tools/qif.js";
+import { registerSecFilingsTool } from "./tools/sec-filings.js";
 
 const server = new McpServer({
   name: "finance-os",
@@ -12,6 +13,7 @@ const server = new McpServer({
 registerEchoTool(server);
 registerFinancialDataTool(server);
 registerQifTool(server);
+registerSecFilingsTool(server);
 
 async function main(): Promise<void> {
   const transport = new StdioServerTransport();

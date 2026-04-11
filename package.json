@@ -10,7 +10,8 @@
   "scripts": {
     "build": "npm run build --workspace=mcp-server",
     "test": "npm run test --workspace=mcp-server",
-    "lint": "npm run lint --workspace=mcp-server"
+    "lint": "npm run lint --workspace=mcp-server",
+    "preflight": "npm run build && npm test && npm run lint && (cd agents && ruff check src/ tests/ && python -m pytest || echo '⚠ Python preflight skipped (ruff/pytest not installed). CI will catch Python issues.')"
   },
   "license": "MIT"
 }

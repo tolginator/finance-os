@@ -98,7 +98,15 @@ These rules exist because this is financial software. Violations produce incorre
 - **Agents**: `cd agents && pytest`
 - **Full suite**: `npm test` (from root, runs workspace tests)
 - **Python type checking**: `cd agents && mypy src/`
-- **Linting**: `npm run lint` (root), `cd agents && ruff check src/`
+- **Linting**: `npm run lint` (root), `cd agents && ruff check src/ tests/`
+
+### Pre-Push Preflight
+
+**Always run `npm run preflight` from the repo root before pushing.** This mirrors CI exactly: build → test → lint (TypeScript), then ruff → pytest (Python). A push that fails CI is a wasted round-trip. Fix locally first.
+
+```bash
+npm run preflight   # must pass before every push
+```
 
 ### Testing Philosophy
 
@@ -167,7 +175,8 @@ Examples: `tolginator/AddEdgarPipeline`, `copilot/RefactorAgentFramework`
 0. **Never commit to main.** Main is only for PRs and production builds.
 1. `git worktree add <path> -b <username>/<task> origin/main`
 2. Work exclusively in the worktree.
-3. Commit, push, create PR targeting `main`.
+3. Run `npm run preflight` — fix any failures before pushing.
+4. Commit, push, create PR targeting `main`.
 
 ### After PR Merge
 

@@ -1,0 +1,16 @@
+{
+  "name": "finance-os",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Personal Investment Intelligence OS",
+  "type": "module",
+  "workspaces": [
+    "mcp-server"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace=mcp-server",
+    "test": "npm run test --workspace=mcp-server",
+    "lint": "npm run lint --workspace=mcp-server"
+  },
+  "license": "MIT"
+}

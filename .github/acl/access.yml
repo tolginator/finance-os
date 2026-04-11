@@ -1,0 +1,25 @@
+# Repository Access Management
+# See: https://github.com/probot/settings
+
+repository:
+  name: finance-os
+  description: Personal Investment Intelligence OS
+  private: false
+  has_issues: true
+  has_projects: true
+  has_wiki: false
+  default_branch: main
+
+collaborators:
+  - username: tolginator
+    permission: admin
+
+teams: []
+
+branches:
+  - name: main
+    protection:
+      required_pull_request_reviews:
+        required_approving_review_count: 1
+      enforce_admins: false
+      restrictions: null

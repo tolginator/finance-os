@@ -14,7 +14,7 @@ dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.24",
     "ruff>=0.8.0",
-    "mypy>=1.13",
+    "mypy>=1.20.0",
 ]
 quant = [
     "numpy>=2.0",

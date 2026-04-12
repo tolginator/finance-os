@@ -2,6 +2,8 @@
 
 from decimal import Decimal
 
+import pytest
+
 from src.agents.macro_regime import (
     IndicatorReading,
     MacroRegimeAgent,
@@ -144,6 +146,7 @@ class TestMacroRegimeAgent:
         assert "API key" in response.content
 
 
+@pytest.mark.integration
 class TestLiveFRED:
     """Live FRED API tests — skipped when API key is not configured."""
 

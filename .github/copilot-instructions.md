@@ -111,17 +111,36 @@ These rules exist because this is financial software. Violations produce incorre
 
 ### Running Tests
 
-- **MCP Server**: `cd mcp-server && npm test`
-- **Agents**: `cd agents && source .venv/bin/activate && pytest`
-- **Full suite**: `npm test` (from root, runs workspace tests)
+- **MCP Server (unit)**: `cd mcp-server && npm test`
+- **MCP Server (integration)**: `cd mcp-server && npm run test:integration`
+- **Agents (unit)**: `cd agents && source .venv/bin/activate && pytest -m "not integration"`
+- **Agents (integration)**: `cd agents && source .venv/bin/activate && pytest -m integration`
+- **Full suite (unit)**: `npm test` (from root, runs workspace tests)
 - **Python type checking**: `cd agents && source .venv/bin/activate && mypy src/`
 - **Linting**: `npm run lint` (root), `cd agents && source .venv/bin/activate && ruff check src/ tests/`
 
 > **Note**: Python requires a virtual environment. Set up once: `cd agents && python3 -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]"`
 
+### Unit vs Integration Tests
+
+Tests are split into **unit** (fast, no external deps) and **integration** (calls external APIs):
+
+| | Python | TypeScript |
+|---|---|---|
+| Unit files | `tests/*.py` | `tests/*.test.ts` |
+| Integration files | `tests/*.py` with `@pytest.mark.integration` | `tests/*.integration.test.ts` |
+| Run unit | `pytest -m "not integration"` | `npm test` |
+| Run integration | `pytest -m integration` | `npm run test:integration` |
+
+**Rules:**
+- Mark any test that calls an external service (FRED, EDGAR, etc.) with `@pytest.mark.integration` (Python) or place it in a `*.integration.test.ts` file (TypeScript).
+- Integration tests must **skip gracefully** when credentials are missing (use the `fred_api_key` fixture or similar).
+- CI runs unit tests on every PR. Integration tests run only on pushes to `main`.
+- `npm run preflight` runs unit tests only.
+
 ### Pre-Push Preflight
 
-**Always run `npm run preflight` from the repo root before pushing.** This mirrors CI exactly: build → test → lint (TypeScript), then ruff → pytest (Python). A push that fails CI is a wasted round-trip. Fix locally first.
+**Always run `npm run preflight` from the repo root before pushing.** This mirrors CI: build → unit test → lint (TypeScript), then ruff → unit pytest (Python). A push that fails CI is a wasted round-trip. Fix locally first.
 
 ```bash
 npm run preflight   # must pass before every push

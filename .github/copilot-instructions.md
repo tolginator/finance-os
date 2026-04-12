@@ -275,6 +275,7 @@ finance-os/
 │   │   ├── core/                   # Agent base, orchestrator, memory
 │   │   ├── agents/                 # Domain-specific agents
 │   │   ├── application/            # Shared contracts, LLM gateway, services
+│   │   ├── cli/                    # CLI entry points (finance-os command)
 │   │   ├── tools/                  # Quant tools
 │   │   └── pipelines/             # Data ingestion pipelines
 │   └── tests/

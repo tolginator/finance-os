@@ -95,10 +95,12 @@ These rules exist because this is financial software. Violations produce incorre
 ### Running Tests
 
 - **MCP Server**: `cd mcp-server && npm test`
-- **Agents**: `cd agents && pytest`
+- **Agents**: `cd agents && source .venv/bin/activate && pytest`
 - **Full suite**: `npm test` (from root, runs workspace tests)
-- **Python type checking**: `cd agents && mypy src/`
-- **Linting**: `npm run lint` (root), `cd agents && ruff check src/ tests/`
+- **Python type checking**: `cd agents && source .venv/bin/activate && mypy src/`
+- **Linting**: `npm run lint` (root), `cd agents && source .venv/bin/activate && ruff check src/ tests/`
+
+> **Note**: Python requires a virtual environment. Set up once: `cd agents && python3 -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]"`
 
 ### Pre-Push Preflight
 

@@ -28,7 +28,6 @@ from src.application.contracts.agents import (
     SearchFilingsRequest,
     SearchFilingsResponse,
 )
-from src.application.llm.gateway import LLMGateway
 from src.core.agent import AgentResponse, BaseAgent
 
 
@@ -38,18 +37,16 @@ def _metadata_get(metadata: dict[str, Any], key: str, default: Any = "") -> Any:
 
 
 class AgentService:
-    """Invokes agents with validated contracts and optional LLM synthesis.
+    """Invokes agents with validated contracts.
 
     Each method:
     1. Validates the Pydantic request
     2. Maps fields to agent kwargs
     3. Runs the agent
     4. Normalizes the response into a typed contract
-    5. Optionally synthesizes via LLM gateway
     """
 
-    def __init__(self, gateway: LLMGateway | None = None) -> None:
-        self._gateway = gateway
+    def __init__(self) -> None:
         self._agents: dict[str, BaseAgent] = {}
 
     def _get_or_create(self, agent_cls: type[BaseAgent], *args: Any) -> BaseAgent:
@@ -110,7 +107,8 @@ class AgentService:
             kwargs["ticker"] = request.ticker
         if request.cik:
             kwargs["cik"] = request.cik
-        prompt = f"Search filings for {request.ticker or request.cik}"
+        query_target = request.ticker or request.cik
+        prompt = f"Search filings for {query_target}" if query_target else ""
         response = await agent.run(prompt, **kwargs)
         return SearchFilingsResponse(
             content=response.content,
@@ -140,7 +138,7 @@ class AgentService:
         response = await agent.run("Generate composite signals", **kwargs)
         return GenerateSignalsResponse(
             content=response.content,
-            agent=_metadata_get(response.metadata, "agent", "quant-signal"),
+            agent=_metadata_get(response.metadata, "agent", "quant_signal"),
             composite=_metadata_get(response.metadata, "composite", {}),
             signals=_metadata_get(response.metadata, "signals", []),
         )

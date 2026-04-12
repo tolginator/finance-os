@@ -45,18 +45,17 @@ class PipelineService:
         """
         tasks: list[AgentTask] = []
         for task_def in request.tasks:
-            agent_name = task_def.get("agent_name", "")
-            agent = self._orchestrator.get_agent(agent_name)
+            agent = self._orchestrator.get_agent(task_def.agent_name)
             if agent is None:
                 continue
 
             task = AgentTask(
                 agent=agent,
-                prompt=task_def.get("prompt", ""),
-                kwargs=task_def.get("kwargs", {}),
-                priority=task_def.get("priority", 0),
-                depends_on=task_def.get("depends_on", []),
-                task_id=task_def.get("task_id"),
+                prompt=task_def.prompt,
+                kwargs=task_def.kwargs,
+                priority=task_def.priority,
+                depends_on=task_def.depends_on,
+                task_id=task_def.task_id or None,
             )
             tasks.append(task)
 
@@ -76,15 +75,23 @@ class PipelineService:
 
         memo = None
         if ticker and date:
-            research_memo = self._orchestrator.generate_memo(
-                ticker, date, pipeline_result.results
-            )
+            memo_sections: dict[str, str] = {}
+            for r in pipeline_result.results:
+                if not r.success:
+                    continue
+                section_key = r.task_id or r.agent_name
+                if section_key in memo_sections:
+                    section_key = f"{section_key} ({r.agent_name})"
+                memo_sections[section_key] = r.response.content
+
+            sources = [r.agent_name for r in pipeline_result.results if r.success]
+            analyzed = ", ".join(sources) if sources else "none"
             memo = {
-                "ticker": research_memo.ticker,
-                "date": research_memo.date,
-                "sections": research_memo.sections,
-                "sources": research_memo.sources,
-                "summary": research_memo.summary,
+                "ticker": ticker,
+                "date": date,
+                "sections": memo_sections,
+                "sources": sources,
+                "summary": f"Research memo for {ticker} on {date}. Analyzed by: {analyzed}.",
             }
 
         return RunPipelineResponse(

@@ -93,7 +93,7 @@ class GenerateSignalsResponse(BaseModel):
     """Composite signal results."""
 
     content: str = Field(description="Human-readable signal report")
-    agent: str = Field(default="quant-signal", description="Agent that produced signals")
+    agent: str = Field(default="quant_signal", description="Agent that produced signals")
     composite: dict = Field(default_factory=dict, description="Composite score details")
     signals: list[dict] = Field(default_factory=list, description="Individual signal details")
 
@@ -173,11 +173,28 @@ class ChallengeThesisResponse(BaseModel):
 # --- Pipeline ---
 
 
+class TaskDefinition(BaseModel):
+    """Definition for a single pipeline task."""
+
+    agent_name: str = Field(min_length=1, description="Agent name to execute")
+    prompt: str = Field(default="", description="Prompt text passed to the agent")
+    kwargs: dict[str, object] = Field(
+        default_factory=dict,
+        description="Additional keyword arguments passed to the agent",
+    )
+    priority: int = Field(default=0, description="Scheduling priority for the task")
+    depends_on: list[str] = Field(
+        default_factory=list,
+        description="Task IDs that must complete before this task runs",
+    )
+    task_id: str = Field(default="", description="Unique task identifier")
+
+
 class RunPipelineRequest(BaseModel):
     """Request to run a multi-agent orchestrated pipeline."""
 
-    tasks: list[dict] = Field(
-        description="Task dicts with agent_name, prompt, kwargs, priority, depends_on, task_id",
+    tasks: list[TaskDefinition] = Field(
+        description="Task definitions for the pipeline",
     )
 
 
@@ -199,7 +216,7 @@ class RunDigestRequest(BaseModel):
 
     tickers: list[str] = Field(description="Watchlist tickers")
     lookback_days: int = Field(default=7, description="Days of data to consider")
-    alert_threshold: float = Field(default=0.5, description="Materiality threshold")
+    alert_threshold: Decimal = Field(default=Decimal("0.5"), description="Materiality threshold")
     sources: list[dict] = Field(
         default_factory=list,
         description="Pre-loaded DataSource dicts. If empty, pipeline runs with no sources.",

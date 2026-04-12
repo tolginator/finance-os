@@ -31,3 +31,7 @@ param principalId = ''
 
 // Principal type: 'User' for interactive, 'ServicePrincipal' for CI/CD.
 param principalType = 'User'
+
+// CI managed identity name and GitHub repository for OIDC federation.
+param ciIdentityName = 'finance-os-ci'
+param gitHubRepo = 'tolginator/finance-os'

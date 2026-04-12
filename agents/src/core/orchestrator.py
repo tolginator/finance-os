@@ -18,6 +18,12 @@ class AgentTask:
     kwargs: dict[str, Any] = field(default_factory=dict)
     priority: int = 0
     depends_on: list[str] = field(default_factory=list)
+    task_id: str | None = None
+
+    @property
+    def id(self) -> str:
+        """Unique task identifier. Falls back to agent name for backwards compat."""
+        return self.task_id if self.task_id is not None else self.agent.name
 
 
 @dataclass
@@ -29,6 +35,7 @@ class AgentResult:
     duration_ms: int
     success: bool
     error: str | None = None
+    task_id: str | None = None
 
 
 @dataclass
@@ -107,6 +114,7 @@ class Orchestrator:
                 response=response,
                 duration_ms=elapsed,
                 success=True,
+                task_id=task.id,
             )
         except Exception as exc:  # noqa: BLE001
             elapsed = int((time.monotonic() - start) * 1000)
@@ -116,6 +124,7 @@ class Orchestrator:
                 duration_ms=elapsed,
                 success=False,
                 error=str(exc),
+                task_id=task.id,
             )
 
     async def run_pipeline(self, tasks: list[AgentTask]) -> PipelineResult:
@@ -124,6 +133,7 @@ class Orchestrator:
         Tasks with no dependencies run first (ordered by priority desc).
         Tasks with dependencies wait for their dependencies to complete.
         Failed dependencies cause dependent tasks to fail with an error message.
+        Dependencies reference task IDs (or agent names for backwards compat).
 
         Args:
             tasks: List of agent tasks to execute.
@@ -157,8 +167,9 @@ class Orchestrator:
                             error=(
                                 f"Dependency failed: {', '.join(failed_deps)}"
                             ),
+                            task_id=task.id,
                         )
-                        completed[task.agent.name] = result
+                        completed[task.id] = result
                         all_results.append(result)
                         continue
                     ready.append(task)
@@ -174,8 +185,9 @@ class Orchestrator:
                         duration_ms=0,
                         success=False,
                         error="Unresolvable dependency",
+                        task_id=task.id,
                     )
-                    completed[task.agent.name] = result
+                    completed[task.id] = result
                     all_results.append(result)
                 break
 
@@ -186,8 +198,9 @@ class Orchestrator:
             batch_results = await asyncio.gather(
                 *(self.run_task(t) for t in ready)
             )
-            for result in batch_results:
-                completed[result.agent_name] = result
+            for idx, result in enumerate(batch_results):
+                task_id = ready[idx].id
+                completed[task_id] = result
                 all_results.append(result)
 
             remaining = blocked

@@ -7,6 +7,9 @@ license = {text = "MIT"}
 dependencies = [
     "anthropic>=0.94.0",
     "openai>=2.31.0",
+    "pydantic>=2.11",
+    "pydantic-settings>=2.9",
+    "litellm>=1.72",
 ]
 
 [project.optional-dependencies]

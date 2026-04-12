@@ -9,7 +9,7 @@ All agents extend `BaseAgent` in `agents/src/core/agent.py`, which defines:
 
 ### Current state: no LLM calls
 
-Agents currently perform deterministic data processing (regex, heuristics, statistics) and construct prompts, but **do not call an LLM directly**. This is by design for the MCP path, where the host LLM (Copilot, Claude Desktop) does the reasoning. For the CLI and future web paths, the **LLM gateway** in the application layer will handle inference — see [architecture.md](architecture.md#llm-gateway).
+Agents currently perform deterministic data processing (regex, heuristics, statistics) and construct prompts, but **do not call an LLM directly**. This is by design for the MCP path, where the host LLM (Copilot, Claude Desktop) does the reasoning. For the CLI and future web paths, the **LLM gateway** in the application layer handles inference — see [architecture.md](architecture.md#llm-gateway).
 
 ## Agent Catalog
 
@@ -28,10 +28,19 @@ Agents currently perform deterministic data processing (regex, heuristics, stati
 The `Orchestrator` (`agents/src/core/orchestrator.py`) coordinates agents:
 
 - **Agent registry** — register and discover agents by name
-- **Dependency-aware pipeline** — tasks declare dependencies; independent tasks run in parallel via `asyncio.gather`
+- **Task identity** — tasks have explicit `task_id` (falls back to agent name), enabling the same agent to run multiple times in a pipeline
+- **Dependency-aware pipeline** — tasks declare dependencies by task ID; independent tasks run in parallel via `asyncio.gather`
 - **Priority ordering** — higher-priority tasks execute first within each dependency level
 - **Graceful failure** — failed tasks don't crash the pipeline; dependent tasks get error messages
 - **Research memos** — aggregate agent outputs into structured memos with sections and source attribution
+
+### Application Services
+
+The application layer (`agents/src/application/services/`) provides typed wrappers:
+
+- **`AgentService`** — maps Pydantic request/response contracts to agent `run()` calls. Validates inputs, normalizes metadata, and caches agent instances.
+- **`PipelineService`** — wraps orchestrator with task definitions from typed contracts, optional memo generation.
+- **`DigestService`** — wraps research pipeline with typed I/O and formatted output.
 
 ## Vector Memory
 

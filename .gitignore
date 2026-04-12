@@ -37,6 +37,11 @@ Thumbs.db
 .env.local
 .env.*.local
 
+# Config files with secrets (config lives at ~/.config/finance-os/)
+config.json
+*.secret
+*.key
+
 # Test coverage
 coverage/
 htmlcov/

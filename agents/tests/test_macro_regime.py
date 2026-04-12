@@ -142,3 +142,21 @@ class TestMacroRegimeAgent:
         agent = MacroRegimeAgent()
         response = await agent.run("analyze")
         assert "API key" in response.content
+
+
+class TestLiveFRED:
+    """Live FRED API tests — skipped when API key is not configured."""
+
+    async def test_fetch_single_series(self, fred_api_key: str) -> None:
+        from src.agents.macro_regime import fetch_fred_series
+
+        observations = fetch_fred_series("UNRATE", fred_api_key, limit=3)
+        assert len(observations) > 0
+        assert "date" in observations[0]
+        assert "value" in observations[0]
+
+    async def test_agent_run_produces_regime(self, fred_api_key: str) -> None:
+        agent = MacroRegimeAgent(fred_api_key=fred_api_key)
+        response = await agent.run("classify current macro regime", indicators=["UNRATE"])
+        assert response.metadata["regime"] in ("EXPANSION", "CONTRACTION", "TRANSITION")
+        assert "nemployment rate" in response.content

@@ -39,7 +39,7 @@
 |---|---|
 | MCP Server (data tools) | TypeScript, Node.js, `@modelcontextprotocol/sdk` |
 | MCP Server (agents) | Python, `mcp` SDK (planned) |
-| Application Layer | Python, Pydantic, litellm (planned) |
+| Application Layer | Python, Pydantic 2.11+, pydantic-settings 2.9+, litellm 1.72+ |
 | Agents | Python 3.12+, NumPy, pandas, scipy |
 | Vector DB | ChromaDB (local) |
 | LLM Gateway | Pluggable — OpenAI, Anthropic, ollama, or host LLM via MCP |
@@ -52,16 +52,16 @@
 
 ## LLM Gateway
 
-The LLM gateway is a first-class component in the application layer, not a bolt-on. It resolves the fundamental question: *who does the LLM reasoning?*
+The LLM gateway is a first-class component in the application layer. It resolves the fundamental question: *who does the LLM reasoning?*
 
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                   Application Layer                      │
 │                                                          │
 │  contracts/     Pydantic request/response models         │
-│  llm/           Pluggable inference client               │
-│  services/      Agent invocation, orchestration           │
-│  config/        Provider selection, model routing          │
+│  llm/           LLMProvider protocol + implementations   │
+│  services/      AgentService, PipelineService, Digest    │
+│  config.py      AppConfig (FINANCE_OS_* env vars)        │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -113,13 +113,22 @@ The TypeScript MCP server exposes investment **data tools** to LLMs via the Mode
 
 Entry point: `src/index.ts` registers all tools and starts the server on stdio transport.
 
-### Application Layer (`agents/src/application/`, planned)
+### Application Layer (`agents/src/application/`)
 
-The shared core that all interfaces wrap. Contains:
-- **Contracts** — Pydantic request/response models for every agent operation
-- **LLM gateway** — pluggable inference client with provider routing
-- **Services** — agent invocation, orchestration coordination, pipeline triggers
-- **Config** — provider selection, model routing, API key management
+The shared core that all interfaces wrap. Implemented as:
+
+- **Contracts** (`contracts/agents.py`) — Pydantic request/response models for every agent operation (9 request/response pairs covering all 7 agents, pipeline, and digest). Models match actual agent capabilities.
+- **LLM Gateway** (`llm/`) — pluggable inference via `LLMProvider` protocol:
+  - `LiteLLMProvider` — multi-provider routing (OpenAI, Anthropic, ollama, etc.)
+  - `MockProvider` — deterministic responses for testing
+  - `SkipProvider` — MCP path where host LLM reasons
+  - `LLMGateway` — routes requests, `synthesize()` for agent output → narrative
+  - `create_gateway()` — factory for creating configured gateways
+- **Services** (`services/`) — typed wrappers over agents:
+  - `AgentService` — maps Pydantic contracts to agent `run()` calls with normalization
+  - `PipelineService` — wraps orchestrator with task_id support and memo generation
+  - `DigestService` — wraps research pipeline with typed I/O
+- **Config** (`config.py`) — `AppConfig` via pydantic-settings, environment variables with `FINANCE_OS_` prefix
 
 CLI, Python MCP server, and future Web API are thin wrappers over this layer.
 
@@ -130,7 +139,7 @@ Domain-tuned Python agents built on a shared `BaseAgent` ABC (`src/core/agent.py
 - An async `run()` method for execution
 - Access to conversation history
 
-The orchestrator (`src/core/orchestrator.py`) coordinates agents via dependency-aware pipelines with priority ordering and parallel execution.
+The orchestrator (`src/core/orchestrator.py`) coordinates agents via dependency-aware pipelines with priority ordering and parallel execution. Tasks are identified by `task_id` (or agent name for backwards compatibility), enabling the same agent to run multiple times in a single pipeline.
 
 The vector memory layer (`src/core/memory.py`) provides ChromaDB-backed RAG for document retrieval with metadata filtering.
 
@@ -153,6 +162,15 @@ Shared prompt templates organized by strategy:
 | 0 | Repository foundation, MCP server, agent framework | ✅ Complete |
 | 1 | Core tools and agents (SEC, earnings, macro, quant, portfolio) | ✅ Complete |
 | 2 | Intelligence layer (thesis, risk, adversarial, orchestrator, pipeline) | ✅ Complete |
-| 3 | Integration layer (application layer + LLM gateway, CLI, Python MCP, Skills) | 🔜 Next |
+| 3 | Integration layer (application layer + LLM gateway, CLI, Python MCP, Skills) | 🔧 In Progress |
 | 4 | Advanced (knowledge graph, alt data, fine-tuning) — Copilot-first | Planned |
 | 5 | Web layer (FastAPI + Web UI) — after Copilot CLI is mostly complete | Planned |
+
+### Phase 3 Progress
+
+| Component | Issue | Status |
+|---|---|---|
+| Application layer (contracts, LLM gateway, services, config) | #49 | ✅ Complete |
+| Agent CLI | #50 | Next |
+| Python MCP server | #51 | Next |
+| Copilot Skills | #53 | Blocked on #50, #51 |

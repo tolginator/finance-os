@@ -1,0 +1,61 @@
+"""Tests for application config."""
+
+import json
+
+from src.application.config import CONFIG_DIR, CONFIG_FILE, AppConfig
+
+
+class TestAppConfig:
+    def test_defaults(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(
+            "src.application.config.CONFIG_FILE", tmp_path / "nonexistent.json"
+        )
+        config = AppConfig()
+        assert config.llm_provider == "skip"
+        assert config.llm_default_model == "gpt-4o"
+        assert config.llm_temperature == 0.0
+        assert config.fred_api_key == ""
+
+    def test_env_override(self, monkeypatch):
+        monkeypatch.setenv("FINANCE_OS_LLM_PROVIDER", "litellm")
+        monkeypatch.setenv("FINANCE_OS_LLM_DEFAULT_MODEL", "claude-sonnet-4")
+        config = AppConfig()
+        assert config.llm_provider == "litellm"
+        assert config.llm_default_model == "claude-sonnet-4"
+
+    def test_fred_api_key_from_env(self, monkeypatch):
+        monkeypatch.setenv("FINANCE_OS_FRED_API_KEY", "test-key-123")
+        config = AppConfig()
+        assert config.fred_api_key == "test-key-123"
+
+    def test_config_file_loads(self, tmp_path, monkeypatch):
+        cfg = {"fred_api_key": "file-key-456", "llm_provider": "litellm"}
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text(json.dumps(cfg))
+        monkeypatch.setattr("src.application.config.CONFIG_FILE", cfg_file)
+        config = AppConfig()
+        assert config.fred_api_key == "file-key-456"
+        assert config.llm_provider == "litellm"
+
+    def test_env_overrides_config_file(self, tmp_path, monkeypatch):
+        cfg = {"fred_api_key": "file-key", "llm_provider": "litellm"}
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text(json.dumps(cfg))
+        monkeypatch.setattr("src.application.config.CONFIG_FILE", cfg_file)
+        monkeypatch.setenv("FINANCE_OS_FRED_API_KEY", "env-key")
+        config = AppConfig()
+        assert config.fred_api_key == "env-key"
+        assert config.llm_provider == "litellm"
+
+    def test_missing_config_file_uses_defaults(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(
+            "src.application.config.CONFIG_FILE", tmp_path / "nonexistent.json"
+        )
+        config = AppConfig()
+        assert config.fred_api_key == ""
+        assert config.llm_provider == "skip"
+
+    def test_config_dir_location(self):
+        assert CONFIG_DIR.name == "finance-os"
+        assert CONFIG_DIR.parent.name == ".config"
+        assert CONFIG_FILE.name == "config.json"

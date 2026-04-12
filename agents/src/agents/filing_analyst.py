@@ -7,16 +7,36 @@ and capex from 10-K/10-Q filings.
 
 import json
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 from typing import Any
 
 from src.core.agent import AgentResponse, BaseAgent
 
-# SEC EDGAR requires a User-Agent with contact info
-EDGAR_USER_AGENT = "finance-os/0.1.0 (https://github.com/tolginator/finance-os)"
+# SEC EDGAR requires a User-Agent with app name and contact email
 EDGAR_BASE_URL = "https://efts.sec.gov/LATEST"
 EDGAR_FILINGS_URL = "https://data.sec.gov/submissions"
+EDGAR_TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
+
+
+def _edgar_user_agent() -> str:
+    """Build the User-Agent string for SEC EDGAR requests.
+
+    SEC requires format: 'AppName (contact@email.com)'.
+    Reads email from AppConfig; falls back to a placeholder.
+    """
+    try:
+        from src.application.config import AppConfig
+        email = AppConfig().sec_edgar_email
+    except Exception:  # noqa: BLE001
+        email = ""
+    if not email:
+        return "finance-os/0.1.0"
+    return f"finance-os/0.1.0 ({email})"
+
+# Module-level cache for ticker→CIK mapping
+_ticker_cik_cache: dict[str, str] = {}
 
 
 @dataclass
@@ -28,6 +48,50 @@ class Filing:
     filing_date: str
     primary_document: str
     description: str
+
+
+def _load_ticker_map() -> dict[str, str]:
+    """Load SEC's ticker→CIK mapping (cached after first call).
+
+    Returns:
+        Dict mapping uppercase ticker symbols to CIK strings.
+    """
+    global _ticker_cik_cache  # noqa: PLW0603
+    if _ticker_cik_cache:
+        return _ticker_cik_cache
+
+    url = EDGAR_TICKERS_URL
+    req = urllib.request.Request(url, headers={"User-Agent": _edgar_user_agent()})
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            raw = resp.read()
+            try:
+                text = raw.decode("utf-8")
+            except UnicodeDecodeError:
+                import gzip
+                text = gzip.decompress(raw).decode("utf-8")
+            data = json.loads(text)
+        for entry in data.values():
+            ticker = entry.get("ticker", "").upper()
+            cik = str(entry.get("cik_str", ""))
+            if ticker and cik:
+                _ticker_cik_cache[ticker] = cik
+    except (urllib.error.URLError, json.JSONDecodeError, AttributeError, OSError):
+        pass
+    return _ticker_cik_cache
+
+
+def resolve_cik(ticker: str) -> str:
+    """Resolve a stock ticker to its SEC CIK number.
+
+    Args:
+        ticker: Stock ticker symbol (e.g., 'AAPL').
+
+    Returns:
+        CIK string if found, empty string otherwise.
+    """
+    ticker_map = _load_ticker_map()
+    return ticker_map.get(ticker.upper(), "")
 
 
 def search_company(query: str) -> list[dict[str, Any]]:
@@ -45,7 +109,7 @@ def search_company(query: str) -> list[dict[str, Any]]:
         f"?q={encoded_query}"
         "&dateRange=custom&startdt=2020-01-01&forms=10-K,10-Q"
     )
-    req = urllib.request.Request(url, headers={"User-Agent": EDGAR_USER_AGENT})
+    req = urllib.request.Request(url, headers={"User-Agent": _edgar_user_agent()})
     try:
         with urllib.request.urlopen(req, timeout=15) as resp:
             data = json.loads(resp.read().decode())
@@ -66,7 +130,7 @@ def get_company_filings(cik: str, form_types: list[str] | None = None) -> list[F
     """
     padded_cik = cik.zfill(10)
     url = f"{EDGAR_FILINGS_URL}/CIK{padded_cik}.json"
-    req = urllib.request.Request(url, headers={"User-Agent": EDGAR_USER_AGENT})
+    req = urllib.request.Request(url, headers={"User-Agent": _edgar_user_agent()})
 
     try:
         with urllib.request.urlopen(req, timeout=15) as resp:
@@ -114,7 +178,7 @@ def fetch_filing_text(cik: str, accession_number: str, document: str) -> str:
     padded_cik = cik.zfill(10)
     acc_clean = accession_number.replace("-", "")
     url = f"https://www.sec.gov/Archives/edgar/data/{padded_cik}/{acc_clean}/{document}"
-    req = urllib.request.Request(url, headers={"User-Agent": EDGAR_USER_AGENT})
+    req = urllib.request.Request(url, headers={"User-Agent": _edgar_user_agent()})
 
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
@@ -196,6 +260,10 @@ class FilingAnalystAgent(BaseAgent):
         ticker = kwargs.get("ticker", "")
         cik = kwargs.get("cik", "")
         form_type = kwargs.get("form_type", "10-K")
+
+        # Auto-resolve ticker to CIK if ticker is provided without CIK
+        if ticker and not cik:
+            cik = resolve_cik(ticker)
 
         # If we have a CIK, fetch filings directly
         if cik:

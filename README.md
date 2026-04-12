@@ -70,11 +70,28 @@ Create `~/.config/finance-os/config.json`:
 {
   "fred_api_key": "your-fred-api-key",
   "llm_provider": "skip",
-  "llm_default_model": "gpt-4o"
+  "sec_edgar_email": "your-email@example.com",
+  "azure": {
+    "endpoint": "",
+    "deployment": "",
+    "api_version": "2024-10-21"
+  }
 }
 ```
 
-Environment variables (`FINANCE_OS_*`) override config file values. See [docs/architecture.md](docs/architecture.md) for details.
+Environment variables (`FINANCE_OS_*`) override config file values — use double underscore for nested fields (e.g. `FINANCE_OS_AZURE__ENDPOINT`). See [docs/architecture.md](docs/architecture.md) for details.
+
+| Field | Values | Description |
+|-------|--------|-------------|
+| `llm_provider` | `"skip"` (default), `"azure_openai"` | `skip` returns raw agent data without LLM synthesis — ideal for the MCP path where Copilot/Claude reasons over the output. `azure_openai` enables LLM synthesis via Azure OpenAI with Entra ID (OAuth2/OIDC) authentication — no API keys required. |
+| `azure.endpoint` | URL string | Azure OpenAI resource endpoint (e.g. `https://my-instance.openai.azure.com`). Required when provider is `"azure_openai"`. |
+| `azure.deployment` | Deployment name | Azure OpenAI model deployment name (e.g. `gpt-4o`). This is the deployment you created in Azure AI Studio. Required when provider is `"azure_openai"`. |
+| `azure.api_version` | API version string | Azure OpenAI API version. Default `"2024-10-21"`. |
+| `llm_temperature` | `0.0`–`2.0` | Sampling temperature for LLM calls. Default `0.0` (deterministic). |
+| `fred_api_key` | API key string | [FRED API](https://fred.stlouisfed.org/docs/api/api_key.html) key for the macro-regime agent. Free to obtain. |
+| `sec_edgar_email` | Email address | **Required for SEC API access.** SEC requires a valid contact email in request headers — set this to a real email you control. |
+
+> **Azure authentication**: Uses `DefaultAzureCredential` which supports Azure CLI (`az login`), managed identity, workload identity, and environment credentials. No API keys are stored in config. Requires the `Cognitive Services OpenAI User` RBAC role on the Azure OpenAI resource. See the [Azure Deployment Guide](docs/azure-deployment.md) for step-by-step setup.
 
 ### Agent CLI
 

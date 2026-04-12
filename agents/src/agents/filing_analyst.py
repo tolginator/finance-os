@@ -7,6 +7,7 @@ and capex from 10-K/10-Q filings.
 
 import json
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 from typing import Any
@@ -17,6 +18,10 @@ from src.core.agent import AgentResponse, BaseAgent
 EDGAR_USER_AGENT = "finance-os/0.1.0 (https://github.com/tolginator/finance-os)"
 EDGAR_BASE_URL = "https://efts.sec.gov/LATEST"
 EDGAR_FILINGS_URL = "https://data.sec.gov/submissions"
+EDGAR_TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
+
+# Module-level cache for ticker→CIK mapping
+_ticker_cik_cache: dict[str, str] = {}
 
 
 @dataclass
@@ -28,6 +33,44 @@ class Filing:
     filing_date: str
     primary_document: str
     description: str
+
+
+def _load_ticker_map() -> dict[str, str]:
+    """Load SEC's ticker→CIK mapping (cached after first call).
+
+    Returns:
+        Dict mapping uppercase ticker symbols to CIK strings.
+    """
+    global _ticker_cik_cache  # noqa: PLW0603
+    if _ticker_cik_cache:
+        return _ticker_cik_cache
+
+    url = EDGAR_TICKERS_URL
+    req = urllib.request.Request(url, headers={"User-Agent": EDGAR_USER_AGENT})
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read().decode())
+        for entry in data.values():
+            ticker = entry.get("ticker", "").upper()
+            cik = str(entry.get("cik_str", ""))
+            if ticker and cik:
+                _ticker_cik_cache[ticker] = cik
+    except (urllib.error.URLError, json.JSONDecodeError, AttributeError):
+        pass
+    return _ticker_cik_cache
+
+
+def resolve_cik(ticker: str) -> str:
+    """Resolve a stock ticker to its SEC CIK number.
+
+    Args:
+        ticker: Stock ticker symbol (e.g., 'AAPL').
+
+    Returns:
+        CIK string if found, empty string otherwise.
+    """
+    ticker_map = _load_ticker_map()
+    return ticker_map.get(ticker.upper(), "")
 
 
 def search_company(query: str) -> list[dict[str, Any]]:
@@ -196,6 +239,10 @@ class FilingAnalystAgent(BaseAgent):
         ticker = kwargs.get("ticker", "")
         cik = kwargs.get("cik", "")
         form_type = kwargs.get("form_type", "10-K")
+
+        # Auto-resolve ticker to CIK if ticker is provided without CIK
+        if ticker and not cik:
+            cik = resolve_cik(ticker)
 
         # If we have a CIK, fetch filings directly
         if cik:

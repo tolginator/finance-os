@@ -46,7 +46,7 @@
 | Data Sources | SEC EDGAR (free), FRED (free API key), Yahoo Finance, QIF |
 | CLI | Python (`python -m agents.cli`, planned) |
 | Copilot Skills | Markdown workflow definitions (`.github/skills/`, planned) |
-| Testing | Vitest (TypeScript), pytest (Python) |
+| Testing | Vitest (TypeScript), pytest with markers (Python) — unit and integration separated |
 | Linting | ESLint (TypeScript), ruff (Python) |
 | CI/CD | GitHub Actions |
 
@@ -61,7 +61,7 @@ The LLM gateway is a first-class component in the application layer. It resolves
 │  contracts/     Pydantic request/response models         │
 │  llm/           LLMProvider protocol + implementations   │
 │  services/      AgentService, PipelineService, Digest    │
-│  config.py      AppConfig (FINANCE_OS_* env vars)        │
+│  config.py      AppConfig (config file + FINANCE_OS_* env vars)  │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -120,15 +120,14 @@ The shared core that all interfaces wrap. Implemented as:
 - **Contracts** (`contracts/agents.py`) — Pydantic request/response models for every agent operation (9 request/response pairs covering all 7 agents, pipeline, and digest). Models match actual agent capabilities.
 - **LLM Gateway** (`llm/`) — pluggable inference via `LLMProvider` protocol:
   - `LiteLLMProvider` — multi-provider routing (OpenAI, Anthropic, ollama, etc.)
-  - `MockProvider` — deterministic responses for testing
   - `SkipProvider` — MCP path where host LLM reasons
   - `LLMGateway` — routes requests, `synthesize()` for agent output → narrative
-  - `create_gateway()` — factory for creating configured gateways
+  - `create_gateway()` — factory for creating configured gateways ("skip", "litellm")
 - **Services** (`services/`) — typed wrappers over agents:
-  - `AgentService` — maps Pydantic contracts to agent `run()` calls with normalization
+  - `AgentService` — maps Pydantic request/response contracts to agent `run()` calls. Validates inputs, normalizes metadata, and caches agent instances.
   - `PipelineService` — wraps orchestrator with task_id support and memo generation
   - `DigestService` — wraps research pipeline with typed I/O
-- **Config** (`config.py`) — `AppConfig` via pydantic-settings, environment variables with `FINANCE_OS_` prefix
+- **Config** (`config.py`) — `AppConfig` via pydantic-settings. Loads from `~/.config/finance-os/config.json` (user settings) and `FINANCE_OS_*` environment variables (highest priority).
 
 CLI, Python MCP server, and future Web API are thin wrappers over this layer.
 

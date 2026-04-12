@@ -11,6 +11,7 @@ dependencies = [
     "pydantic-settings>=2.9",
     "azure-identity>=1.19",
     "aiohttp>=3.11",
+    "mcp>=1.27.0",
 ]
 
 [project.optional-dependencies]
@@ -27,6 +28,7 @@ dev = [
 
 [project.scripts]
 finance-os = "src.cli.main:main"
+finance-os-mcp = "src.mcp_server:main"
 
 [build-system]
 requires = ["hatchling"]

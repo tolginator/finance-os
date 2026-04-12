@@ -2,7 +2,7 @@
 //
 // Deploys:
 //   1. Azure OpenAI (Cognitive Services) with Entra-only auth (API keys disabled)
-//   2. Model deployment (e.g. gpt-4o)
+//   2. Model deployment (e.g. gpt-4o-mini)
 //   3. RBAC role assignment for the specified principal
 //
 // Usage:
@@ -26,13 +26,13 @@ param openAiAccountName string
 param openAiSku string = 'S0'
 
 @description('Model to deploy (e.g. gpt-4o, gpt-4o-mini).')
-param modelName string = 'gpt-4o'
+param modelName string = 'gpt-4o-mini'
 
 @description('Model version to deploy.')
-param modelVersion string = '2024-11-20'
+param modelVersion string = '2024-07-18'
 
 @description('Deployment name — this is the value for azure.deployment in config.json.')
-param deploymentName string = 'gpt-4o'
+param deploymentName string = 'gpt-4o-mini'
 
 @description('Deployment capacity in thousands of tokens per minute.')
 param deploymentCapacity int = 10

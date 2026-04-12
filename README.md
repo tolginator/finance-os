@@ -85,7 +85,7 @@ Environment variables (`FINANCE_OS_*`) override config file values — use doubl
 |-------|--------|-------------|
 | `llm_provider` | `"skip"` (default), `"azure_openai"` | `skip` returns raw agent data without LLM synthesis — ideal for the MCP path where Copilot/Claude reasons over the output. `azure_openai` enables LLM synthesis via Azure OpenAI with Entra ID (OAuth2/OIDC) authentication — no API keys required. |
 | `azure.endpoint` | URL string | Azure OpenAI resource endpoint (e.g. `https://my-instance.openai.azure.com`). Required when provider is `"azure_openai"`. |
-| `azure.deployment` | Deployment name | Azure OpenAI model deployment name (e.g. `gpt-4o`). This is the deployment you created in Azure AI Studio. Required when provider is `"azure_openai"`. |
+| `azure.deployment` | Deployment name | Azure OpenAI model deployment name (e.g. `gpt-4o-mini`). This is the deployment you created in Azure AI Studio. Required when provider is `"azure_openai"`. |
 | `azure.api_version` | API version string | Azure OpenAI API version. Default `"2024-10-21"`. |
 | `llm_temperature` | `0.0`–`2.0` | Sampling temperature for LLM calls. Default `0.0` (deterministic). |
 | `fred_api_key` | API key string | [FRED API](https://fred.stlouisfed.org/docs/api/api_key.html) key for the macro-regime agent. Free to obtain. |

@@ -13,11 +13,11 @@ using 'main.bicep'
 param openAiAccountName = ''
 
 // Model to deploy and its version.
-param modelName = 'gpt-4o'
-param modelVersion = '2024-11-20'
+param modelName = 'gpt-4o-mini'
+param modelVersion = '2024-07-18'
 
 // Deployment name — this becomes the azure.deployment value in config.json.
-param deploymentName = 'gpt-4o'
+param deploymentName = 'gpt-4o-mini'
 
 // Capacity in thousands of tokens per minute.
 param deploymentCapacity = 10

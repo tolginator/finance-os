@@ -64,9 +64,9 @@ The defaults work for everything else, but you can customize:
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `openAiAccountName` | *(required)* | Globally unique name for the Azure OpenAI resource |
-| `modelName` | `gpt-4o` | OpenAI model to deploy |
+| `modelName` | `gpt-4o-mini` | OpenAI model to deploy |
 | `modelVersion` | `2024-11-20` | Model version |
-| `deploymentName` | `gpt-4o` | Deployment name (becomes `azure.deployment` in config) |
+| `deploymentName` | `gpt-4o-mini` | Deployment name (becomes `azure.deployment` in config) |
 | `deploymentCapacity` | `10` | Capacity in thousands of tokens per minute |
 | `principalId` | *(required)* | Your Entra object ID |
 | `principalType` | `User` | `User`, `ServicePrincipal`, or `Group` |
@@ -86,7 +86,7 @@ Expected output:
 
 ```json
 {
-  "deploymentName": { "value": "gpt-4o" },
+  "deploymentName": { "value": "gpt-4o-mini" },
   "endpoint": { "value": "https://finance-os-openai.openai.azure.com/" }
 }
 ```
@@ -102,7 +102,7 @@ Update `~/.config/finance-os/config.json`:
   "llm_provider": "azure_openai",
   "azure": {
     "endpoint": "https://finance-os-openai.openai.azure.com/",
-    "deployment": "gpt-4o",
+    "deployment": "gpt-4o-mini",
     "api_version": "2024-10-21"
   }
 }

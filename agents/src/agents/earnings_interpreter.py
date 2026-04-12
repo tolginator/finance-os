@@ -33,10 +33,24 @@ HEDGING_TERMS: frozenset[str] = frozenset({
 })
 
 GUIDANCE_PATTERNS: list[re.Pattern[str]] = [
-    re.compile(r"(?:full[- ]year|fy|annual)\s+(?:guidance|outlook|forecast)", re.IGNORECASE),
-    re.compile(r"(?:raise|lower|maintain|reiterate|revise)\w*\s+(?:our\s+)?(?:guidance|outlook)", re.IGNORECASE),
-    re.compile(r"(?:expect|anticipate|project)\w*\s+(?:revenue|earnings|eps|ebitda)", re.IGNORECASE),
-    re.compile(r"(?:range|target)\s+of\s+\$[\d,.]+ to \$[\d,.]+", re.IGNORECASE),
+    re.compile(
+        r"(?:full[- ]year|fy|annual)\s+(?:guidance|outlook|forecast)",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"(?:raise|lower|maintain|reiterate|revise)\w*\s+"
+        r"(?:our\s+)?(?:guidance|outlook)",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"(?:expect|anticipate|project)\w*\s+"
+        r"(?:revenue|earnings|eps|ebitda)",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"(?:range|target)\s+of\s+\$[\d,.]+ to \$[\d,.]+",
+        re.IGNORECASE,
+    ),
 ]
 
 
@@ -142,11 +156,17 @@ def extract_guidance(text: str) -> GuidanceExtraction:
 
     direction = "NEUTRAL"
     lower = text.lower()
-    if re.search(r"rais\w+\s+(?:our\s+)?(?:guidance|outlook)", lower):
+    raised_pat = r"rais\w+\s+(?:our\s+)?(?:[\w-]+\s+)*(?:guidance|outlook)"
+    lowered_pat = r"lower\w+\s+(?:our\s+)?(?:[\w-]+\s+)*(?:guidance|outlook)"
+    maintained_pat = (
+        r"(?:maintain|reiterat)\w+\s+"
+        r"(?:our\s+)?(?:[\w-]+\s+)*(?:guidance|outlook)"
+    )
+    if re.search(raised_pat, lower):
         direction = "RAISED"
-    elif re.search(r"lower\w+\s+(?:our\s+)?(?:guidance|outlook)", lower):
+    elif re.search(lowered_pat, lower):
         direction = "LOWERED"
-    elif re.search(r"(?:maintain|reiterat)\w+\s+(?:our\s+)?(?:guidance|outlook)", lower):
+    elif re.search(maintained_pat, lower):
         direction = "MAINTAINED"
 
     return GuidanceExtraction(statements=statements, direction=direction)
@@ -245,9 +265,9 @@ def format_analysis(analysis: TranscriptAnalysis) -> str:
         Formatted multi-line analysis string.
     """
     lines = [
-        f"## Earnings Call Analysis\n",
+        "## Earnings Call Analysis\n",
         f"### Tone: {analysis.tone_summary}\n",
-        f"### Overall Sentiment",
+        "### Overall Sentiment",
         f"- Net sentiment: {analysis.overall_sentiment.net_sentiment:+.2f}",
         f"- Positive signals: {analysis.overall_sentiment.positive_count}",
         f"- Negative signals: {analysis.overall_sentiment.negative_count}",
@@ -257,20 +277,20 @@ def format_analysis(analysis: TranscriptAnalysis) -> str:
 
     if analysis.prepared_sentiment:
         lines.extend([
-            f"\n### Prepared Remarks",
+            "\n### Prepared Remarks",
             f"- Net sentiment: {analysis.prepared_sentiment.net_sentiment:+.2f}",
             f"- Confidence: {analysis.prepared_sentiment.confidence_level}",
         ])
 
     if analysis.qa_sentiment:
         lines.extend([
-            f"\n### Q&A Session",
+            "\n### Q&A Session",
             f"- Net sentiment: {analysis.qa_sentiment.net_sentiment:+.2f}",
             f"- Confidence: {analysis.qa_sentiment.confidence_level}",
         ])
 
     lines.extend([
-        f"\n### Guidance",
+        "\n### Guidance",
         f"- Direction: {analysis.guidance.direction}",
     ])
     if analysis.guidance.statements:

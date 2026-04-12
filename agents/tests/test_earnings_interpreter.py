@@ -4,7 +4,6 @@ import pytest
 
 from src.agents.earnings_interpreter import (
     EarningsInterpreterAgent,
-    GuidanceExtraction,
     SentimentScore,
     analyze_transcript,
     extract_guidance,
@@ -69,7 +68,10 @@ class TestExtractGuidance:
     """Tests for guidance extraction."""
 
     def test_detects_raised_guidance(self) -> None:
-        text = "We are raising our full-year guidance to reflect strong performance"
+        text = (
+            "We are raising our full-year guidance "
+            "to reflect strong performance"
+        )
         guidance = extract_guidance(text)
         assert guidance.direction == "RAISED"
         assert len(guidance.statements) > 0
@@ -80,7 +82,10 @@ class TestExtractGuidance:
         assert guidance.direction == "LOWERED"
 
     def test_detects_maintained_guidance(self) -> None:
-        text = "We are reiterating our guidance for the full year outlook"
+        text = (
+            "We are reiterating our guidance "
+            "for the full year outlook"
+        )
         guidance = extract_guidance(text)
         assert guidance.direction == "MAINTAINED"
 
@@ -95,7 +100,11 @@ class TestSplitTranscript:
     """Tests for transcript section splitting."""
 
     def test_splits_on_qa_marker(self) -> None:
-        text = "CEO: Great quarter. CFO: Numbers look good. Question-and-Answer Session. Analyst: What about margins?"
+        text = (
+            "CEO: Great quarter. CFO: Numbers look good. "
+            "Question-and-Answer Session. "
+            "Analyst: What about margins?"
+        )
         prepared, qa = split_transcript_sections(text)
         assert "Great quarter" in prepared
         assert "What about margins" in qa

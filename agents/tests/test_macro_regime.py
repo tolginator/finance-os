@@ -38,34 +38,49 @@ class TestParseObservations:
         assert readings == []
 
 
+def _reading(
+    sid: str, desc: str, date: str,
+    val: str, prev: str | None = None, chg: str | None = None,
+) -> IndicatorReading:
+    """Helper to build IndicatorReading with less boilerplate."""
+    return IndicatorReading(
+        series_id=sid,
+        description=desc,
+        date=date,
+        value=Decimal(val),
+        previous_value=Decimal(prev) if prev else None,
+        change_pct=Decimal(chg) if chg else None,
+    )
+
+
 class TestClassifyRegime:
     """Tests for regime classification logic."""
 
     def test_expansion_signals(self) -> None:
         readings = {
-            "GDP": [IndicatorReading("GDP", "GDP", "2024-03", Decimal("100"), Decimal("95"), Decimal("5.26"))],
-            "UNRATE": [IndicatorReading("UNRATE", "Unemployment", "2024-03", Decimal("3.5"), Decimal("3.7"), Decimal("-5.41"))],
-            "T10Y2Y": [IndicatorReading("T10Y2Y", "Spread", "2024-03", Decimal("1.5"), None, None)],
-            "UMCSENT": [IndicatorReading("UMCSENT", "Sentiment", "2024-03", Decimal("100"), Decimal("90"), Decimal("11.1"))],
-            "INDPRO": [IndicatorReading("INDPRO", "IndProd", "2024-03", Decimal("105"), Decimal("100"), Decimal("5"))],
+            "GDP": [_reading("GDP", "GDP", "2024-03", "100", "95", "5.26")],
+            "UNRATE": [_reading("UNRATE", "Unemp", "2024-03", "3.5", "3.7", "-5.41")],
+            "T10Y2Y": [_reading("T10Y2Y", "Spread", "2024-03", "1.5")],
+            "UMCSENT": [_reading("UMCSENT", "Sent", "2024-03", "100", "90", "11.1")],
+            "INDPRO": [_reading("INDPRO", "IndProd", "2024-03", "105", "100", "5")],
         }
         assert classify_regime(readings) == "EXPANSION"
 
     def test_contraction_signals(self) -> None:
         readings = {
-            "GDP": [IndicatorReading("GDP", "GDP", "2024-03", Decimal("95"), Decimal("100"), Decimal("-5"))],
-            "UNRATE": [IndicatorReading("UNRATE", "Unemployment", "2024-03", Decimal("5.0"), Decimal("4.0"), Decimal("25"))],
-            "T10Y2Y": [IndicatorReading("T10Y2Y", "Spread", "2024-03", Decimal("-0.5"), None, None)],
-            "UMCSENT": [IndicatorReading("UMCSENT", "Sentiment", "2024-03", Decimal("60"), Decimal("70"), Decimal("-14.3"))],
-            "INDPRO": [IndicatorReading("INDPRO", "IndProd", "2024-03", Decimal("95"), Decimal("100"), Decimal("-5"))],
+            "GDP": [_reading("GDP", "GDP", "2024-03", "95", "100", "-5")],
+            "UNRATE": [_reading("UNRATE", "Unemp", "2024-03", "5.0", "4.0", "25")],
+            "T10Y2Y": [_reading("T10Y2Y", "Spread", "2024-03", "-0.5")],
+            "UMCSENT": [_reading("UMCSENT", "Sent", "2024-03", "60", "70", "-14.3")],
+            "INDPRO": [_reading("INDPRO", "IndProd", "2024-03", "95", "100", "-5")],
         }
         assert classify_regime(readings) == "CONTRACTION"
 
     def test_transition_on_mixed_signals(self) -> None:
         readings = {
-            "GDP": [IndicatorReading("GDP", "GDP", "2024-03", Decimal("101"), Decimal("100"), Decimal("1"))],
-            "UNRATE": [IndicatorReading("UNRATE", "Unemployment", "2024-03", Decimal("4.5"), Decimal("4.0"), Decimal("12.5"))],
-            "T10Y2Y": [IndicatorReading("T10Y2Y", "Spread", "2024-03", Decimal("0.1"), None, None)],
+            "GDP": [_reading("GDP", "GDP", "2024-03", "101", "100", "1")],
+            "UNRATE": [_reading("UNRATE", "Unemp", "2024-03", "4.5", "4.0", "12.5")],
+            "T10Y2Y": [_reading("T10Y2Y", "Spread", "2024-03", "0.1")],
         }
         assert classify_regime(readings) == "TRANSITION"
 
@@ -79,7 +94,7 @@ class TestFormatDashboard:
 
     def test_includes_regime_and_indicators(self) -> None:
         readings = {
-            "GDP": [IndicatorReading("GDP", "Real GDP growth", "2024-03", Decimal("100"), Decimal("95"), Decimal("5.26"))],
+            "GDP": [_reading("GDP", "Real GDP growth", "2024-03", "100", "95", "5.26")],
         }
         output = format_dashboard(readings, "EXPANSION")
         assert "EXPANSION" in output

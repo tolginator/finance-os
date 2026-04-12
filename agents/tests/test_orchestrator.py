@@ -180,6 +180,11 @@ async def test_aggregate_results_filters_failures(orchestrator: Orchestrator) ->
     assert aggregated["good"] == "content"
 
 
+async def test_aggregate_results_empty_list(orchestrator: Orchestrator) -> None:
+    aggregated = orchestrator.aggregate_results([])
+    assert aggregated == {}
+
+
 # ---------------------------------------------------------------------------
 # generate_memo tests
 # ---------------------------------------------------------------------------
@@ -201,3 +206,23 @@ async def test_generate_memo(orchestrator: Orchestrator) -> None:
     assert set(memo.sources) == {"filings", "earnings"}
     assert "AAPL" in memo.summary
     assert "2025-01-15" in memo.summary
+
+
+async def test_generate_memo_no_successful_agents(orchestrator: Orchestrator) -> None:
+    tasks = [
+        AgentTask(agent=FailingAgent("bad1"), prompt="go"),
+        AgentTask(agent=FailingAgent("bad2"), prompt="go"),
+    ]
+    pipeline = await orchestrator.run_pipeline(tasks)
+    memo = orchestrator.generate_memo("TSLA", "2025-06-01", pipeline.results)
+
+    assert memo.sections == {}
+    assert memo.sources == []
+    assert "none" in memo.summary
+
+
+async def test_pipeline_empty_task_list(orchestrator: Orchestrator) -> None:
+    result = await orchestrator.run_pipeline([])
+    assert result.successful == 0
+    assert result.failed == 0
+    assert result.results == []

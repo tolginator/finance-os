@@ -150,6 +150,13 @@ class TestFilterMaterialEntries:
         assert len(filter_material_entries([entry], Decimal("0.3"))) == 1
         assert len(filter_material_entries([entry], Decimal("0.4"))) == 0
 
+    def test_material_flag_overrides_low_sentiment(self) -> None:
+        """Entry with material=True but low sentiment is still included."""
+        entry = _make_entry(material=True, sentiment=Decimal("0.1"))
+        result = filter_material_entries([entry])
+        assert len(result) == 1
+        assert result[0].material is True
+
 
 # --- generate_digest_summary ---
 
@@ -226,6 +233,23 @@ class TestBuildDigest:
         assert digest.alerts == []
         assert digest.tickers_analyzed == []
         assert "0 entries" in digest.summary
+
+    def test_sources_with_nonzero_sentiment(self) -> None:
+        """build_digest creates entries with sentiment=0, so materiality comes from flag."""
+        config = PipelineConfig(tickers=["AAPL"])
+        sources = [
+            DataSource(
+                source_type="edgar",
+                ticker="AAPL",
+                date="2025-01-01",
+                content="Apple 10-K",
+            ),
+        ]
+        digest = build_digest(config, sources)
+        # Default sentiment is 0 and material is False → not material
+        assert len(digest.alerts) == 0
+        assert len(digest.entries) == 1
+        assert digest.entries[0].sentiment == Decimal("0")
 
 
 # --- ResearchPipeline class ---

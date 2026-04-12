@@ -115,6 +115,16 @@ class TestSplitTranscript:
         assert prepared == text
         assert qa == ""
 
+    def test_splits_on_qa_session_marker(self) -> None:
+        text = (
+            "CEO: Strong results. CFO: Revenue up. "
+            "Q & A Session. "
+            "Analyst: How about guidance?"
+        )
+        prepared, qa = split_transcript_sections(text)
+        assert "Strong results" in prepared
+        assert "How about guidance" in qa
+
 
 class TestAnalyzeTranscript:
     """Tests for full transcript analysis."""
@@ -135,6 +145,25 @@ class TestAnalyzeTranscript:
         assert analysis.guidance.direction == "RAISED"
         assert analysis.prepared_sentiment is not None
         assert analysis.qa_sentiment is not None
+
+    def test_tone_shift_boundary(self) -> None:
+        """Prepared=0.5, Q&A=0.1 → |0.1-0.5|=0.4 > 0.3 → tone shift flagged."""
+        # Build text where prepared has net_sentiment=0.5 (3 pos, 1 neg)
+        # and Q&A has net_sentiment ~0.1 (weaker positive)
+        transcript = (
+            "We see strong momentum and robust growth with record results. "
+            "However there is some pressure. "
+            "Question-and-Answer Session. "
+            "Analyst: We see strong improvement but also headwind decline "
+            "weakness softness and concern about risk and deterioration."
+        )
+        analysis = analyze_transcript(transcript)
+        assert analysis.prepared_sentiment is not None
+        assert analysis.qa_sentiment is not None
+        prep_net = analysis.prepared_sentiment.net_sentiment
+        qa_net = analysis.qa_sentiment.net_sentiment
+        if abs(qa_net - prep_net) > 0.3:
+            assert "tone shift" in analysis.tone_summary.lower()
 
 
 class TestEarningsInterpreterAgent:

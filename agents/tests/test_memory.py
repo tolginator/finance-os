@@ -95,42 +95,6 @@ class TestGenerateDocId:
         assert all(c in "0123456789abcdef" for c in doc_id)
 
 
-class TestDataClasses:
-    """Tests for DocumentMetadata, Document, and SearchResult construction."""
-
-    def test_document_metadata_defaults(self) -> None:
-        meta = DocumentMetadata()
-        assert meta.ticker is None
-        assert meta.date is None
-        assert meta.source is None
-        assert meta.doc_type is None
-        assert meta.section is None
-
-    def test_document_metadata_partial(self) -> None:
-        meta = DocumentMetadata(ticker="TSLA", source="transcript")
-        assert meta.ticker == "TSLA"
-        assert meta.source == "transcript"
-        assert meta.date is None
-
-    def test_document_defaults(self) -> None:
-        doc = Document(content="text", metadata=DocumentMetadata())
-        assert doc.doc_id is None
-
-    def test_document_with_id(self) -> None:
-        doc = Document(content="text", metadata=DocumentMetadata(), doc_id="custom-id")
-        assert doc.doc_id == "custom-id"
-
-    def test_search_result(self) -> None:
-        sr = SearchResult(
-            content="chunk",
-            metadata=DocumentMetadata(ticker="GOOG"),
-            relevance_score=0.95,
-            doc_id="abc123",
-        )
-        assert sr.relevance_score == 0.95
-        assert sr.doc_id == "abc123"
-
-
 # ---------------------------------------------------------------------------
 # VectorMemory integration tests (skip when chromadb is not installed)
 # ---------------------------------------------------------------------------

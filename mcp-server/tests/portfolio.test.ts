@@ -51,6 +51,15 @@ describe("calculateExposure", () => {
     expect(result.bySector).toEqual({});
     expect(result.byAssetClass).toEqual({});
   });
+
+  it("missing sector defaults to 'Unknown'", () => {
+    const holdings: Holding[] = [
+      { ticker: "XYZ", shares: 10, costBasis: 100, currentPrice: 100 },
+    ];
+    const result = calculateExposure(holdings);
+    expect(result.bySector["Unknown"]).toBe(100);
+    expect(result.byAssetClass["Unknown"]).toBe(100);
+  });
 });
 
 describe("calculateConcentration", () => {
@@ -82,6 +91,23 @@ describe("calculateConcentration", () => {
     expect(result.level).toBe("DIVERSIFIED");
     expect(result.topHoldings).toEqual([]);
   });
+
+  it("holdings producing HHI between 1500 and 2500 → MODERATE", () => {
+    // 3 holdings: 50%, 30%, 20% → HHI = 2500+900+400 = 3800 (too high)
+    // 4 holdings: 40%, 30%, 20%, 10% → HHI = 1600+900+400+100 = 3000 (too high)
+    // 5 holdings: 30%, 25%, 20%, 15%, 10% → HHI = 900+625+400+225+100 = 2250 ✓
+    const holdings: Holding[] = [
+      { ticker: "A", shares: 30, costBasis: 100, currentPrice: 100 },
+      { ticker: "B", shares: 25, costBasis: 100, currentPrice: 100 },
+      { ticker: "C", shares: 20, costBasis: 100, currentPrice: 100 },
+      { ticker: "D", shares: 15, costBasis: 100, currentPrice: 100 },
+      { ticker: "E", shares: 10, costBasis: 100, currentPrice: 100 },
+    ];
+    const result = calculateConcentration(holdings);
+    expect(result.hhi).toBeGreaterThanOrEqual(1500);
+    expect(result.hhi).toBeLessThanOrEqual(2500);
+    expect(result.level).toBe("MODERATE");
+  });
 });
 
 describe("calculateDrawdown", () => {
@@ -99,6 +125,27 @@ describe("calculateDrawdown", () => {
     expect(result.currentDrawdownPct).toBe(0);
     expect(result.peakValue).toBe(0);
     expect(result.troughValue).toBe(0);
+  });
+
+  it("monotonically increasing prices → zero drawdown", () => {
+    const result = calculateDrawdown([100, 110, 120, 130, 140]);
+    expect(result.maxDrawdownPct).toBe(0);
+    expect(result.currentDrawdownPct).toBe(0);
+  });
+
+  it("monotonically decreasing prices → max drawdown equals total decline", () => {
+    const result = calculateDrawdown([200, 180, 150, 120, 100]);
+    // Peak 200, trough 100 → 50% drawdown
+    expect(result.maxDrawdownPct).toBe(50);
+    expect(result.currentDrawdownPct).toBe(50);
+    expect(result.peakValue).toBe(200);
+    expect(result.troughValue).toBe(100);
+  });
+
+  it("single price → zero drawdown", () => {
+    const result = calculateDrawdown([42]);
+    expect(result.maxDrawdownPct).toBe(0);
+    expect(result.currentDrawdownPct).toBe(0);
   });
 });
 

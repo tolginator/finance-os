@@ -96,6 +96,14 @@ class TestEvaluateAssumption:
         result = evaluate_assumption(a, Decimal("4.7"))
         assert result.status == "WEAKENED"
 
+    def test_weakened_value_just_within_margin(self) -> None:
+        """Value at exactly threshold + 10% margin boundary → WEAKENED."""
+        # threshold=5, margin=0.5, value=5.5 → distance=0.5 == margin → borderline
+        a = Assumption("Revenue growing", "revenue_growth", ">5")
+        result = evaluate_assumption(a, Decimal("5.5"))
+        assert result.status == "WEAKENED"
+        assert result.current_value == Decimal("5.5")
+
     def test_original_assumption_unchanged(self) -> None:
         a = Assumption("Margin positive", "margin", "positive")
         result = evaluate_assumption(a, Decimal("10"))

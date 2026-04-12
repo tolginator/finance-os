@@ -39,6 +39,12 @@ class TestComputeVar:
         """Empty return series yields zero."""
         assert compute_var([], Decimal("0.95")) == Decimal("0")
 
+    def test_identical_returns(self) -> None:
+        """All identical returns → VaR reflects no variation in losses."""
+        returns = [Decimal("0")] * 20
+        var = compute_var(returns, Decimal("0.95"))
+        assert var == Decimal("0")
+
 
 # ---------------------------------------------------------------------------
 # compute_cvar
@@ -179,6 +185,13 @@ class TestCorrelationPair:
         b = [Decimal(str(-i)) for i in range(10)]
         corr = correlation_pair(a, b)
         assert abs(corr - Decimal("-1")) < Decimal("0.0001")
+
+    def test_zero_variance_returns_zero(self) -> None:
+        """One series with all same values (zero variance) → correlation = 0."""
+        a = [Decimal("1")] * 5
+        b = [Decimal(str(i)) for i in range(5)]
+        corr = correlation_pair(a, b)
+        assert corr == Decimal("0")
 
 
 # ---------------------------------------------------------------------------

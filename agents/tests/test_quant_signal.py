@@ -171,6 +171,15 @@ class TestCompositeScore:
         with pytest.raises(ValueError):
             composite_score([])
 
+    def test_all_zero_confidence(self) -> None:
+        """Signals with zero confidence should not cause division by zero."""
+        signals = [
+            self._make_signal("0.5", "0"),
+            self._make_signal("-0.3", "0"),
+        ]
+        comp = composite_score(signals, method="confidence_weight")
+        assert comp.score == Decimal("0")
+
 
 # ---------------------------------------------------------------------------
 # decay_weight
@@ -186,6 +195,11 @@ class TestDecayWeight:
 
     def test_weight_decreases_with_age(self) -> None:
         assert decay_weight(60, half_life=30) < decay_weight(30, half_life=30)
+
+    def test_large_age_still_positive(self) -> None:
+        w = decay_weight(300, half_life=30)
+        assert w > Decimal("0")
+        assert w < Decimal("0.01")
 
 
 # ---------------------------------------------------------------------------

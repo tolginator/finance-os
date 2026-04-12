@@ -7,7 +7,7 @@ Bicep templates for provisioning Azure resources used by finance-os.
 | Resource | Purpose |
 |----------|---------|
 | Azure OpenAI (Cognitive Services) | LLM inference with Entra-only auth (API keys disabled) |
-| Model deployment (e.g. gpt-4o-mini) | The deployment your config points to |
+| Model deployment (e.g. gpt-4.1-mini) | The deployment your config points to |
 | RBAC role assignment | `Cognitive Services OpenAI User` for your principal |
 
 ## Prerequisites

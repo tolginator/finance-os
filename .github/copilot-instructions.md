@@ -10,15 +10,16 @@
 - **Runtime**: Node.js with TypeScript
 - **Protocol**: Model Context Protocol via `@modelcontextprotocol/sdk`
 - **Build**: `tsc` to `dist/`, ES Modules (`"type": "module"`)
-- **Tools**: Each tool in `src/tools/` exports a registration function. Tools are stateless request handlers.
+- **Tools**: Each tool in `src/tools/` exports a registration function. Tools are stateless data request handlers.
 - **Resources**: `src/resources/` for MCP resource providers
 - **Prompts**: `src/prompts/` for MCP prompt templates
 - **Tests**: Vitest in `tests/`
 
 ### Agents (`agents/`) — Python
 - **Framework**: Custom agent base classes in `src/core/`
-- **LLM Abstraction**: Supports Claude (Anthropic) and OpenAI APIs, configurable per agent
+- **LLM Gateway**: Pluggable inference client in the application layer — supports OpenAI, Anthropic, ollama, or skip when host LLM reasons (MCP path)
 - **Domain Agents**: `src/agents/` — filing analyst, earnings interpreter, macro regime, quant signal, thesis guardian, risk, adversarial
+- **Application Layer**: `src/application/` — shared contracts (Pydantic), LLM gateway, services. CLI, MCP server, and future web API are thin wrappers over this.
 - **Quant Tools**: `src/tools/` — regression, factor analysis, Monte Carlo, Bayesian updates
 - **Data Pipelines**: `src/pipelines/` — EDGAR, FRED, market data, research digest
 - **Tests**: pytest in `tests/`
@@ -29,6 +30,16 @@
 - `adversarial/` — thesis-challenging prompts
 - `synthesis/` — multi-document synthesis
 
+## LLM Inference Model
+
+Agents perform deterministic data processing and construct prompts but **do not call LLMs directly**. The LLM gateway in the application layer provides inference when needed:
+
+| Path | LLM reasoning | Gateway |
+|---|---|---|
+| MCP (Copilot, Claude Desktop) | Host LLM reasons | Skipped |
+| CLI | LLM gateway calls provider | Used |
+| Web API (future) | LLM gateway calls provider | Used |
+
 ## Data Flow
 
 ```
@@ -37,6 +48,8 @@ External APIs (EDGAR, FRED, Yahoo Finance)
 Data Pipelines (Python) → Local Data Store
         ↓
 MCP Tools (TypeScript) ← LLM requests via MCP protocol
+        ↓
+Application Layer (contracts + LLM gateway)
         ↓
 Agents (Python) — orchestrated multi-agent reasoning
         ↓
@@ -47,11 +60,15 @@ Research Output (memos, alerts, signals)
 
 | Layer | Technology |
 |---|---|
-| MCP Server | TypeScript, Node.js, `@modelcontextprotocol/sdk` |
-| Agents | Python 3.11+, NumPy, pandas, scipy |
-| Vector DB | ChromaDB (local, v0) |
-| LLM Backend | Claude / GPT-4 / open models (configurable) |
+| MCP Server (data tools) | TypeScript, Node.js, `@modelcontextprotocol/sdk` |
+| MCP Server (agents) | Python, `mcp` SDK |
+| Application Layer | Python, Pydantic, litellm |
+| Agents | Python 3.12+, NumPy, pandas, scipy |
+| Vector DB | ChromaDB (local) |
+| LLM Gateway | Pluggable — OpenAI, Anthropic, ollama, or host LLM via MCP |
 | Data Sources | SEC EDGAR (free), FRED (free), Yahoo Finance (yfinance), QIF files |
+| CLI | Python (`python -m agents.cli`) |
+| Copilot Skills | Markdown workflow definitions (`.github/skills/`) |
 | Testing | Vitest (TS), pytest (Python) |
 | CI/CD | GitHub Actions |
 
@@ -235,6 +252,7 @@ finance-os/
 │   ├── src/
 │   │   ├── core/                   # Agent base, orchestrator, memory
 │   │   ├── agents/                 # Domain-specific agents
+│   │   ├── application/            # Shared contracts, LLM gateway, services
 │   │   ├── tools/                  # Quant tools
 │   │   └── pipelines/             # Data ingestion pipelines
 │   └── tests/

@@ -12,19 +12,25 @@ Not a chatbot. A **system**. The personal Bloomberg terminal + quant lab + resea
 - **Adversarial challenge**: Every thesis gets systematically attacked before capital is deployed
 - **Quantitative signals**: Transform unstructured text into structured, timestamped, confidence-weighted quant features
 - **Multi-agent orchestration**: Agents collaborate and debate to produce consolidated research memos
+- **LLM-native**: Pluggable LLM gateway for direct inference (CLI, future web) or delegate to host LLM (Copilot, Claude Desktop via MCP)
 
 ## Project Structure
 
 ```
 finance-os/
-├── mcp-server/          # TypeScript MCP server (tools for LLMs)
-├── agents/              # Python agent framework (domain agents, orchestrator)
+├── mcp-server/          # TypeScript MCP server (data tools for LLMs)
+├── agents/              # Python agent framework + application layer
+│   └── src/
+│       ├── agents/      # Domain agents (filing, earnings, macro, risk, etc.)
+│       ├── core/        # BaseAgent, orchestrator, vector memory
+│       ├── application/ # Shared contracts, LLM gateway, services (planned)
+│       └── pipelines/   # Research digest pipeline
 ├── prompts/             # Shared prompt library
 ├── docs/                # Architecture, agent, and tool documentation
-└── .github/             # CI, copilot instructions, templates
+└── .github/             # CI, copilot instructions, skills, templates
 ```
 
-See [docs/architecture.md](docs/architecture.md) for the full system architecture, data flow, and tech stack.
+See [docs/architecture.md](docs/architecture.md) for the full system architecture, LLM gateway design, and data flow.
 See [docs/agents.md](docs/agents.md) for agent descriptions and the orchestration model.
 See [docs/tools.md](docs/tools.md) for MCP tool reference and how to add new tools.
 

@@ -24,6 +24,9 @@ dev = [
     "chromadb>=1.0.0",
 ]
 
+[project.scripts]
+finance-os = "src.cli.main:main"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

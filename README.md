@@ -24,6 +24,7 @@ finance-os/
 │       ├── agents/      # Domain agents (filing, earnings, macro, risk, etc.)
 │       ├── core/        # BaseAgent, orchestrator, vector memory
 │       ├── application/ # Contracts, LLM gateway, services, config
+│       ├── cli/         # CLI entry points (finance-os command)
 │       └── pipelines/   # Research digest pipeline
 ├── prompts/             # Shared prompt library
 ├── docs/                # Architecture, agent, and tool documentation
@@ -74,6 +75,23 @@ Create `~/.config/finance-os/config.json`:
 ```
 
 Environment variables (`FINANCE_OS_*`) override config file values. See [docs/architecture.md](docs/architecture.md) for details.
+
+### Agent CLI
+
+After installing the agents package (`pip install -e ".[dev]"`), the `finance-os` command is available:
+
+```bash
+finance-os list                                      # List available agents
+finance-os config                                    # Show current config
+finance-os run macro-regime                          # Run a single agent
+finance-os run filing-analyst --ticker AAPL           # With options
+finance-os pipeline --ticker AAPL                     # Multi-agent research pipeline
+finance-os digest --tickers AAPL,MSFT,GOOG            # Research digest
+finance-os --output json run macro-regime             # JSON output
+finance-os run adversarial --prompt "Bull case" --synthesize  # LLM synthesis
+```
+
+Use `--synthesize` to pass agent output through the LLM gateway (requires `llm_provider: "litellm"` in config). Use `--output json` for structured output.
 
 ### Preflight (run before every push)
 

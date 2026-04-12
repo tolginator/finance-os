@@ -13,14 +13,17 @@ using 'main.bicep'
 param openAiAccountName = ''
 
 // Model to deploy and its version.
-param modelName = 'gpt-4o-mini'
-param modelVersion = '2024-07-18'
+param modelName = 'gpt-4.1-mini'
+param modelVersion = '2025-04-14'
 
 // Deployment name — this becomes the azure.deployment value in config.json.
-param deploymentName = 'gpt-4o-mini'
+param deploymentName = 'gpt-4.1-mini'
 
 // Capacity in thousands of tokens per minute.
 param deploymentCapacity = 10
+
+// Deployment SKU — newer models (gpt-4.1+) require 'Standard'.
+param deploymentSkuName = 'Standard'
 
 // Your Entra user/principal object ID.
 // Find it with: az ad signed-in-user show --query id -o tsv

@@ -62,7 +62,7 @@ Research Output (memos, alerts, signals)
 |---|---|
 | MCP Server (data tools) | TypeScript, Node.js, `@modelcontextprotocol/sdk` |
 | MCP Server (agents) | Python, `mcp` SDK |
-| Application Layer | Python, Pydantic 2.11+, pydantic-settings, litellm |
+| Application Layer | Python, Pydantic 2.11+, pydantic-settings, azure-identity |
 | Agents | Python 3.12+, NumPy, pandas, scipy |
 | Vector DB | ChromaDB (local) |
 | LLM Gateway | Pluggable — OpenAI, Anthropic, ollama, or host LLM via MCP |

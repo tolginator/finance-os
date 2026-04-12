@@ -24,6 +24,9 @@ param deploymentName string
 @description('Capacity in thousands of tokens per minute.')
 param deploymentCapacity int
 
+@description('Deployment SKU name.')
+param deploymentSkuName string = 'GlobalStandard'
+
 resource account 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
   name: accountName
   location: location
@@ -49,7 +52,7 @@ resource deployment 'Microsoft.CognitiveServices/accounts/deployments@2024-10-01
   parent: account
   name: deploymentName
   sku: {
-    name: 'Standard'
+    name: deploymentSkuName
     capacity: deploymentCapacity
   }
   properties: {

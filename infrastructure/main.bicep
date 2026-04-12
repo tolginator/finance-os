@@ -2,7 +2,7 @@
 //
 // Deploys:
 //   1. Azure OpenAI (Cognitive Services) with Entra-only auth (API keys disabled)
-//   2. Model deployment (e.g. gpt-4o-mini)
+//   2. Model deployment (e.g. gpt-4.1-mini)
 //   3. RBAC role assignment for the specified principal
 //
 // Usage:
@@ -25,17 +25,20 @@ param openAiAccountName string
 @allowed(['S0'])
 param openAiSku string = 'S0'
 
-@description('Model to deploy (e.g. gpt-4o, gpt-4o-mini).')
-param modelName string = 'gpt-4o-mini'
+@description('Model to deploy (e.g. gpt-4.1-mini, gpt-4.1-mini).')
+param modelName string = 'gpt-4.1-mini'
 
 @description('Model version to deploy.')
-param modelVersion string = '2024-07-18'
+param modelVersion string = '2025-04-14'
 
 @description('Deployment name — this is the value for azure.deployment in config.json.')
-param deploymentName string = 'gpt-4o-mini'
+param deploymentName string = 'gpt-4.1-mini'
 
 @description('Deployment capacity in thousands of tokens per minute.')
 param deploymentCapacity int = 10
+
+@description('Deployment SKU name (e.g. Standard, GlobalStandard). Newer models require GlobalStandard.')
+param deploymentSkuName string = 'Standard'
 
 @description('Object ID of the Entra principal (user or service principal) to grant access.')
 param principalId string
@@ -56,6 +59,7 @@ module openAi 'modules/cognitive-services.bicep' = {
     modelVersion: modelVersion
     deploymentName: deploymentName
     deploymentCapacity: deploymentCapacity
+    deploymentSkuName: deploymentSkuName
   }
 }
 

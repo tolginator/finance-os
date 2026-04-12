@@ -77,7 +77,13 @@ Create `~/.config/finance-os/config.json`:
 
 Environment variables (`FINANCE_OS_*`) override config file values. See [docs/architecture.md](docs/architecture.md) for details.
 
-> **SEC EDGAR**: The `sec_edgar_email` field is required for SEC API access. The SEC requires a valid contact email in request headers — set this to a real email address you control.
+| Field | Values | Description |
+|-------|--------|-------------|
+| `llm_provider` | `"skip"` (default), `"litellm"` | `skip` returns raw agent data without LLM synthesis — ideal for the MCP path where Copilot/Claude reasons over the output. `litellm` enables LLM-powered synthesis via [LiteLLM](https://github.com/BerriAI/litellm), supporting 100+ models (OpenAI, Anthropic, Ollama, Azure, etc.). Requires the provider's API key in the environment (e.g. `OPENAI_API_KEY`). |
+| `llm_default_model` | Any LiteLLM model string | Model to use when `llm_provider` is `"litellm"` (e.g. `"gpt-4o"`, `"claude-sonnet-4-20250514"`, `"ollama/llama3"`). Ignored when provider is `"skip"`. |
+| `llm_temperature` | `0.0`–`2.0` | Sampling temperature for LLM calls. Default `0.0` (deterministic). |
+| `fred_api_key` | API key string | [FRED API](https://fred.stlouisfed.org/docs/api/api_key.html) key for the macro-regime agent. Free to obtain. |
+| `sec_edgar_email` | Email address | **Required for SEC API access.** SEC requires a valid contact email in request headers — set this to a real email you control. |
 
 ### Agent CLI
 

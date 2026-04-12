@@ -21,6 +21,9 @@ quant = [
     "pandas>=3.0.2",
     "scipy>=1.17.1",
 ]
+rag = [
+    "chromadb>=1.0.0",
+]
 
 [build-system]
 requires = ["hatchling"]

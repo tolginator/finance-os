@@ -4,7 +4,6 @@ Detects tone shifts, sentiment drift, management confidence,
 guidance changes, and key language patterns in earnings calls.
 """
 
-from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field

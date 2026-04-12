@@ -33,6 +33,17 @@ class TestParseObservations:
         assert len(readings) == 1
         assert readings[0].date == "2024-02-01"
 
+    def test_skips_dot_value_in_middle(self) -> None:
+        """FRED uses '.' for missing data — entries with '.' should be skipped."""
+        obs = [
+            {"date": "2024-04-01", "value": "110.0"},
+            {"date": "2024-03-01", "value": "."},
+            {"date": "2024-02-01", "value": "100.0"},
+        ]
+        readings = parse_observations("INDPRO", "Industrial Production", obs)
+        assert len(readings) == 2
+        assert all(r.value != "." for r in readings)
+
     def test_handles_empty_observations(self) -> None:
         readings = parse_observations("GDP", "GDP", [])
         assert readings == []
@@ -87,6 +98,16 @@ class TestClassifyRegime:
     def test_empty_readings(self) -> None:
         regime = classify_regime({})
         assert regime == "TRANSITION"
+
+    def test_equal_expansion_contraction_signals(self) -> None:
+        """When expansion and contraction signals are exactly equal → TRANSITION."""
+        readings = {
+            "GDP": [_reading("GDP", "GDP", "2024-03", "101", "100", "1")],
+            "UNRATE": [_reading("UNRATE", "Unemp", "2024-03", "4.5", "4.0", "12.5")],
+            "T10Y2Y": [_reading("T10Y2Y", "Spread", "2024-03", "0.5")],
+            "INDPRO": [_reading("INDPRO", "IndProd", "2024-03", "95", "100", "-5")],
+        }
+        assert classify_regime(readings) == "TRANSITION"
 
 
 class TestFormatDashboard:

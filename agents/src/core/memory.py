@@ -6,7 +6,6 @@ utility functions (chunk_text, generate_doc_id) work without it, but
 VectorMemory requires chromadb to be installed.
 """
 
-from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass

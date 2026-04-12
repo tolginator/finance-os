@@ -5,7 +5,6 @@ guidance directions) into structured quantitative signals suitable for
 portfolio construction and risk management.
 """
 
-from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field

@@ -60,7 +60,7 @@ Research Output (memos, alerts, signals)
 ### General
 - **ES Modules**: All TypeScript and JavaScript uses ESM (`"type": "module"`)
 - **Dependencies**: Minimize. Justify every new dependency.
-- **Dependency versions**: Always use the latest stable version. No legacy compatibility — legacy systems must fail. When a dependency ships a breaking change, update all consuming code to work with the new version. Never pin to old versions to avoid migration work.
+- **Dependency versions**: Always use the latest stable version. No legacy compatibility — legacy systems must fail. When a dependency ships a breaking change, update all consuming code to work with the new version. Never pin to old versions to avoid migration work. **Legacy compatibility is an anti-pattern** — do not use compatibility shims, polyfills, or `__future__` imports that exist only to support older versions.
 - **No secrets**: Do not store PATs or secrets in GitHub Secrets. Use only the built-in `GITHUB_TOKEN` and native GitHub features (e.g., Project auto-add workflows).
 - **Error handling**: Graceful degradation. Never crash on malformed input — log warnings and continue.
 - **Privacy**: All portfolio/personal data stays local. No PII sent to external APIs unless explicitly configured.
@@ -73,7 +73,7 @@ Research Output (memos, alerts, signals)
 - Tool implementations must validate all inputs and return structured error responses
 
 ### Python (Agents)
-- Python 3.11+ with type hints everywhere
+- Python 3.12+ with type hints everywhere (use native `X | Y`, `list[str]`, etc. — no `from __future__ import annotations`)
 - PEP 8, `snake_case` for functions/variables, `PascalCase` for classes
 - Docstrings on all public functions and classes (Google style)
 - Use `pathlib.Path` over `os.path`

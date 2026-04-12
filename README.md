@@ -2,66 +2,40 @@
 
 Personal Investment Intelligence OS — a modular, LLM-powered investing AI stack with agent orchestration, domain-tuned prompting, custom MCP tools, and deep integration with quant + NLP pipelines.
 
-Not a chatbot. A **system**.
+Not a chatbot. A **system**. The personal Bloomberg terminal + quant lab + research team.
 
-## Architecture
+## Goals
+
+- **Automated research**: Ingest SEC filings, earnings transcripts, and macro data — extract signals, score sentiment, flag material changes
+- **Thesis monitoring**: Define investment theses with explicit assumptions — get alerts when assumptions weaken or break
+- **Risk analysis**: Scenario modeling, stress tests, tail-risk simulation, concentration analysis
+- **Adversarial challenge**: Every thesis gets systematically attacked before capital is deployed
+- **Quantitative signals**: Transform unstructured text into structured, timestamped, confidence-weighted quant features
+- **Multi-agent orchestration**: Agents collaborate and debate to produce consolidated research memos
+
+## Project Structure
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                   Orchestration Layer                │
-│         Agent Framework (multi-agent collab)         │
-├──────────┬──────────┬──────────┬──────────┬─────────┤
-│  Filing  │ Earnings │  Macro   │  Thesis  │  Risk   │
-│  Analyst │  Call    │  Regime  │ Guardian │  Agent  │
-│  Agent   │ Interp.  │  Agent   │          │         │
-├──────────┴──────────┴──────────┴──────────┴─────────┤
-│                    MCP Tool Layer                    │
-│  Financial │ SEC     │ Quant   │ Portfolio│ Alt     │
-│  Data Tool │ Filings │ Model   │ Diag.   │ Data    │
-├─────────────────────────────────────────────────────┤
-│                   Data Pipeline                     │
-│  EDGAR │ FRED │ Yahoo Finance │ QIF │ Vector DB    │
-├─────────────────────────────────────────────────────┤
-│               RAG + Knowledge Layer                 │
-│  Vector Store │ Knowledge Graph │ Thesis DB         │
-└─────────────────────────────────────────────────────┘
+finance-os/
+├── mcp-server/          # TypeScript MCP server (tools for LLMs)
+├── agents/              # Python agent framework (domain agents, orchestrator)
+├── prompts/             # Shared prompt library
+├── docs/                # Architecture, agent, and tool documentation
+└── .github/             # CI, copilot instructions, templates
 ```
 
-## Components
-
-### MCP Server (`mcp-server/`)
-
-TypeScript MCP server exposing investment tools to LLMs:
-
-- **Financial Data** — stock quotes, fundamentals, historical prices
-- **SEC Filings** — EDGAR 10-K/10-Q/8-K fetch, parse, section extraction
-- **Portfolio Diagnostics** — exposures, drawdowns, concentration, liquidity risk
-- **QIF Data Access** — query personal transaction data from Quicken exports
-
-### Agents (`agents/`)
-
-Python domain-tuned agents that collaborate or debate:
-
-- **Filing Analyst** — extracts deltas, risk language shifts, capex changes
-- **Earnings Interpreter** — tone analysis, sentiment drift, management confidence
-- **Macro Regime** — classifies macro environment from text + data
-- **Quant Signal** — transforms textual insights into structured quant features
-- **Thesis Guardian** — monitors theses, flags broken assumptions
-- **Risk Agent** — scenario analysis, stress tests, tail-risk simulations
-- **Adversarial** — systematic thesis challenger
-
-### Prompt Library (`prompts/`)
-
-Shared prompt templates for expert-level financial analysis:
-
-- Role-stacking (multi-persona collaboration)
-- Constraint-driven (stepwise reasoning with evidence)
-- Adversarial (thesis attack from multiple angles)
-- Multi-document synthesis (cross-company, cross-filing)
+See [docs/architecture.md](docs/architecture.md) for the full system architecture, data flow, and tech stack.
+See [docs/agents.md](docs/agents.md) for agent descriptions and the orchestration model.
+See [docs/tools.md](docs/tools.md) for MCP tool reference and how to add new tools.
 
 ## Getting Started
 
-### MCP Server
+### Prerequisites
+
+- **Node.js** 22+ and npm
+- **Python** 3.12+ with venv
+
+### MCP Server (TypeScript)
 
 ```bash
 cd mcp-server
@@ -70,7 +44,7 @@ npm run build
 npm test
 ```
 
-### Agents
+### Agents (Python)
 
 ```bash
 cd agents
@@ -80,21 +54,43 @@ pip install -e ".[dev]"
 pytest
 ```
 
+Optional dependencies for quant and RAG features:
+
+```bash
+pip install -e ".[quant]"    # numpy, pandas, scipy
+pip install -e ".[rag]"      # chromadb
+```
+
 ### Preflight (run before every push)
+
+From the repo root:
 
 ```bash
 npm run preflight
 ```
 
-## Tech Stack
+This mirrors CI exactly: build → test → lint (TypeScript), then ruff → pytest (Python). A push that fails CI is a wasted round-trip.
 
-| Layer | Technology |
-|---|---|
-| MCP Server | TypeScript, `@modelcontextprotocol/sdk` |
-| Agents | Python, NumPy, pandas |
-| Vector DB | ChromaDB (v0) |
-| LLM Backend | Claude / GPT-4 / open models (configurable) |
-| Data Sources | SEC EDGAR, FRED, Yahoo Finance, QIF |
+## Development
+
+### Git Workflow
+
+- Never commit to `main` — use worktrees and feature branches
+- Branch naming: `<username>/<MeaningfulDescription>`
+- Every PR must have a corresponding issue created first
+- Run `npm run preflight` before pushing
+
+### Adding a New MCP Tool
+
+1. Create `mcp-server/src/tools/<name>.ts` exporting `registerXxxTool(server)`
+2. Register in `src/index.ts`
+3. Add tests in `mcp-server/tests/<name>.test.ts`
+
+### Adding a New Agent
+
+1. Create `agents/src/agents/<name>.py` extending `BaseAgent`
+2. Implement `run()` and `system_prompt` property
+3. Add tests in `agents/tests/test_<name>.py`
 
 ## License
 

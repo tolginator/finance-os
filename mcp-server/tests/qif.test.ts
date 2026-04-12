@@ -242,6 +242,34 @@ T100
 });
 
 // ============================================================================
+// parseQif — Security sections
+// ============================================================================
+
+describe("parseQif security sections", () => {
+  it("parses !Type:Security blocks into securities array", () => {
+    const qif = `!Type:Security
+NAAPL Inc
+SAAPL
+TStock
+^
+!Type:Security
+NMSFT Corp
+SMSFT
+TMutual Fund
+^
+`;
+    const data = parseQif(qif);
+    expect(data.securities).toHaveLength(2);
+    expect(data.securities[0].name).toBe("AAPL Inc");
+    expect(data.securities[0].symbol).toBe("AAPL");
+    expect(data.securities[0].type).toBe("Stock");
+    expect(data.securities[1].name).toBe("MSFT Corp");
+    expect(data.securities[1].symbol).toBe("MSFT");
+    expect(data.securities[1].type).toBe("Mutual Fund");
+  });
+});
+
+// ============================================================================
 // QIF MCP tool registration
 // ============================================================================
 

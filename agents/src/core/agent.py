@@ -1,6 +1,5 @@
 """Base agent class for finance-os domain agents."""
 
-from __future__ import annotations
 
 import abc
 from dataclasses import dataclass, field

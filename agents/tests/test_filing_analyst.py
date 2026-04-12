@@ -10,7 +10,14 @@ from src.agents.filing_analyst import (
     _ticker_cik_cache,
     resolve_cik,
 )
+from src.application.config import AppConfig
 from src.core.agent import AgentResponse
+
+_config = AppConfig()
+requires_edgar = pytest.mark.skipif(
+    not _config.sec_edgar_email,
+    reason="SEC EDGAR email not configured (sec_edgar_email empty)",
+)
 
 # Sample SEC company_tickers.json response
 MOCK_TICKERS_DATA = {
@@ -164,6 +171,8 @@ class TestFilingAnalystAgent:
         assert isinstance(response, AgentResponse)
 
 
+@pytest.mark.integration
+@requires_edgar
 class TestFilingAnalystLive:
     """Integration tests hitting real SEC EDGAR APIs."""
 

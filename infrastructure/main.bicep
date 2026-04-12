@@ -3,7 +3,8 @@
 // Deploys:
 //   1. Azure OpenAI (Cognitive Services) with Entra-only auth (API keys disabled)
 //   2. Model deployment (e.g. gpt-4.1-mini)
-//   3. RBAC role assignment for the specified principal
+//   3. RBAC role assignments for the operator and CI identity
+//   4. User Assigned Managed Identity with GitHub Actions OIDC federation
 //
 // Usage:
 //   az deployment group create \
@@ -47,6 +48,12 @@ param principalId string
 @allowed(['User', 'ServicePrincipal', 'Group'])
 param principalType string = 'User'
 
+@description('Name of the managed identity for CI/CD.')
+param ciIdentityName string = 'finance-os-ci'
+
+@description('GitHub repository in owner/repo format for OIDC federation.')
+param gitHubRepo string = 'tolginator/finance-os'
+
 // ── Modules ─────────────────────────────────────────────────────────────────
 
 module openAi 'modules/cognitive-services.bicep' = {
@@ -63,12 +70,30 @@ module openAi 'modules/cognitive-services.bicep' = {
   }
 }
 
+module ciIdentity 'modules/managed-identity.bicep' = {
+  name: 'ci-identity-${uniqueString(resourceGroup().id)}'
+  params: {
+    location: location
+    identityName: ciIdentityName
+    gitHubRepo: gitHubRepo
+  }
+}
+
 module rbac 'modules/role-assignment.bicep' = {
   name: 'rbac-${uniqueString(resourceGroup().id, principalId)}'
   params: {
     openAiAccountName: openAi.outputs.accountName
     principalId: principalId
     principalType: principalType
+  }
+}
+
+module ciRbac 'modules/role-assignment.bicep' = {
+  name: 'rbac-ci-${uniqueString(resourceGroup().id, ciIdentity.outputs.principalId)}'
+  params: {
+    openAiAccountName: openAi.outputs.accountName
+    principalId: ciIdentity.outputs.principalId
+    principalType: 'ServicePrincipal'
   }
 }
 
@@ -79,3 +104,6 @@ output endpoint string = openAi.outputs.endpoint
 
 @description('Model deployment name — use as azure.deployment in config.json.')
 output deploymentName string = openAi.outputs.deploymentName
+
+@description('CI managed identity client ID — set as AZURE_CLIENT_ID in GitHub.')
+output ciClientId string = ciIdentity.outputs.clientId

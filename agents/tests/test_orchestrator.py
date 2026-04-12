@@ -225,3 +225,62 @@ async def test_pipeline_empty_task_list(orchestrator: Orchestrator) -> None:
     assert result.successful == 0
     assert result.failed == 0
     assert result.results == []
+
+
+# ---------------------------------------------------------------------------
+# task_id tests
+# ---------------------------------------------------------------------------
+
+
+def test_task_id_defaults_to_agent_name() -> None:
+    agent = MockAgent("analyst")
+    task = AgentTask(agent=agent, prompt="go")
+    assert task.id == "analyst"
+
+
+def test_task_id_explicit() -> None:
+    agent = MockAgent("analyst")
+    task = AgentTask(agent=agent, prompt="go", task_id="task-1")
+    assert task.id == "task-1"
+
+
+async def test_run_task_includes_task_id(orchestrator: Orchestrator) -> None:
+    agent = MockAgent("analyst")
+    task = AgentTask(agent=agent, prompt="go", task_id="custom-id")
+    result = await orchestrator.run_task(task)
+    assert result.task_id == "custom-id"
+
+
+async def test_run_task_default_task_id(orchestrator: Orchestrator) -> None:
+    agent = MockAgent("analyst")
+    task = AgentTask(agent=agent, prompt="go")
+    result = await orchestrator.run_task(task)
+    assert result.task_id == "analyst"
+
+
+async def test_pipeline_same_agent_different_task_ids(
+    orchestrator: Orchestrator,
+) -> None:
+    """The same agent can run multiple times with different task IDs."""
+    agent = MockAgent("shared-agent", "output")
+    tasks = [
+        AgentTask(agent=agent, prompt="task 1", task_id="t1"),
+        AgentTask(agent=agent, prompt="task 2", task_id="t2"),
+    ]
+    result = await orchestrator.run_pipeline(tasks)
+    assert result.successful == 2
+    task_ids = {r.task_id for r in result.results}
+    assert task_ids == {"t1", "t2"}
+
+
+async def test_pipeline_task_id_dependencies(orchestrator: Orchestrator) -> None:
+    """Dependencies can reference task IDs instead of agent names."""
+    agent = MockAgent("worker", "done")
+    tasks = [
+        AgentTask(agent=agent, prompt="first", task_id="step-1"),
+        AgentTask(agent=agent, prompt="second", task_id="step-2", depends_on=["step-1"]),
+    ]
+    result = await orchestrator.run_pipeline(tasks)
+    assert result.successful == 2
+    ids = [r.task_id for r in result.results]
+    assert ids.index("step-1") < ids.index("step-2")

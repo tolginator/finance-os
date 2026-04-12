@@ -23,7 +23,7 @@ finance-os/
 │   └── src/
 │       ├── agents/      # Domain agents (filing, earnings, macro, risk, etc.)
 │       ├── core/        # BaseAgent, orchestrator, vector memory
-│       ├── application/ # Shared contracts, LLM gateway, services (planned)
+│       ├── application/ # Contracts, LLM gateway, services, config
 │       └── pipelines/   # Research digest pipeline
 ├── prompts/             # Shared prompt library
 ├── docs/                # Architecture, agent, and tool documentation
@@ -57,15 +57,23 @@ cd agents
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
-pytest
+pytest -m "not integration"    # unit tests only
+pytest -m integration          # integration tests (requires API keys)
 ```
 
-Optional dependencies for quant and RAG features:
+### Configuration
 
-```bash
-pip install -e ".[quant]"    # numpy, pandas, scipy
-pip install -e ".[rag]"      # chromadb
+Create `~/.config/finance-os/config.json`:
+
+```json
+{
+  "fred_api_key": "your-fred-api-key",
+  "llm_provider": "skip",
+  "llm_default_model": "gpt-4o"
+}
 ```
+
+Environment variables (`FINANCE_OS_*`) override config file values. See [docs/architecture.md](docs/architecture.md) for details.
 
 ### Preflight (run before every push)
 
@@ -75,13 +83,14 @@ From the repo root:
 npm run preflight
 ```
 
-This mirrors CI exactly: build → test → lint (TypeScript), then ruff → pytest (Python). A push that fails CI is a wasted round-trip.
+This mirrors CI: build → unit test → lint (TypeScript), then ruff → unit pytest (Python). Integration tests run in CI only on pushes to `main`.
 
 ## Development
 
 ### Git Workflow
 
 - Never commit to `main` — use worktrees and feature branches
+- Make separate, descriptive commits per logical change; squash merge PRs
 - Branch naming: `<username>/<MeaningfulDescription>`
 - Every PR must have a corresponding issue created first
 - Run `npm run preflight` before pushing

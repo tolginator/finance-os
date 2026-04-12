@@ -8,6 +8,7 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts --passWithNoTests",
     "test:watch": "vitest",
     "lint": "eslint src/ tests/"
   },

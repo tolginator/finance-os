@@ -91,7 +91,7 @@ Environment variables (`FINANCE_OS_*`) override config file values — use doubl
 | `fred_api_key` | API key string | [FRED API](https://fred.stlouisfed.org/docs/api/api_key.html) key for the macro-regime agent. Free to obtain. |
 | `sec_edgar_email` | Email address | **Required for SEC API access.** SEC requires a valid contact email in request headers — set this to a real email you control. |
 
-> **Azure authentication**: Uses `DefaultAzureCredential` which supports Azure CLI (`az login`), managed identity, workload identity, and environment credentials. No API keys are stored in config. Requires the `Cognitive Services OpenAI User` RBAC role on the Azure OpenAI resource.
+> **Azure authentication**: Uses `DefaultAzureCredential` which supports Azure CLI (`az login`), managed identity, workload identity, and environment credentials. No API keys are stored in config. Requires the `Cognitive Services OpenAI User` RBAC role on the Azure OpenAI resource. See the [Azure Deployment Guide](docs/azure-deployment.md) for step-by-step setup.
 
 ### Agent CLI
 

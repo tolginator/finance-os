@@ -52,3 +52,6 @@ htmlcov/
 *.faiss
 *.index
 chroma/
+
+# Infrastructure — real parameters contain principal IDs
+infrastructure/parameters.bicepparam

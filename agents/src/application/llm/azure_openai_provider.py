@@ -24,10 +24,10 @@ class AzureOpenAIProvider:
         api_version: str = "2024-10-21",
     ) -> None:
         if not endpoint:
-            msg = "Azure OpenAI endpoint is required (set azure_openai_endpoint in config)"
+            msg = "Azure OpenAI endpoint is required (set azure.endpoint in config)"
             raise ValueError(msg)
         if not deployment:
-            msg = "Azure OpenAI deployment is required (set azure_openai_deployment in config)"
+            msg = "Azure OpenAI deployment is required (set azure.deployment in config)"
             raise ValueError(msg)
 
         self._deployment = deployment

@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from pydantic import BaseModel
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource
 
 CONFIG_DIR = Path.home() / ".config" / "finance-os"
@@ -19,6 +20,14 @@ def _load_config_file() -> dict[str, Any]:
     if CONFIG_FILE.is_file():
         return json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
     return {}
+
+
+class AzureOpenAIConfig(BaseModel):
+    """Nested config for Azure OpenAI with Entra ID auth."""
+
+    endpoint: str = ""
+    deployment: str = ""
+    api_version: str = "2024-10-21"
 
 
 class JsonFileSource(PydanticBaseSettingsSource):
@@ -42,18 +51,29 @@ class AppConfig(BaseSettings):
     1. Environment variables with FINANCE_OS_ prefix (highest priority)
     2. ~/.config/finance-os/config.json
     3. Built-in defaults
+
+    Azure config uses a nested object in JSON::
+
+        {
+          "llm_provider": "azure_openai",
+          "azure": {
+            "endpoint": "https://my-instance.openai.azure.com",
+            "deployment": "gpt-4o"
+          }
+        }
+
+    Or via env vars: FINANCE_OS_AZURE__ENDPOINT, FINANCE_OS_AZURE__DEPLOYMENT
+    (double underscore for nested fields).
     """
 
-    model_config = {"env_prefix": "FINANCE_OS_"}
+    model_config = {"env_prefix": "FINANCE_OS_", "env_nested_delimiter": "__"}
 
     llm_provider: str = "skip"
     llm_default_model: str = "gpt-4o"
     llm_temperature: float = 0.0
     fred_api_key: str = ""
     sec_edgar_email: str = ""
-    azure_openai_endpoint: str = ""
-    azure_openai_deployment: str = ""
-    azure_openai_api_version: str = "2024-10-21"
+    azure: AzureOpenAIConfig = AzureOpenAIConfig()
 
     @classmethod
     def settings_customise_sources(

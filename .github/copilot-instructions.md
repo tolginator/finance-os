@@ -95,10 +95,12 @@ These rules exist because this is financial software. Violations produce incorre
 ### Running Tests
 
 - **MCP Server**: `cd mcp-server && npm test`
-- **Agents**: `cd agents && pytest`
+- **Agents**: `cd agents && source .venv/bin/activate && pytest`
 - **Full suite**: `npm test` (from root, runs workspace tests)
-- **Python type checking**: `cd agents && mypy src/`
-- **Linting**: `npm run lint` (root), `cd agents && ruff check src/ tests/`
+- **Python type checking**: `cd agents && source .venv/bin/activate && mypy src/`
+- **Linting**: `npm run lint` (root), `cd agents && source .venv/bin/activate && ruff check src/ tests/`
+
+> **Note**: Python requires a virtual environment. Set up once: `cd agents && python3 -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]"`
 
 ### Pre-Push Preflight
 
@@ -190,18 +192,20 @@ Examples: `tolginator/AddEdgarPipeline`, `copilot/RefactorAgentFramework`
 
 ## Issues and Pull Requests
 
-### Issue Structure
+### Issue-First Workflow
 
-Use **parent issue + sub-issues** for multi-step features:
+**Every PR must have a corresponding issue created before the PR.** No exceptions. Issues are the unit of work; PRs are the delivery mechanism.
 
-1. Create parent issue with goals, architecture, progress checklist.
-2. Create sub-issues referencing the parent (e.g., "Part of #1").
-3. Update parent checklist to link sub-issues.
-4. Close sub-issues as merged; close parent when all complete.
+1. Before starting work, create an issue describing what will be built.
+2. For multi-step features, use **parent issue + sub-issues**:
+   - Create parent issue with goals, architecture, progress checklist.
+   - Create sub-issues referencing the parent (e.g., "Part of #1").
+   - Update parent checklist to link sub-issues.
+   - Close sub-issues as merged; close parent when all complete.
+3. Every PR body must reference its issue(s) via closing keywords (`Closes #N`) or references (`Part of #N`).
 
 ### Pull Requests
 
-- Every PR links to issues via closing keywords (`Closes #N`) or references (`Part of #N`).
 - Use `gh pr create --title "..." --body "Closes #N"`.
 - **Assign every PR to the "finance-os" GitHub Project** (if one exists). If token lacks `read:project` scope, inform the user to assign manually.
 

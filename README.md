@@ -74,8 +74,16 @@ npm test
 
 ```bash
 cd agents
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -e ".[dev]"
 pytest
+```
+
+### Preflight (run before every push)
+
+```bash
+npm run preflight
 ```
 
 ## Tech Stack

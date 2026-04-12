@@ -61,13 +61,6 @@ pytest -m "not integration"    # unit tests only
 pytest -m integration          # integration tests (requires API keys)
 ```
 
-Optional dependencies for quant and RAG features:
-
-```bash
-pip install -e ".[quant]"    # numpy, pandas, scipy
-pip install -e ".[rag]"      # chromadb
-```
-
 ### Configuration
 
 Create `~/.config/finance-os/config.json`:

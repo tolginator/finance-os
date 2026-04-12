@@ -44,7 +44,7 @@
 | Vector DB | ChromaDB (local) |
 | LLM Gateway | Pluggable — OpenAI, Anthropic, ollama, or host LLM via MCP |
 | Data Sources | SEC EDGAR (free), FRED (free API key), Yahoo Finance, QIF |
-| CLI | Python (`python -m agents.cli`, planned) |
+| CLI | Python (`finance-os` console script) |
 | Copilot Skills | Markdown workflow definitions (`.github/skills/`, planned) |
 | Testing | Vitest (TypeScript), pytest with markers (Python) — unit and integration separated |
 | Linting | ESLint (TypeScript), ruff (Python) |
@@ -67,21 +67,62 @@ The LLM gateway is a first-class component in the application layer. It resolves
 
 ### Two inference paths
 
-| Path | How LLM reasoning works |
-|---|---|
-| **MCP path** (Copilot, Claude Desktop) | Host LLM calls MCP tools → agents return structured data + prompts → host LLM synthesizes. Gateway is **skipped**. |
-| **Direct path** (CLI, future Web API) | User invokes agent → application layer calls LLM gateway → agents return data → gateway calls LLM for synthesis. |
+```
+                         ┌─────────────────────────────────────────────┐
+                         │           MCP Path (Copilot / Claude)       │
+                         │                                             │
+  User ──→ Copilot ──→ Host LLM ──→ MCP Server ──→ Agent Service     │
+                 ↑         │              ↑              │             │
+                 │         │              │              ↓             │
+                 │         │         SkipProvider    Agents run()      │
+                 │         │         (no LLM call)   (data + prompts)  │
+                 │         │                             │             │
+                 │         ←── synthesizes from ─────────┘             │
+                 │              agent output                           │
+                 └─────────── returns to user                         │
+                         └─────────────────────────────────────────────┘
 
-### Why this matters
+                         ┌─────────────────────────────────────────────┐
+                         │           CLI Path (Direct)                 │
+                         │                                             │
+  User ──→ finance-os ──→ AppConfig ──→ Agent Service                 │
+              CLI              │              │                        │
+               │               │              ↓                        │
+               │               │         Agents run()                  │
+               │               │         (data + prompts)              │
+               │               │              │                        │
+               │               │              ↓                        │
+               │      --synthesize?     structured output              │
+               │           │                  │                        │
+               │      ┌────┴────┐             │                        │
+               │      │   YES   │       ┌─────┴─────┐                 │
+               │      ↓         │       │    NO     │                  │
+               │  LLM Gateway   │       ↓           │                 │
+               │      │         │  print as-is      │                 │
+               │      ↓         │  (text / json)    │                 │
+               │  LiteLLMProvider       │           │                  │
+               │      │         │       │           │                  │
+               │      ↓         │       │           │                  │
+               │  OpenAI /      │       │           │                  │
+               │  Anthropic /   │       │           │                  │
+               │  Ollama        │       │           │                  │
+               │      │         │       │           │                  │
+               │      ↓         │       │           │                  │
+               │  synthesized   │       │           │                  │
+               │  narrative     │       │           │                  │
+               │      └─────────┴───────┴───→ User  │                 │
+               │                                                       │
+               └───────────────────────────────────────────────────────┘
+```
 
-The agents currently build prompts and structure data but **never call an LLM**. This is correct for the MCP path where the host LLM reasons. But the CLI and web paths need their own LLM inference — the gateway provides it without duplicating agent logic.
+**Key difference**: In the MCP path, the host LLM (Copilot/Claude) does all reasoning — agents just return data. In the CLI path, agents return data by default; the LLM gateway is only invoked when `--synthesize` is explicitly requested.
 
-### Provider flexibility
-
-The gateway is pluggable:
-- **Cloud**: OpenAI, Anthropic, Google (via litellm or native SDKs)
-- **Local**: ollama, llama.cpp
-- **Skip**: MCP consumers can bypass the gateway entirely
+| Path | Who reasons? | Gateway | LLM cost |
+|---|---|---|---|
+| **MCP** (Copilot, Claude Desktop) | Host LLM | `SkipProvider` (no-op) | Included in host |
+| **CLI** (no `--synthesize`) | Nobody — raw output | Not called | Zero |
+| **CLI** (`--synthesize`) | LLM via gateway | `LiteLLMProvider` | Pay-per-call |
+| **Web API** (future) | LLM via gateway | `LiteLLMProvider` | Pay-per-call |
 
 ## Data Flow
 
@@ -170,6 +211,6 @@ Shared prompt templates organized by strategy:
 | Component | Issue | Status |
 |---|---|---|
 | Application layer (contracts, LLM gateway, services, config) | #49 | ✅ Complete |
-| Agent CLI | #50 | Next |
+| Agent CLI | #50 | ✅ Complete |
 | Python MCP server | #51 | Next |
 | Copilot Skills | #53 | Blocked on #50, #51 |

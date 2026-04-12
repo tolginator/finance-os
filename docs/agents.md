@@ -7,6 +7,10 @@ All agents extend `BaseAgent` in `agents/src/core/agent.py`, which defines:
 - `system_prompt` — the agent's persona and capabilities
 - Conversation history management
 
+### Current state: no LLM calls
+
+Agents currently perform deterministic data processing (regex, heuristics, statistics) and construct prompts, but **do not call an LLM directly**. This is by design for the MCP path, where the host LLM (Copilot, Claude Desktop) does the reasoning. For the CLI and future web paths, the **LLM gateway** in the application layer will handle inference — see [architecture.md](architecture.md#llm-gateway).
+
 ## Agent Catalog
 
 | Agent | Module | Purpose |

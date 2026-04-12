@@ -2,9 +2,13 @@
 
 ## Overview
 
-The MCP server (`mcp-server/`) exposes tools to LLMs via the Model Context Protocol. Each tool is a self-contained TypeScript module that registers with the server via `server.tool()`.
+finance-os has two MCP servers:
 
-## Tool Catalog
+1. **TypeScript MCP server** (`mcp-server/`) — data tools that fetch, parse, and compute financial data. These are stateless request handlers callable by any LLM via the Model Context Protocol.
+
+2. **Python MCP server** (planned, `agents/src/mcp_server.py`) — agent tools that expose the Python agent framework to LLMs. Wraps the shared application layer. When a host LLM calls these tools, the LLM gateway is skipped (the host LLM does the reasoning).
+
+## TypeScript Tool Catalog
 
 | Tool | Module | Purpose |
 |---|---|---|

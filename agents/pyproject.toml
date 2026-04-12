@@ -2,7 +2,7 @@
 name = "finance-os-agents"
 version = "0.1.0"
 description = "Domain-tuned AI agents for personal investment intelligence"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 license = {text = "MIT"}
 dependencies = [
     "anthropic>=0.94.0",
@@ -33,14 +33,14 @@ build-backend = "hatchling.build"
 packages = ["src"]
 
 [tool.ruff]
-target-version = "py311"
+target-version = "py312"
 line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP"]
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.12"
 strict = true
 warn_return_any = true
 warn_unused_configs = true

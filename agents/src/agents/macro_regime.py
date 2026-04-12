@@ -4,7 +4,6 @@ Analyzes FRED economic indicators and textual signals to classify
 the current macro regime as expansion, contraction, or transition.
 """
 
-from __future__ import annotations
 
 import json
 import urllib.error

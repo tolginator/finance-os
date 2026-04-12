@@ -1,6 +1,5 @@
 """Tests for the quant_signal agent and its helper functions."""
 
-from __future__ import annotations
 
 from decimal import Decimal
 

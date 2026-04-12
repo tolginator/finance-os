@@ -1,6 +1,5 @@
 """Tests for the vector memory module."""
 
-from __future__ import annotations
 
 import pytest
 

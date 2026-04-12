@@ -5,7 +5,6 @@ and stress-test scenario analysis using only ``decimal.Decimal``
 arithmetic (no floats).
 """
 
-from __future__ import annotations
 
 import math
 from dataclasses import dataclass

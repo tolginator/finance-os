@@ -5,7 +5,6 @@ when underlying conditions weaken or break, triggering alerts at
 appropriate severity levels.
 """
 
-from __future__ import annotations
 
 import re
 from dataclasses import dataclass, replace

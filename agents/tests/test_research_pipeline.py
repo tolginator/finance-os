@@ -1,6 +1,5 @@
 """Tests for the research digest pipeline."""
 
-from __future__ import annotations
 
 from decimal import Decimal
 

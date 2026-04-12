@@ -4,7 +4,6 @@ Extracts key changes in risk factors, MD&A, financial statements,
 and capex from 10-K/10-Q filings.
 """
 
-from __future__ import annotations
 
 import json
 import urllib.error

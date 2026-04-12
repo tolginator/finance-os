@@ -4,7 +4,6 @@ Generates counter-arguments, identifies blind spots, and stress-tests
 investment theses to surface risks and strengthen conviction.
 """
 
-from __future__ import annotations
 
 from dataclasses import dataclass, field
 from decimal import Decimal

@@ -1,6 +1,5 @@
 """Multi-agent orchestrator for coordinating finance-os domain agents."""
 
-from __future__ import annotations
 
 import asyncio
 import time

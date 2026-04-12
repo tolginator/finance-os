@@ -30,7 +30,7 @@ jobs:
   mcp-server-integration:
     name: MCP Server – Integration (TypeScript)
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
     defaults:
       run:
         working-directory: mcp-server
@@ -62,7 +62,7 @@ jobs:
   agents-integration:
     name: Agents – Integration (Python)
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
     defaults:
       run:
         working-directory: agents

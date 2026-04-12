@@ -82,7 +82,7 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
       - name: Verify Azure auth
-        run: az account show --query "{subscription: name, user: user.name}" -o table
+        run: 'az account show --query "{subscription: name, user: user.name}" -o table'
       - name: Run integration tests
         env:
           FINANCE_OS_LLM_PROVIDER: azure_openai

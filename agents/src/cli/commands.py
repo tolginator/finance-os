@@ -58,6 +58,14 @@ def _load_config() -> AppConfig:
 
 def _create_gateway(config: AppConfig, model_override: str = "") -> LLMGateway:
     """Create LLM gateway from config with optional model override."""
+    if config.llm_provider == "azure_openai":
+        deployment = model_override or config.azure_openai_deployment
+        return create_gateway(
+            provider_type="azure_openai",
+            endpoint=config.azure_openai_endpoint,
+            deployment=deployment,
+            api_version=config.azure_openai_api_version,
+        )
     model = model_override or config.llm_default_model
     return create_gateway(
         provider_type=config.llm_provider,
@@ -269,6 +277,10 @@ def show_config(args: argparse.Namespace) -> None:
         "llm_default_model": config.llm_default_model,
         "llm_temperature": config.llm_temperature,
         "fred_api_key": _mask(config.fred_api_key),
+        "sec_edgar_email": config.sec_edgar_email or "(not set)",
+        "azure_openai_endpoint": config.azure_openai_endpoint or "(not set)",
+        "azure_openai_deployment": config.azure_openai_deployment or "(not set)",
+        "azure_openai_api_version": config.azure_openai_api_version,
     }
     if args.output == "json":
         print(json.dumps(data, indent=2))

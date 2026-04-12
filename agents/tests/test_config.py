@@ -17,11 +17,11 @@ class TestAppConfig:
         assert config.fred_api_key == ""
 
     def test_env_override(self, monkeypatch):
-        monkeypatch.setenv("FINANCE_OS_LLM_PROVIDER", "litellm")
-        monkeypatch.setenv("FINANCE_OS_LLM_DEFAULT_MODEL", "claude-sonnet-4")
+        monkeypatch.setenv("FINANCE_OS_LLM_PROVIDER", "azure_openai")
+        monkeypatch.setenv("FINANCE_OS_AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
         config = AppConfig()
-        assert config.llm_provider == "litellm"
-        assert config.llm_default_model == "claude-sonnet-4"
+        assert config.llm_provider == "azure_openai"
+        assert config.azure_openai_deployment == "gpt-4o"
 
     def test_fred_api_key_from_env(self, monkeypatch):
         monkeypatch.setenv("FINANCE_OS_FRED_API_KEY", "test-key-123")
@@ -29,23 +29,23 @@ class TestAppConfig:
         assert config.fred_api_key == "test-key-123"
 
     def test_config_file_loads(self, tmp_path, monkeypatch):
-        cfg = {"fred_api_key": "file-key-456", "llm_provider": "litellm"}
+        cfg = {"fred_api_key": "file-key-456", "llm_provider": "azure_openai"}
         cfg_file = tmp_path / "config.json"
         cfg_file.write_text(json.dumps(cfg))
         monkeypatch.setattr("src.application.config.CONFIG_FILE", cfg_file)
         config = AppConfig()
         assert config.fred_api_key == "file-key-456"
-        assert config.llm_provider == "litellm"
+        assert config.llm_provider == "azure_openai"
 
     def test_env_overrides_config_file(self, tmp_path, monkeypatch):
-        cfg = {"fred_api_key": "file-key", "llm_provider": "litellm"}
+        cfg = {"fred_api_key": "file-key", "llm_provider": "azure_openai"}
         cfg_file = tmp_path / "config.json"
         cfg_file.write_text(json.dumps(cfg))
         monkeypatch.setattr("src.application.config.CONFIG_FILE", cfg_file)
         monkeypatch.setenv("FINANCE_OS_FRED_API_KEY", "env-key")
         config = AppConfig()
         assert config.fred_api_key == "env-key"
-        assert config.llm_provider == "litellm"
+        assert config.llm_provider == "azure_openai"
 
     def test_missing_config_file_uses_defaults(self, tmp_path, monkeypatch):
         monkeypatch.setattr(

@@ -1,5 +1,7 @@
 """Tests for the LLM gateway and providers."""
 
+from unittest.mock import patch
+
 import pytest
 
 from src.application.llm.gateway import LLMGateway, create_gateway
@@ -133,8 +135,36 @@ class TestCreateGateway:
         with pytest.raises(ValueError, match="Unknown provider"):
             create_gateway("nonexistent")
 
-    def test_litellm_provider(self):
-        gateway = create_gateway("litellm", default_model="gpt-4o-mini")
-        from src.application.llm.litellm_provider import LiteLLMProvider
+    def test_azure_openai_provider(self):
+        with patch(
+            "src.application.llm.azure_openai_provider.DefaultAzureCredential"
+        ), patch(
+            "src.application.llm.azure_openai_provider.get_bearer_token_provider",
+            return_value=lambda: "fake-token",
+        ), patch(
+            "src.application.llm.azure_openai_provider.AsyncAzureOpenAI"
+        ):
+            gateway = create_gateway(
+                "azure_openai",
+                endpoint="https://test.openai.azure.com",
+                deployment="gpt-4o",
+            )
+            from src.application.llm.azure_openai_provider import AzureOpenAIProvider
 
-        assert isinstance(gateway.provider, LiteLLMProvider)
+            assert isinstance(gateway.provider, AzureOpenAIProvider)
+
+    def test_azure_openai_missing_endpoint_raises(self):
+        with pytest.raises(ValueError, match="endpoint is required"):
+            create_gateway(
+                "azure_openai",
+                endpoint="",
+                deployment="gpt-4o",
+            )
+
+    def test_azure_openai_missing_deployment_raises(self):
+        with pytest.raises(ValueError, match="deployment is required"):
+            create_gateway(
+                "azure_openai",
+                endpoint="https://test.openai.azure.com",
+                deployment="",
+            )

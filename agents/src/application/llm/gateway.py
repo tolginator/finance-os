@@ -87,7 +87,7 @@ def create_gateway(provider_type: str = "skip", **kwargs: Any) -> LLMGateway:
     """Factory for creating configured gateways.
 
     Args:
-        provider_type: One of "skip", "litellm".
+        provider_type: One of "skip", "azure_openai".
         **kwargs: Provider-specific configuration.
 
     Returns:
@@ -95,10 +95,10 @@ def create_gateway(provider_type: str = "skip", **kwargs: Any) -> LLMGateway:
     """
     if provider_type == "skip":
         return LLMGateway(SkipProvider())
-    elif provider_type == "litellm":
-        from src.application.llm.litellm_provider import LiteLLMProvider
+    elif provider_type == "azure_openai":
+        from src.application.llm.azure_openai_provider import AzureOpenAIProvider
 
-        return LLMGateway(LiteLLMProvider(**kwargs))
+        return LLMGateway(AzureOpenAIProvider(**kwargs))
     else:
-        msg = f"Unknown provider type: {provider_type}"
+        msg = f"Unknown provider type: {provider_type}. Valid values: 'skip', 'azure_openai'"
         raise ValueError(msg)

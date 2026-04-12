@@ -51,6 +51,9 @@ class AppConfig(BaseSettings):
     llm_temperature: float = 0.0
     fred_api_key: str = ""
     sec_edgar_email: str = ""
+    azure_openai_endpoint: str = ""
+    azure_openai_deployment: str = ""
+    azure_openai_api_version: str = "2024-10-21"
 
     @classmethod
     def settings_customise_sources(

@@ -197,8 +197,11 @@ Examples: `tolginator/AddEdgarPipeline`, `copilot/RefactorAgentFramework`
 0. **Never commit to main.** Main is only for PRs and production builds.
 1. `git worktree add <path> -b <username>/<task> origin/main`
 2. Work exclusively in the worktree.
-3. Run `npm run preflight` — fix any failures before pushing.
-4. Commit, push, create PR targeting `main`.
+3. Make **separate, descriptive commits** for each logical change within a PR.
+4. Do **not** amend or force-push — keep the commit history intact for review.
+5. Run `npm run preflight` — fix any failures before pushing.
+6. Commit, push, create PR targeting `main`.
+7. **Squash merge** when merging PRs into main (`gh pr merge --squash`).
 
 ### After PR Merge
 

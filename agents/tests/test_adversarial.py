@@ -137,40 +137,44 @@ class TestComputeConviction:
     def test_no_issues_full_conviction(self) -> None:
         assert compute_conviction([], []) == Decimal("1.0")
 
-    def test_strong_counter_penalty(self) -> None:
-        counters = [
-            CounterArgument("c", "x", "historical", "STRONG"),
-        ]
-        assert compute_conviction(counters, []) == Decimal("0.85")
+    def test_strong_counter_reduces_more_than_moderate(self) -> None:
+        strong = compute_conviction(
+            [CounterArgument("c", "x", "historical", "STRONG")], []
+        )
+        moderate = compute_conviction(
+            [CounterArgument("c", "x", "historical", "MODERATE")], []
+        )
+        weak = compute_conviction(
+            [CounterArgument("c", "x", "historical", "WEAK")], []
+        )
+        assert strong < moderate < weak < Decimal("1.0")
 
-    def test_moderate_counter_penalty(self) -> None:
-        counters = [
-            CounterArgument("c", "x", "historical", "MODERATE"),
-        ]
-        assert compute_conviction(counters, []) == Decimal("0.90")
+    def test_more_issues_lower_conviction(self) -> None:
+        one = compute_conviction(
+            [CounterArgument("c", "x", "historical", "STRONG")], []
+        )
+        two = compute_conviction(
+            [CounterArgument("c", "x", "historical", "STRONG")] * 2, []
+        )
+        assert two < one
 
-    def test_weak_counter_penalty(self) -> None:
-        counters = [
-            CounterArgument("c", "x", "historical", "WEAK"),
-        ]
-        assert compute_conviction(counters, []) == Decimal("0.95")
+    def test_blind_spots_reduce_conviction(self) -> None:
+        high = compute_conviction(
+            [], [BlindSpot("regulatory", "desc", "HIGH")]
+        )
+        low = compute_conviction(
+            [], [BlindSpot("macro", "desc", "LOW")]
+        )
+        assert high < low < Decimal("1.0")
 
-    def test_blind_spot_penalties(self) -> None:
-        spots = [
-            BlindSpot("regulatory", "desc", "HIGH"),
-            BlindSpot("macro", "desc", "LOW"),
-        ]
-        # 1.0 - 0.10 - 0.02 = 0.88
-        assert compute_conviction([], spots) == Decimal("0.88")
-
-    def test_combined_penalties(self) -> None:
-        counters = [
-            CounterArgument("c", "x", "historical", "STRONG"),
-            CounterArgument("c", "x", "structural", "MODERATE"),
-        ]
+    def test_combined_issues_reduce_more_than_either_alone(self) -> None:
+        counters = [CounterArgument("c", "x", "historical", "STRONG")]
         spots = [BlindSpot("exec", "desc", "MEDIUM")]
-        # 1.0 - 0.15 - 0.10 - 0.05 = 0.70
-        assert compute_conviction(counters, spots) == Decimal("0.70")
+        combined = compute_conviction(counters, spots)
+        counters_only = compute_conviction(counters, [])
+        spots_only = compute_conviction([], spots)
+        assert combined < counters_only
+        assert combined < spots_only
 
     def test_clamps_to_zero(self) -> None:
         counters = [

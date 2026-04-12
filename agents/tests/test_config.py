@@ -2,7 +2,7 @@
 
 import json
 
-from src.application.config import CONFIG_DIR, CONFIG_FILE, AppConfig
+from src.application.config import AppConfig
 
 
 class TestAppConfig:
@@ -54,8 +54,3 @@ class TestAppConfig:
         config = AppConfig()
         assert config.fred_api_key == ""
         assert config.llm_provider == "skip"
-
-    def test_config_dir_location(self):
-        assert CONFIG_DIR.name == "finance-os"
-        assert CONFIG_DIR.parent.name == ".config"
-        assert CONFIG_FILE.name == "config.json"

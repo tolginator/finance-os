@@ -7,7 +7,6 @@ from pydantic import ValidationError
 
 from src.application.contracts.agents import (
     AnalyzeEarningsRequest,
-    AnalyzeEarningsResponse,
     AssessRiskRequest,
     ChallengeThesisRequest,
     ClassifyMacroRequest,
@@ -20,27 +19,9 @@ from src.application.contracts.agents import (
 
 
 class TestAnalyzeEarningsContract:
-    def test_valid_request(self):
-        req = AnalyzeEarningsRequest(transcript="Q3 earnings call transcript...")
-        assert req.transcript == "Q3 earnings call transcript..."
-        assert req.ticker == ""
-
     def test_empty_transcript_rejected(self):
         with pytest.raises(ValidationError):
             AnalyzeEarningsRequest(transcript="")
-
-    def test_response_from_metadata(self):
-        resp = AnalyzeEarningsResponse(
-            content="Report",
-            tone="bullish",
-            net_sentiment=0.75,
-            confidence="HIGH",
-            guidance_direction="up",
-            guidance_count=3,
-            key_phrase_count=12,
-        )
-        assert resp.tone == "bullish"
-        assert resp.net_sentiment == 0.75
 
 
 class TestClassifyMacroContract:

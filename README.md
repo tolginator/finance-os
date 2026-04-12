@@ -70,11 +70,14 @@ Create `~/.config/finance-os/config.json`:
 {
   "fred_api_key": "your-fred-api-key",
   "llm_provider": "skip",
-  "llm_default_model": "gpt-4o"
+  "llm_default_model": "gpt-4o",
+  "sec_edgar_email": "your-email@example.com"
 }
 ```
 
 Environment variables (`FINANCE_OS_*`) override config file values. See [docs/architecture.md](docs/architecture.md) for details.
+
+> **SEC EDGAR**: The `sec_edgar_email` field is required for SEC API access. The SEC requires a valid contact email in request headers — set this to a real email address you control.
 
 ### Agent CLI
 

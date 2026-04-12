@@ -162,3 +162,48 @@ class TestFilingAnalystAgent:
         with patch("src.agents.filing_analyst.urllib.request.urlopen", mock_urlopen):
             response = await agent.run("Search filings", ticker="AAPL")
         assert isinstance(response, AgentResponse)
+
+
+class TestFilingAnalystLive:
+    """Integration tests hitting real SEC EDGAR APIs."""
+
+    def setup_method(self):
+        _ticker_cik_cache.clear()
+
+    @pytest.mark.integration
+    def test_resolve_cik_msft(self):
+        """Resolve MSFT to a real CIK."""
+        cik = resolve_cik("MSFT")
+        assert cik == "789019"
+
+    @pytest.mark.integration
+    def test_resolve_cik_aapl(self):
+        """Resolve AAPL to a real CIK."""
+        cik = resolve_cik("AAPL")
+        assert cik == "320193"
+
+    @pytest.mark.integration
+    @pytest.mark.asyncio
+    async def test_run_with_ticker_msft(self):
+        """Run filing analyst with MSFT ticker — should return real filings."""
+        agent = FilingAnalystAgent()
+        response = await agent.run("Search filings for MSFT", ticker="MSFT")
+        assert isinstance(response, AgentResponse)
+        assert "789019" in response.content
+        assert response.metadata.get("cik") == "789019"
+        assert response.metadata.get("filing_count", 0) > 0
+        # Should have actual filing data
+        filings = response.metadata.get("filings", [])
+        assert len(filings) > 0
+        assert filings[0].get("form") == "10-K"
+        assert filings[0].get("date")  # has a filing date
+
+    @pytest.mark.integration
+    @pytest.mark.asyncio
+    async def test_run_with_ticker_aapl_10q(self):
+        """Run filing analyst with AAPL ticker for 10-Q filings."""
+        agent = FilingAnalystAgent()
+        response = await agent.run("Search filings", ticker="AAPL", form_type="10-Q")
+        assert response.metadata.get("cik") == "320193"
+        assert response.metadata.get("filing_count", 0) > 0
+        assert response.metadata.get("form_type") == "10-Q"

@@ -72,8 +72,9 @@ Create `~/.config/finance-os/config.json`:
   "llm_provider": "skip",
   "sec_edgar_email": "your-email@example.com",
   "azure": {
-    "endpoint": "https://your-instance.openai.azure.com",
-    "deployment": "gpt-4o"
+    "endpoint": "",
+    "deployment": "",
+    "api_version": "2024-10-21"
   }
 }
 ```

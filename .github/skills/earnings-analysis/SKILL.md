@@ -4,6 +4,7 @@ description: >-
   Analyze earnings call transcripts for sentiment, guidance, and key themes.
   Use when asked to analyze earnings, interpret an earnings call, or assess
   management tone and forward guidance.
+model: claude-sonnet-4
 tools:
   - shell
 ---

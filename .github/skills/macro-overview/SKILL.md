@@ -4,6 +4,7 @@ description: >-
   Classify the current macroeconomic regime using FRED economic indicators.
   Use when asked about macro conditions, economic outlook, interest rate
   environment, recession risk, or economic regime classification.
+model: gpt-4.1
 tools:
   - shell
 ---

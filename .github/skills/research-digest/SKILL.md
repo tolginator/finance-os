@@ -5,6 +5,7 @@ description: >-
   classifies macro regime, scores materiality, and generates alerts. Use when
   asked for a research digest, daily briefing, watchlist update, or market
   overview for specific tickers.
+model: claude-sonnet-4
 tools:
   - shell
 ---

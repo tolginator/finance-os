@@ -4,6 +4,7 @@ description: >-
   Analyze portfolio risk including scenario stress tests, concentration analysis,
   and tail-risk simulations. Use when asked about portfolio risk, stress testing,
   drawdown analysis, VaR, or position sizing.
+model: claude-sonnet-4
 tools:
   - shell
 ---

@@ -4,6 +4,7 @@ description: >-
   Evaluate an investment thesis by running adversarial challenges, identifying
   blind spots, and computing conviction scores. Use when asked to evaluate,
   challenge, stress-test, or critique an investment thesis.
+model: claude-opus-4
 tools:
   - shell
 ---

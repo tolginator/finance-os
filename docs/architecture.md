@@ -5,11 +5,11 @@
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │                        UX Layer                              │
-│  Copilot CLI │ Agent CLI │ Copilot Skills │ Web UI (future)  │
+│  Copilot CLI │ Agent CLI │ Copilot Skills │ Web API │ Web UI (future)  │
 ├──────────────────────────────────────────────────────────────┤
 │                    Interface Layer                            │
 │  TS MCP Server (data tools) │ Python MCP Server (agents)     │
-│                             │ Web API / FastAPI (future)      │
+│                             │ FastAPI Web API                 │
 ├──────────────────────────────────────────────────────────────┤
 │                  Application Layer                            │
 │  Pydantic Contracts │ LLM Gateway │ Agent Services            │
@@ -122,7 +122,7 @@ The LLM gateway is a first-class component in the application layer. It resolves
 | **MCP** (Copilot, Claude Desktop) | Host LLM | `SkipProvider` (no-op) | Included in host |
 | **CLI** (no `--synthesize`) | Nobody — raw output | Not called | Zero |
 | **CLI** (`--synthesize`) | LLM via gateway | `LiteLLMProvider` | Pay-per-call |
-| **Web API** (future) | LLM via gateway | `LiteLLMProvider` | Pay-per-call |
+| **Web API** | LLM via gateway | `LiteLLMProvider` | Pay-per-call |
 
 ## Data Flow
 
@@ -170,7 +170,7 @@ The shared core that all interfaces wrap. Implemented as:
   - `DigestService` — wraps research pipeline with typed I/O
 - **Config** (`config.py`) — `AppConfig` via pydantic-settings. Loads from `~/.config/finance-os/config.json` (user settings) and `FINANCE_OS_*` environment variables (highest priority).
 
-CLI, Python MCP server, and future Web API are thin wrappers over this layer.
+CLI, Python MCP server, and Web API are thin wrappers over this layer.
 
 ### Agent Framework (`agents/`)
 
@@ -202,9 +202,16 @@ Shared prompt templates organized by strategy:
 | 0 | Repository foundation, MCP server, agent framework | ✅ Complete |
 | 1 | Core tools and agents (SEC, earnings, macro, quant, portfolio) | ✅ Complete |
 | 2 | Intelligence layer (thesis, risk, adversarial, orchestrator, pipeline) | ✅ Complete |
-| 3 | Integration layer (application layer + LLM gateway, CLI, Python MCP, Skills) | 🔧 In Progress |
+| 3 | Integration layer (application layer + LLM gateway, CLI, Python MCP, Skills) | ✅ Complete |
 | 4 | Advanced (knowledge graph, alt data, fine-tuning) — Copilot-first | Planned |
-| 5 | Web layer (FastAPI + Web UI) — after Copilot CLI is mostly complete | Planned |
+| 5 | Web layer (FastAPI + Web UI) | 🔧 In Progress |
+
+### Phase 5 Progress
+
+| Component | Issue | Status |
+|---|---|---|
+| Web API (FastAPI) | #58 | ✅ Complete |
+| Web UI | #57 | Planned |
 
 ### Phase 3 Progress
 

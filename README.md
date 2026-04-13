@@ -26,6 +26,7 @@ finance-os/
 │       ├── application/ # Contracts, LLM gateway, services, config, registry
 │       ├── cli/         # CLI entry points (finance-os command)
 │       ├── mcp_server.py # Python MCP server (finance-os-mcp command)
+│       ├── web_api.py   # FastAPI web server (finance-os-api command)
 │       └── pipelines/   # Research digest pipeline
 ├── prompts/             # Shared prompt library
 ├── docs/                # Architecture, agent, and tool documentation
@@ -121,6 +122,17 @@ python -m src.mcp_server    # direct invocation
 ```
 
 Tools available: `analyze_earnings`, `classify_macro`, `research_digest`, `orchestrate`. See [docs/tools.md](docs/tools.md) for details.
+
+### Web API
+
+REST API wrapping the same application layer as CLI and MCP server:
+
+```bash
+finance-os-api              # starts on http://127.0.0.1:8000
+uvicorn src.web_api:app --reload  # development mode
+```
+
+Endpoints: `GET /health`, `GET /agents`, `POST /agents/{name}` (7 agents), `POST /pipeline`, `POST /digest`. Interactive docs at `/docs` (Swagger UI).
 
 ### Copilot Skills
 

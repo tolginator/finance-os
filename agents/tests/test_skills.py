@@ -18,11 +18,14 @@ def _parse_frontmatter(path: Path) -> dict[str, str]:
     text = path.read_text()
     if not text.startswith("---"):
         return {}
-    end = text.index("---", 3)
+    try:
+        end = text.index("---", 3)
+    except ValueError:
+        return {}
     block = text[3:end]
     result: dict[str, str] = {}
 
-    # Handle multi-line values (>- or | style) first
+    # Handle multi-line values (>- style) first
     for match in re.finditer(
         r"^(\w[\w-]*):\s*>-?\s*\n((?:\s+.+\n?)+)", block, re.MULTILINE
     ):

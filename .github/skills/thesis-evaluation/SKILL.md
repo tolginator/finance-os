@@ -45,11 +45,29 @@ source agents/scripts/ensure-env.sh
 
 4. **Run the thesis guardian** if the user has an active thesis to monitor.
 
-   ```bash
-   finance-os run thesis-guardian --ticker <TICKER> --prompt "Monitor thesis assumptions"
+   Use MCP tool `orchestrate` to pass structured thesis definitions:
+
+   ```json
+   {
+     "tasks": [{
+       "agent_name": "thesis_guardian",
+       "prompt": "Monitor thesis assumptions",
+       "task_id": "monitor",
+       "kwargs": {
+         "theses": [{
+           "ticker": "<TICKER>",
+           "thesis": "<bull_case>",
+           "assumptions": ["<assumption_1>", "<assumption_2>"],
+           "catalysts": ["<catalyst_1>"],
+           "risks": ["<risk_1>"]
+         }]
+       }
+     }]
+   }
    ```
 
-   Pass structured theses via kwargs for richer analysis.
+   The CLI `finance-os run thesis-guardian` runs without structured data and
+   requires theses to be passed via MCP or the application layer directly.
 
 5. **Cross-reference with filings.** Run the filing analyst to check if recent
    SEC filings support or contradict thesis assumptions.

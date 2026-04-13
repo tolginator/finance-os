@@ -25,11 +25,26 @@ source agents/scripts/ensure-env.sh
 2. **Run the risk agent.**
 
    ```bash
-   finance-os run risk-analyst --prompt "Assess portfolio risk" \
-     --prompt "<portfolio_description_and_positions>"
+   finance-os run risk-analyst
    ```
 
-   Pass structured data via the prompt: positions, scenarios, or return series.
+   The CLI runs a baseline risk assessment. For structured inputs
+   (positions, scenarios, return series), use MCP tool `orchestrate`:
+
+   ```json
+   {
+     "tasks": [{
+       "agent_name": "risk_analyst",
+       "prompt": "Assess portfolio risk",
+       "task_id": "risk",
+       "kwargs": {
+         "positions": [{"ticker": "AAPL", "weight": 0.3}],
+         "scenarios": ["recession", "rate_shock"]
+       }
+     }]
+   }
+   ```
+
    The agent performs:
    - Value-at-Risk (VaR) estimation.
    - Concentration analysis (single-name, sector, factor).

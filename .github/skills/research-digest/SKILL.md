@@ -44,10 +44,23 @@ source agents/scripts/ensure-env.sh
    finance-os pipeline --ticker <TICKER>
    ```
 
-   Or via MCP tool `orchestrate` with the default pipeline tasks.
-   The pipeline runs: macro regime → filing analyst → earnings interpreter →
-   quant signals (depends on macro + earnings) → adversarial (depends on
-   filings + earnings). Returns a structured research memo.
+   This runs the default pipeline: macro regime → filing analyst → earnings
+   interpreter → quant signals → adversarial, with dependency ordering.
+
+   Via MCP tool `orchestrate`, provide the full task list explicitly:
+
+   ```json
+   {
+     "ticker": "<TICKER>",
+     "tasks": [
+       {"agent_name": "macro_regime", "prompt": "Classify regime", "task_id": "macro"},
+       {"agent_name": "filing_analyst", "prompt": "Search filings", "task_id": "filings"},
+       {"agent_name": "earnings_interpreter", "prompt": "Analyze earnings", "task_id": "earnings"},
+       {"agent_name": "quant_signal", "prompt": "Generate signals", "task_id": "signals", "depends_on": ["macro", "earnings"]},
+       {"agent_name": "adversarial", "prompt": "Challenge thesis", "task_id": "adversarial", "depends_on": ["filings", "earnings"]}
+     ]
+   }
+   ```
 
 5. **Present findings.** Organize by priority:
    - **Material alerts** first — what changed and why it matters.

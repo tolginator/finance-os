@@ -38,8 +38,8 @@
 | Layer | Technology |
 |---|---|
 | MCP Server (data tools) | TypeScript, Node.js, `@modelcontextprotocol/sdk` |
-| MCP Server (agents) | Python, `mcp` SDK (planned) |
-| Application Layer | Python, Pydantic 2.11+, pydantic-settings 2.9+, litellm 1.72+ |
+| MCP Server (agents) | Python, `mcp` SDK (FastMCP, stdio transport) |
+| Application Layer | Python, Pydantic 2.11+, pydantic-settings 2.9+, azure-identity 1.19+ |
 | Agents | Python 3.12+, NumPy, pandas, scipy |
 | Vector DB | ChromaDB (local) |
 | LLM Gateway | Pluggable — OpenAI, Anthropic, ollama, or host LLM via MCP |
@@ -212,5 +212,5 @@ Shared prompt templates organized by strategy:
 |---|---|---|
 | Application layer (contracts, LLM gateway, services, config) | #49 | ✅ Complete |
 | Agent CLI | #50 | ✅ Complete |
-| Python MCP server | #51 | Next |
-| Copilot Skills | #53 | Blocked on #50, #51 |
+| Python MCP server | #51 | ✅ Complete |
+| Copilot Skills | #53 | Next |

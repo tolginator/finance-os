@@ -67,7 +67,8 @@ Research Output (memos, alerts, signals)
 | Vector DB | ChromaDB (local) |
 | LLM Gateway | Pluggable — OpenAI, Anthropic, ollama, or host LLM via MCP |
 | Data Sources | SEC EDGAR (free), FRED (free), Yahoo Finance (yfinance), QIF files |
-| CLI | Python (`python -m agents.cli`) |
+| CLI | Python (`finance-os` console script) |
+| MCP Server entry | Python (`finance-os-mcp` console script, stdio transport) |
 | Copilot Skills | Markdown workflow definitions (`.github/skills/`) |
 | Testing | Vitest (TS), pytest (Python) |
 | CI/CD | GitHub Actions |
@@ -274,8 +275,9 @@ finance-os/
 │   ├── src/
 │   │   ├── core/                   # Agent base, orchestrator, memory
 │   │   ├── agents/                 # Domain-specific agents
-│   │   ├── application/            # Shared contracts, LLM gateway, services
+│   │   ├── application/            # Shared contracts, LLM gateway, services, registry
 │   │   ├── cli/                    # CLI entry points (finance-os command)
+│   │   ├── mcp_server.py           # Python MCP server (finance-os-mcp command)
 │   │   ├── tools/                  # Quant tools
 │   │   └── pipelines/             # Data ingestion pipelines
 │   └── tests/

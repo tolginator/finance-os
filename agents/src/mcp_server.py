@@ -7,7 +7,6 @@ LLM gateway is skipped by default — the host LLM (Copilot, Claude Desktop)
 handles reasoning. Agents return structured data for the host to synthesize.
 """
 
-import logging
 import sys
 from decimal import Decimal
 from typing import Any
@@ -26,14 +25,12 @@ from src.application.registry import AGENT_CATALOG, create_pipeline_service
 from src.application.services.agent_service import AgentService
 from src.application.services.digest_service import DigestService
 
-logger = logging.getLogger(__name__)
-
 mcp = FastMCP(
     "finance-os-agents",
     instructions=(
         "Personal investment intelligence tools. "
-        "Use analyze-earnings for transcript analysis, classify-macro for macro regime, "
-        "research-digest for watchlist digests, and orchestrate for multi-agent pipelines."
+        "Use analyze_earnings for transcript analysis, classify_macro for macro regime, "
+        "research_digest for watchlist digests, and orchestrate for multi-agent pipelines."
     ),
 )
 
@@ -155,6 +152,8 @@ async def orchestrate(
 
 def main() -> None:
     """Entry point for the MCP server."""
+    import logging
+
     logging.basicConfig(
         level=logging.WARNING,
         stream=sys.stderr,

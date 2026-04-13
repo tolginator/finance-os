@@ -3,6 +3,7 @@
 import json
 
 import pytest
+from mcp.server.fastmcp.exceptions import ToolError
 
 from src.mcp_server import VALID_AGENT_NAMES, mcp
 
@@ -76,7 +77,7 @@ class TestAnalyzeEarnings:
         assert "content" in parsed
 
     async def test_empty_transcript_rejected(self) -> None:
-        with pytest.raises(Exception):
+        with pytest.raises(ToolError):
             await mcp.call_tool("analyze_earnings", {"transcript": ""})
 
 
@@ -176,7 +177,7 @@ class TestOrchestrate:
         assert len(parsed["results"]) == 2
 
     async def test_unknown_agent_raises(self) -> None:
-        with pytest.raises(Exception, match="Unknown agent"):
+        with pytest.raises(ToolError):
             await mcp.call_tool(
                 "orchestrate",
                 {

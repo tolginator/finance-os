@@ -89,7 +89,7 @@ def _fetch_macro_source(fred_api_key: str) -> DataSource | None:
     for series_id in indicator_ids:
         desc = MACRO_INDICATORS.get(series_id, series_id)
         observations = fetch_fred_series(series_id, fred_api_key, limit=6)
-        all_readings[series_id] = parse_observations(observations, desc)
+        all_readings[series_id] = parse_observations(series_id, desc, observations)
 
     regime = classify_regime(all_readings)
     if not regime:

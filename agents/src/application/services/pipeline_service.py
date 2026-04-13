@@ -1,5 +1,6 @@
 """Pipeline service — wraps orchestrator for typed pipeline execution."""
 
+import time
 from typing import Any
 
 from src.application.contracts.agents import RunPipelineRequest, RunPipelineResponse
@@ -66,7 +67,9 @@ class PipelineService:
             )
             tasks.append(task)
 
+        t0 = time.monotonic()
         pipeline_result = await self._run_with_context(tasks)
+        wall_ms = int((time.monotonic() - t0) * 1000)
 
         result_dicts: list[dict[str, Any]] = []
         for r in pipeline_result:
@@ -80,7 +83,7 @@ class PipelineService:
                 "error": r.error,
             })
 
-        total_ms = sum(r.duration_ms for r in pipeline_result)
+        total_ms = wall_ms
         successful = sum(1 for d in result_dicts if d["success"])
         failed = len(result_dicts) - successful
 

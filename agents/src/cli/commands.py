@@ -193,15 +193,19 @@ async def run_pipeline(args: argparse.Namespace) -> None:
     # Build task list from defaults or user-selected agents
     if args.agents:
         selected = {_normalize_agent_name(a.strip()) for a in args.agents.split(",")}
-        pipeline_tasks = [
+        selected_pipeline_tasks = [
             t for t in DEFAULT_PIPELINE_TASKS
             if t["agent"] in selected
         ]
         # Filter depends_on to only include selected tasks
-        selected_ids = {t["task_id"] for t in pipeline_tasks}
-        for t in pipeline_tasks:
-            if "depends_on" in t:
-                t = {**t, "depends_on": [d for d in t["depends_on"] if d in selected_ids]}
+        selected_ids = {t["task_id"] for t in selected_pipeline_tasks}
+        pipeline_tasks = [
+            {
+                **t,
+                "depends_on": [d for d in t.get("depends_on", []) if d in selected_ids],
+            }
+            for t in selected_pipeline_tasks
+        ]
     else:
         pipeline_tasks = DEFAULT_PIPELINE_TASKS
 

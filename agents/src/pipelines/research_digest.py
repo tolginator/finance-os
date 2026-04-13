@@ -184,7 +184,10 @@ def build_digest(
 
     entries: list[DigestEntry] = []
     for src in sources:
-        sentiment = Decimal(src.metadata.get("sentiment", "0"))
+        try:
+            sentiment = Decimal(src.metadata.get("sentiment", "0"))
+        except Exception:
+            sentiment = Decimal("0")
         entry = DigestEntry(
             ticker=src.ticker,
             source=src.source_type,

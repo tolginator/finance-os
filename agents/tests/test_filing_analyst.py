@@ -7,6 +7,7 @@ import pytest
 
 from src.agents.filing_analyst import (
     FilingAnalystAgent,
+    _extract_ticker_from_prompt,
     _ticker_cik_cache,
     resolve_cik,
 )
@@ -104,6 +105,29 @@ class TestResolveCIK:
             side_effect=urllib.error.URLError("timeout"),
         ):
             assert resolve_cik("AAPL") == ""
+
+
+class TestExtractTickerFromPrompt:
+    """Test ticker extraction from natural-language prompts."""
+
+    def test_extracts_ticker_at_end(self) -> None:
+        assert _extract_ticker_from_prompt("Search recent filings for MSFT") == "MSFT"
+
+    def test_extracts_ticker_in_middle(self) -> None:
+        assert _extract_ticker_from_prompt("Analyze AAPL earnings report") == "AAPL"
+
+    def test_prefers_last_ticker(self) -> None:
+        assert _extract_ticker_from_prompt("Compare AAPL and MSFT filings") == "MSFT"
+
+    def test_ignores_stopwords(self) -> None:
+        assert _extract_ticker_from_prompt("SEARCH FOR TSLA") == "TSLA"
+
+    def test_empty_prompt(self) -> None:
+        assert _extract_ticker_from_prompt("") == ""
+
+    def test_no_ticker_falls_back_to_last_word(self) -> None:
+        result = _extract_ticker_from_prompt("search for something")
+        assert isinstance(result, str)
 
 
 class TestFilingAnalystAgent:

@@ -191,6 +191,25 @@ def fetch_filing_text(cik: str, accession_number: str, document: str) -> str:
         return ""
 
 
+def _extract_ticker_from_prompt(prompt: str) -> str:
+    """Extract a likely ticker symbol from a natural-language prompt.
+
+    Looks for uppercase words (2-5 chars) that look like ticker symbols.
+    Falls back to the last word in the prompt.
+    """
+    import re
+    # Match uppercase words that look like tickers (2-5 letters)
+    candidates = re.findall(r"\b([A-Z]{2,5})\b", prompt)
+    # Filter out common English words that happen to be uppercase
+    stopwords = {"THE", "AND", "FOR", "FROM", "WITH", "THIS", "THAT", "SEARCH"}
+    tickers = [c for c in candidates if c not in stopwords]
+    if tickers:
+        return tickers[-1]
+    # Fallback: last word (often the ticker in prompts like "filings for MSFT")
+    words = prompt.split()
+    return words[-1] if words else ""
+
+
 class FilingAnalystAgent(BaseAgent):
     """Agent that analyzes SEC filings from EDGAR.
 
@@ -303,7 +322,7 @@ class FilingAnalystAgent(BaseAgent):
 
         # If we have a ticker/name, search first
         if ticker or prompt:
-            search_query = ticker or prompt.split()[0] if prompt else ""
+            search_query = ticker if ticker else _extract_ticker_from_prompt(prompt)
             results = search_company(search_query)
             if not results:
                 return AgentResponse(

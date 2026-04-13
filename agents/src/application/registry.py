@@ -7,6 +7,7 @@ from src.agents.macro_regime import MacroRegimeAgent
 from src.agents.quant_signal import QuantSignalAgent
 from src.agents.risk_agent import RiskAgent
 from src.agents.thesis_guardian import ThesisGuardianAgent
+from src.application.config import AppConfig
 from src.application.services.pipeline_service import PipelineService
 from src.core.agent import BaseAgent
 
@@ -21,13 +22,18 @@ AGENT_CATALOG: list[dict[str, str]] = [
 ]
 
 
-def create_all_agents() -> list[BaseAgent]:
+def create_all_agents(config: AppConfig | None = None) -> list[BaseAgent]:
     """Instantiate all available agents.
 
     Returns fresh instances each call to avoid cross-request state leakage.
+
+    Args:
+        config: Application config for agents that need secrets/settings.
+            Created from environment if not provided.
     """
+    cfg = config or AppConfig()
     return [
-        MacroRegimeAgent(),
+        MacroRegimeAgent(fred_api_key=cfg.fred_api_key),
         FilingAnalystAgent(),
         EarningsInterpreterAgent(),
         QuantSignalAgent(),
@@ -37,9 +43,9 @@ def create_all_agents() -> list[BaseAgent]:
     ]
 
 
-def create_pipeline_service() -> PipelineService:
+def create_pipeline_service(config: AppConfig | None = None) -> PipelineService:
     """Create a PipelineService with all default agents registered."""
     service = PipelineService()
-    for agent in create_all_agents():
+    for agent in create_all_agents(config):
         service.register_agent(agent)
     return service

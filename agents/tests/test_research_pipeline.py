@@ -233,8 +233,8 @@ class TestBuildDigest:
         assert digest.tickers_analyzed == []
         assert "0 entries" in digest.summary
 
-    def test_sources_with_nonzero_sentiment(self) -> None:
-        """build_digest creates entries with sentiment=0, so materiality comes from flag."""
+    def test_sources_with_metadata_sentiment(self) -> None:
+        """build_digest reads sentiment from metadata when available."""
         config = PipelineConfig(tickers=["AAPL"])
         sources = [
             DataSource(
@@ -242,11 +242,27 @@ class TestBuildDigest:
                 ticker="AAPL",
                 date="2025-01-01",
                 content="Apple 10-K",
+                metadata={"sentiment": "0.6"},
             ),
         ]
         digest = build_digest(config, sources)
-        # Default sentiment is 0 and material is False → not material
-        assert len(digest.alerts) == 0
+        assert len(digest.entries) == 1
+        assert digest.entries[0].sentiment == Decimal("0.6")
+        assert digest.entries[0].material is True
+
+    def test_malformed_sentiment_defaults_to_zero(self) -> None:
+        """Malformed sentiment metadata doesn't crash build_digest."""
+        config = PipelineConfig(tickers=["AAPL"])
+        sources = [
+            DataSource(
+                source_type="edgar",
+                ticker="AAPL",
+                date="2025-01-01",
+                content="Apple filing",
+                metadata={"sentiment": "N/A"},
+            ),
+        ]
+        digest = build_digest(config, sources)
         assert len(digest.entries) == 1
         assert digest.entries[0].sentiment == Decimal("0")
 

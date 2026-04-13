@@ -102,7 +102,7 @@ async def research_digest(
         lookback_days=lookback_days,
         alert_threshold=Decimal(str(alert_threshold)),
     )
-    service = DigestService()
+    service = DigestService(AppConfig())
     response = await service.run_digest(request)
     return response.model_dump(mode="json")
 

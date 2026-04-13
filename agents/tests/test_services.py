@@ -1,9 +1,11 @@
 """Tests for application services — agent, pipeline, and digest."""
 
 from decimal import Decimal
+from unittest.mock import patch
 
 import pytest
 
+from src.application.config import AppConfig
 from src.application.contracts.agents import (
     AnalyzeEarningsRequest,
     AssessRiskRequest,
@@ -16,6 +18,7 @@ from src.application.services.agent_service import AgentService
 from src.application.services.digest_service import DigestService
 from src.application.services.pipeline_service import PipelineService
 from src.core.agent import AgentResponse, BaseAgent
+from src.pipelines.research_digest import DataSource
 
 # --- Test helpers ---
 
@@ -34,6 +37,28 @@ class StubAgent(BaseAgent):
         return "Stub"
 
     async def run(self, prompt: str, **kwargs) -> AgentResponse:
+        return AgentResponse(
+            content=self._response_content,
+            metadata=self._metadata,
+        )
+
+
+class CapturingAgent(BaseAgent):
+    """Agent that captures kwargs passed to run() for assertion."""
+
+    def __init__(self, name: str = "capturing", response_content: str = "captured",
+                 metadata: dict | None = None):
+        super().__init__(name=name, description="Capturing agent")
+        self._response_content = response_content
+        self._metadata = metadata or {}
+        self.captured_kwargs: dict = {}
+
+    @property
+    def system_prompt(self) -> str:
+        return "Capturing"
+
+    async def run(self, prompt: str, **kwargs) -> AgentResponse:
+        self.captured_kwargs = dict(kwargs)
         return AgentResponse(
             content=self._response_content,
             metadata=self._metadata,
@@ -172,21 +197,182 @@ class TestPipelineService:
         assert "analyst" in result.memo["sources"]
 
 
+class TestPipelineContextPropagation:
+    """Test that pipeline propagates context between dependent tasks."""
+
+    async def test_regime_flows_to_downstream(self) -> None:
+        macro = StubAgent(
+            name="macro_regime",
+            response_content="EXPANSION",
+            metadata={"regime": "EXPANSION", "indicators_fetched": 5},
+        )
+        consumer = CapturingAgent(name="quant_signal")
+        service = PipelineService()
+        service.register_agent(macro)
+        service.register_agent(consumer)
+
+        request = RunPipelineRequest(tasks=[
+            {"agent_name": "macro_regime", "prompt": "Go", "task_id": "macro"},
+            {
+                "agent_name": "quant_signal",
+                "prompt": "Signals",
+                "task_id": "signals",
+                "depends_on": ["macro"],
+            },
+        ])
+        result = await service.run_pipeline(request)
+        assert result.successful == 2
+        assert consumer.captured_kwargs.get("regime") == "EXPANSION"
+
+    async def test_sentiment_and_direction_flow(self) -> None:
+        earnings = StubAgent(
+            name="earnings_interpreter",
+            response_content="Bullish",
+            metadata={
+                "net_sentiment": 0.8,
+                "guidance_direction": "raised",
+            },
+        )
+        consumer = CapturingAgent(name="quant_signal")
+        service = PipelineService()
+        service.register_agent(earnings)
+        service.register_agent(consumer)
+
+        request = RunPipelineRequest(tasks=[
+            {"agent_name": "earnings_interpreter", "prompt": "Analyze", "task_id": "earnings"},
+            {
+                "agent_name": "quant_signal",
+                "prompt": "Signals",
+                "task_id": "signals",
+                "depends_on": ["earnings"],
+            },
+        ])
+        result = await service.run_pipeline(request)
+        assert result.successful == 2
+        assert consumer.captured_kwargs["sentiment"] == 0.8
+        assert consumer.captured_kwargs["direction"] == "raised"
+
+    async def test_context_from_multiple_producers(self) -> None:
+        macro = StubAgent(
+            name="macro_regime",
+            response_content="EXPANSION",
+            metadata={"regime": "EXPANSION"},
+        )
+        earnings = StubAgent(
+            name="earnings_interpreter",
+            response_content="Bullish",
+            metadata={"net_sentiment": 0.6, "guidance_direction": "maintained"},
+        )
+        consumer = CapturingAgent(name="quant_signal")
+        service = PipelineService()
+        service.register_agent(macro)
+        service.register_agent(earnings)
+        service.register_agent(consumer)
+
+        request = RunPipelineRequest(tasks=[
+            {"agent_name": "macro_regime", "prompt": "Go", "task_id": "macro"},
+            {"agent_name": "earnings_interpreter", "prompt": "Go", "task_id": "earnings"},
+            {
+                "agent_name": "quant_signal",
+                "prompt": "Signals",
+                "task_id": "signals",
+                "depends_on": ["macro", "earnings"],
+            },
+        ])
+        result = await service.run_pipeline(request)
+        assert result.successful == 3
+        assert consumer.captured_kwargs["regime"] == "EXPANSION"
+        assert consumer.captured_kwargs["sentiment"] == 0.6
+        assert consumer.captured_kwargs["direction"] == "maintained"
+
+
+class TestPipelineSoftFailure:
+    """Test that soft failures are properly detected and block dependents."""
+
+    async def test_soft_failure_counted_as_failed(self) -> None:
+        soft_fail = StubAgent(
+            name="macro_regime",
+            response_content="API key required",
+            metadata={"error": "missing_api_key"},
+        )
+        service = PipelineService()
+        service.register_agent(soft_fail)
+
+        request = RunPipelineRequest(tasks=[
+            {"agent_name": "macro_regime", "prompt": "Go", "task_id": "macro"},
+        ])
+        result = await service.run_pipeline(request)
+        assert result.successful == 0
+        assert result.failed == 1
+
+    async def test_soft_failure_blocks_dependents(self) -> None:
+        soft_fail = StubAgent(
+            name="macro_regime",
+            response_content="API key required",
+            metadata={"error": "missing_api_key"},
+        )
+        consumer = StubAgent(name="quant_signal", response_content="Signals")
+        service = PipelineService()
+        service.register_agent(soft_fail)
+        service.register_agent(consumer)
+
+        request = RunPipelineRequest(tasks=[
+            {"agent_name": "macro_regime", "prompt": "Go", "task_id": "macro"},
+            {
+                "agent_name": "quant_signal",
+                "prompt": "Signals",
+                "task_id": "signals",
+                "depends_on": ["macro"],
+            },
+        ])
+        result = await service.run_pipeline(request)
+        assert result.successful == 0
+        assert result.failed == 2
+
+    async def test_soft_failure_excluded_from_memo(self) -> None:
+        soft_fail = StubAgent(
+            name="macro_regime",
+            response_content="API key required",
+            metadata={"error": "missing_api_key"},
+        )
+        good = StubAgent(
+            name="filing_analyst",
+            response_content="Filings found",
+            metadata={"filing_count": 3},
+        )
+        service = PipelineService()
+        service.register_agent(soft_fail)
+        service.register_agent(good)
+
+        request = RunPipelineRequest(tasks=[
+            {"agent_name": "macro_regime", "prompt": "Go", "task_id": "macro"},
+            {"agent_name": "filing_analyst", "prompt": "Search", "task_id": "filings"},
+        ])
+        result = await service.run_pipeline(request, ticker="MSFT", date="2026-04-13")
+        assert result.memo is not None
+        assert "macro_regime" not in result.memo["sources"]
+        assert "filing_analyst" in result.memo["sources"]
+
+
 # --- DigestService tests ---
 
 
 class TestDigestService:
-    @pytest.mark.asyncio
-    async def test_empty_digest(self):
-        service = DigestService()
-        request = RunDigestRequest(tickers=["AAPL"])
-        result = await service.run_digest(request)
+    async def test_empty_digest_with_no_sources_and_no_api(self) -> None:
+        """Digest with no sources and no API access returns empty."""
+        config = AppConfig(fred_api_key="")
+        service = DigestService(config)
+        request = RunDigestRequest(tickers=["ZZZZZ"])
+        with patch(
+            "src.application.services.digest_service._fetch_filing_sources",
+            return_value=[],
+        ):
+            result = await service.run_digest(request)
         assert result.ticker_count == 1
         assert result.entry_count == 0
-        assert result.alert_count == 0
 
-    @pytest.mark.asyncio
-    async def test_digest_with_sources(self):
+    async def test_digest_with_explicit_sources(self) -> None:
+        """Digest with explicit sources skips auto-fetch."""
         service = DigestService()
         request = RunDigestRequest(
             tickers=["AAPL"],
@@ -195,9 +381,96 @@ class TestDigestService:
                 "ticker": "AAPL",
                 "date": "2026-04-01",
                 "content": "Revenue increased significantly",
-                "metadata": {},
+                "metadata": {"sentiment": "0.6"},
             }],
         )
         result = await service.run_digest(request)
         assert result.entry_count == 1
         assert "AAPL" in result.content
+
+    async def test_auto_fetch_produces_entries(self) -> None:
+        """When no sources provided, auto-fetch creates entries."""
+        config = AppConfig(fred_api_key="")
+        service = DigestService(config)
+
+        mock_sources = [
+            DataSource(
+                source_type="edgar",
+                ticker="MSFT",
+                date="2026-04-01",
+                content="10-K filed 2026-04-01: Annual report",
+                metadata={"form_type": "10-K", "sentiment": "0.1"},
+            ),
+        ]
+        with patch(
+            "src.application.services.digest_service._fetch_filing_sources",
+            return_value=mock_sources,
+        ):
+            request = RunDigestRequest(tickers=["MSFT"])
+            result = await service.run_digest(request)
+        assert result.entry_count >= 1
+        assert result.ticker_count == 1
+        assert "MSFT" in result.content
+
+    async def test_auto_fetch_with_macro(self) -> None:
+        """Auto-fetch includes macro regime when FRED key available."""
+        config = AppConfig(fred_api_key="test_key")
+        service = DigestService(config)
+
+        mock_filing_sources = [
+            DataSource(
+                source_type="edgar",
+                ticker="AAPL",
+                date="2026-04-01",
+                content="10-K filing",
+                metadata={"sentiment": "0.1"},
+            ),
+        ]
+        mock_macro_source = DataSource(
+            source_type="macro",
+            ticker="MACRO",
+            date="2026-04-01",
+            content="Macro regime: EXPANSION",
+            metadata={"regime": "EXPANSION", "sentiment": "0.5"},
+        )
+        with (
+            patch(
+                "src.application.services.digest_service._fetch_filing_sources",
+                return_value=mock_filing_sources,
+            ),
+            patch(
+                "src.application.services.digest_service._fetch_macro_source",
+                return_value=mock_macro_source,
+            ),
+        ):
+            request = RunDigestRequest(tickers=["AAPL"])
+            result = await service.run_digest(request)
+        # Should have filing + macro entries
+        assert result.entry_count >= 2
+
+    async def test_material_entries_generate_alerts(self) -> None:
+        """Entries with high sentiment become material and generate alerts."""
+        config = AppConfig(fred_api_key="")
+        service = DigestService(config)
+
+        mock_sources = [
+            DataSource(
+                source_type="edgar",
+                ticker="TSLA",
+                date="2026-04-01",
+                content="8-K material event",
+                metadata={"form_type": "8-K", "sentiment": "-0.6"},
+            ),
+        ]
+        with patch(
+            "src.application.services.digest_service._fetch_filing_sources",
+            return_value=mock_sources,
+        ):
+            request = RunDigestRequest(
+                tickers=["TSLA"],
+                alert_threshold=Decimal("0.5"),
+            )
+            result = await service.run_digest(request)
+        assert result.entry_count == 1
+        assert result.material_count == 1
+        assert result.alert_count == 1

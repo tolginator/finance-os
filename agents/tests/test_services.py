@@ -40,6 +40,28 @@ class StubAgent(BaseAgent):
         )
 
 
+class CapturingAgent(BaseAgent):
+    """Agent that captures kwargs passed to run() for assertion."""
+
+    def __init__(self, name: str = "capturing", response_content: str = "captured",
+                 metadata: dict | None = None):
+        super().__init__(name=name, description="Capturing agent")
+        self._response_content = response_content
+        self._metadata = metadata or {}
+        self.captured_kwargs: dict = {}
+
+    @property
+    def system_prompt(self) -> str:
+        return "Capturing"
+
+    async def run(self, prompt: str, **kwargs) -> AgentResponse:
+        self.captured_kwargs = dict(kwargs)
+        return AgentResponse(
+            content=self._response_content,
+            metadata=self._metadata,
+        )
+
+
 # --- AgentService tests ---
 
 
@@ -170,6 +192,163 @@ class TestPipelineService:
         assert result.memo is not None
         assert result.memo["ticker"] == "AAPL"
         assert "analyst" in result.memo["sources"]
+
+
+class TestPipelineContextPropagation:
+    """Test that pipeline propagates context between dependent tasks."""
+
+    async def test_regime_flows_to_downstream(self) -> None:
+        macro = StubAgent(
+            name="macro_regime",
+            response_content="EXPANSION",
+            metadata={"regime": "EXPANSION", "indicators_fetched": 5},
+        )
+        consumer = CapturingAgent(name="quant_signal")
+        service = PipelineService()
+        service.register_agent(macro)
+        service.register_agent(consumer)
+
+        request = RunPipelineRequest(tasks=[
+            {"agent_name": "macro_regime", "prompt": "Go", "task_id": "macro"},
+            {
+                "agent_name": "quant_signal",
+                "prompt": "Signals",
+                "task_id": "signals",
+                "depends_on": ["macro"],
+            },
+        ])
+        result = await service.run_pipeline(request)
+        assert result.successful == 2
+        assert consumer.captured_kwargs.get("regime") == "EXPANSION"
+
+    async def test_sentiment_and_direction_flow(self) -> None:
+        earnings = StubAgent(
+            name="earnings_interpreter",
+            response_content="Bullish",
+            metadata={
+                "net_sentiment": 0.8,
+                "guidance_direction": "raised",
+            },
+        )
+        consumer = CapturingAgent(name="quant_signal")
+        service = PipelineService()
+        service.register_agent(earnings)
+        service.register_agent(consumer)
+
+        request = RunPipelineRequest(tasks=[
+            {"agent_name": "earnings_interpreter", "prompt": "Analyze", "task_id": "earnings"},
+            {
+                "agent_name": "quant_signal",
+                "prompt": "Signals",
+                "task_id": "signals",
+                "depends_on": ["earnings"],
+            },
+        ])
+        result = await service.run_pipeline(request)
+        assert result.successful == 2
+        assert consumer.captured_kwargs["sentiment"] == 0.8
+        assert consumer.captured_kwargs["direction"] == "raised"
+
+    async def test_context_from_multiple_producers(self) -> None:
+        macro = StubAgent(
+            name="macro_regime",
+            response_content="EXPANSION",
+            metadata={"regime": "EXPANSION"},
+        )
+        earnings = StubAgent(
+            name="earnings_interpreter",
+            response_content="Bullish",
+            metadata={"net_sentiment": 0.6, "guidance_direction": "maintained"},
+        )
+        consumer = CapturingAgent(name="quant_signal")
+        service = PipelineService()
+        service.register_agent(macro)
+        service.register_agent(earnings)
+        service.register_agent(consumer)
+
+        request = RunPipelineRequest(tasks=[
+            {"agent_name": "macro_regime", "prompt": "Go", "task_id": "macro"},
+            {"agent_name": "earnings_interpreter", "prompt": "Go", "task_id": "earnings"},
+            {
+                "agent_name": "quant_signal",
+                "prompt": "Signals",
+                "task_id": "signals",
+                "depends_on": ["macro", "earnings"],
+            },
+        ])
+        result = await service.run_pipeline(request)
+        assert result.successful == 3
+        assert consumer.captured_kwargs["regime"] == "EXPANSION"
+        assert consumer.captured_kwargs["sentiment"] == 0.6
+        assert consumer.captured_kwargs["direction"] == "maintained"
+
+
+class TestPipelineSoftFailure:
+    """Test that soft failures are properly detected and block dependents."""
+
+    async def test_soft_failure_counted_as_failed(self) -> None:
+        soft_fail = StubAgent(
+            name="macro_regime",
+            response_content="API key required",
+            metadata={"error": "missing_api_key"},
+        )
+        service = PipelineService()
+        service.register_agent(soft_fail)
+
+        request = RunPipelineRequest(tasks=[
+            {"agent_name": "macro_regime", "prompt": "Go", "task_id": "macro"},
+        ])
+        result = await service.run_pipeline(request)
+        assert result.successful == 0
+        assert result.failed == 1
+
+    async def test_soft_failure_blocks_dependents(self) -> None:
+        soft_fail = StubAgent(
+            name="macro_regime",
+            response_content="API key required",
+            metadata={"error": "missing_api_key"},
+        )
+        consumer = StubAgent(name="quant_signal", response_content="Signals")
+        service = PipelineService()
+        service.register_agent(soft_fail)
+        service.register_agent(consumer)
+
+        request = RunPipelineRequest(tasks=[
+            {"agent_name": "macro_regime", "prompt": "Go", "task_id": "macro"},
+            {
+                "agent_name": "quant_signal",
+                "prompt": "Signals",
+                "task_id": "signals",
+                "depends_on": ["macro"],
+            },
+        ])
+        result = await service.run_pipeline(request)
+        assert result.successful == 0
+        assert result.failed == 2
+
+    async def test_soft_failure_excluded_from_memo(self) -> None:
+        soft_fail = StubAgent(
+            name="macro_regime",
+            response_content="API key required",
+            metadata={"error": "missing_api_key"},
+        )
+        good = StubAgent(
+            name="filing_analyst",
+            response_content="Filings found",
+            metadata={"filing_count": 3},
+        )
+        service = PipelineService()
+        service.register_agent(soft_fail)
+        service.register_agent(good)
+
+        request = RunPipelineRequest(tasks=[
+            {"agent_name": "macro_regime", "prompt": "Go", "task_id": "macro"},
+            {"agent_name": "filing_analyst", "prompt": "Search", "task_id": "filings"},
+        ])
+        result = await service.run_pipeline(request, ticker="MSFT", date="2026-04-13")
+        assert result.memo is not None
+        assert "macro_regime" not in result.memo["sources"]
+        assert "filing_analyst" in result.memo["sources"]
 
 
 # --- DigestService tests ---

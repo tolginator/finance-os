@@ -150,39 +150,70 @@ async def run_agent(args: argparse.Namespace) -> None:
     _output(result, args)
 
 
-# Default research pipeline: agents and their prompts for a given ticker
-DEFAULT_PIPELINE_AGENTS = [
-    ("macro_regime", "Classify current macro regime"),
-    ("filing_analyst", "Search recent filings for {ticker}"),
-    ("quant_signal", "Generate signals"),
-    ("thesis_guardian", "Evaluate theses"),
-    ("risk_analyst", "Assess portfolio risk"),
-    ("adversarial", "Challenge the investment thesis for {ticker}"),
+# Default research pipeline: agents, prompts, task IDs, and dependencies.
+# Only agents that produce useful output in a ticker-only context are included.
+# thesis_guardian and risk_analyst require portfolio/thesis data — use them
+# via `finance-os agent` directly or a custom pipeline.
+DEFAULT_PIPELINE_TASKS: list[dict[str, Any]] = [
+    {
+        "agent": "macro_regime",
+        "prompt": "Classify current macro regime",
+        "task_id": "macro",
+    },
+    {
+        "agent": "filing_analyst",
+        "prompt": "Search recent filings for {ticker}",
+        "task_id": "filings",
+    },
+    {
+        "agent": "earnings_interpreter",
+        "prompt": "Analyze recent earnings sentiment for {ticker}",
+        "task_id": "earnings",
+    },
+    {
+        "agent": "quant_signal",
+        "prompt": "Generate composite signals for {ticker}",
+        "task_id": "signals",
+        "depends_on": ["macro", "earnings"],
+    },
+    {
+        "agent": "adversarial",
+        "prompt": "Challenge the investment thesis for {ticker}",
+        "task_id": "adversarial",
+        "depends_on": ["filings", "earnings"],
+    },
 ]
 
 
 async def run_pipeline(args: argparse.Namespace) -> None:
     """Run multi-agent research pipeline."""
     config = _load_config()
-    service = create_pipeline_service()
+    service = create_pipeline_service(config)
 
-    # Build task list
+    # Build task list from defaults or user-selected agents
     if args.agents:
-        selected = [_normalize_agent_name(a.strip()) for a in args.agents.split(",")]
-        pipeline_agents = [
-            (name, prompt) for name, prompt in DEFAULT_PIPELINE_AGENTS
-            if name in selected
+        selected = {_normalize_agent_name(a.strip()) for a in args.agents.split(",")}
+        pipeline_tasks = [
+            t for t in DEFAULT_PIPELINE_TASKS
+            if t["agent"] in selected
         ]
+        # Filter depends_on to only include selected tasks
+        selected_ids = {t["task_id"] for t in pipeline_tasks}
+        for t in pipeline_tasks:
+            if "depends_on" in t:
+                t = {**t, "depends_on": [d for d in t["depends_on"] if d in selected_ids]}
     else:
-        pipeline_agents = DEFAULT_PIPELINE_AGENTS
+        pipeline_tasks = DEFAULT_PIPELINE_TASKS
 
     tasks = [
         TaskDefinition(
-            agent_name=name,
-            prompt=prompt.format(ticker=args.ticker),
-            task_id=f"{name}-{args.ticker}",
+            agent_name=t["agent"],
+            prompt=t["prompt"].format(ticker=args.ticker),
+            task_id=t["task_id"],
+            kwargs={"ticker": args.ticker},
+            depends_on=t.get("depends_on", []),
         )
-        for name, prompt in pipeline_agents
+        for t in pipeline_tasks
     ]
 
     request = RunPipelineRequest(tasks=tasks)

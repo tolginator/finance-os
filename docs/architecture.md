@@ -45,7 +45,7 @@
 | LLM Gateway | Pluggable — OpenAI, Anthropic, ollama, or host LLM via MCP |
 | Data Sources | SEC EDGAR (free), FRED (free API key), Yahoo Finance, QIF |
 | CLI | Python (`finance-os` console script) |
-| Copilot Skills | Markdown workflow definitions (`.github/skills/`, planned) |
+| Copilot Skills | Markdown workflow definitions (`.github/skills/`) — earnings, thesis, digest, risk, macro |
 | Testing | Vitest (TypeScript), pytest with markers (Python) — unit and integration separated |
 | Linting | ESLint (TypeScript), ruff (Python) |
 | CI/CD | GitHub Actions |
@@ -213,4 +213,4 @@ Shared prompt templates organized by strategy:
 | Application layer (contracts, LLM gateway, services, config) | #49 | ✅ Complete |
 | Agent CLI | #50 | ✅ Complete |
 | Python MCP server | #51 | ✅ Complete |
-| Copilot Skills | #53 | Next |
+| Copilot Skills | #53 | ✅ Complete |

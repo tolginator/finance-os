@@ -5,8 +5,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from src.application.registry import AGENT_CATALOG as AGENT_INFO
 from src.cli.commands import (
-    AGENT_INFO,
     _mask,
     _normalize_agent_name,
 )
@@ -270,8 +270,12 @@ class TestPipeline:
         mock_result.memo = None
         mock_method = AsyncMock(return_value=mock_result)
         with patch(
-            "src.cli.commands.PipelineService.run_pipeline", mock_method
-        ):
+            "src.cli.commands.create_pipeline_service"
+        ) as mock_factory:
+            mock_service = MagicMock()
+            mock_service.run_pipeline = mock_method
+            mock_service.register_agent = MagicMock()
+            mock_factory.return_value = mock_service
             from src.cli.commands import run_pipeline
             await run_pipeline(args)
         captured = capsys.readouterr()

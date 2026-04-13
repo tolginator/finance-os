@@ -23,8 +23,9 @@ finance-os/
 │   └── src/
 │       ├── agents/      # Domain agents (filing, earnings, macro, risk, etc.)
 │       ├── core/        # BaseAgent, orchestrator, vector memory
-│       ├── application/ # Contracts, LLM gateway, services, config
+│       ├── application/ # Contracts, LLM gateway, services, config, registry
 │       ├── cli/         # CLI entry points (finance-os command)
+│       ├── mcp_server.py # Python MCP server (finance-os-mcp command)
 │       └── pipelines/   # Research digest pipeline
 ├── prompts/             # Shared prompt library
 ├── docs/                # Architecture, agent, and tool documentation
@@ -108,7 +109,18 @@ finance-os --output json run macro-regime             # JSON output
 finance-os run adversarial --prompt "Bull case" --synthesize  # LLM synthesis
 ```
 
-Use `--synthesize` to pass agent output through the LLM gateway (requires `llm_provider: "litellm"` in config). Use `--output json` for structured output.
+Use `--synthesize` to pass agent output through the LLM gateway (requires a configured LLM provider). Use `--output json` for structured output.
+
+### Python MCP Server
+
+The Python MCP server exposes agents as tools for any MCP-compatible client (Copilot CLI, Claude Desktop, Cursor, etc.):
+
+```bash
+finance-os-mcp              # via console script (stdio transport)
+python -m src.mcp_server    # direct invocation
+```
+
+Tools available: `analyze_earnings`, `classify_macro`, `research_digest`, `orchestrate`. See [docs/tools.md](docs/tools.md) for details.
 
 ### Preflight (run before every push)
 

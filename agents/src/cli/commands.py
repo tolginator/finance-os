@@ -20,10 +20,9 @@ from src.application.contracts.agents import (
     TaskDefinition,
 )
 from src.application.llm.gateway import LLMGateway, create_gateway
+from src.application.registry import AGENT_CATALOG, create_pipeline_service
 from src.application.services.agent_service import AgentService
 from src.application.services.digest_service import DigestService
-from src.application.services.pipeline_service import PipelineService
-from src.core.agent import BaseAgent
 
 # Agent name aliases: accept hyphens or underscores
 AGENT_ALIASES: dict[str, str] = {
@@ -34,16 +33,6 @@ AGENT_ALIASES: dict[str, str] = {
     "thesis-guardian": "thesis_guardian",
     "risk-analyst": "risk_analyst",
 }
-
-AGENT_INFO: list[dict[str, str]] = [
-    {"name": "macro_regime", "description": "Classifies macro regime from FRED indicators"},
-    {"name": "filing_analyst", "description": "Searches and analyzes SEC filings (10-K/10-Q)"},
-    {"name": "earnings_interpreter", "description": "Analyzes earnings call transcripts"},
-    {"name": "quant_signal", "description": "Generates composite quantitative signals"},
-    {"name": "thesis_guardian", "description": "Monitors investment theses against data"},
-    {"name": "risk_analyst", "description": "Portfolio risk analysis (VaR, stress tests)"},
-    {"name": "adversarial", "description": "Challenges investment theses adversarially"},
-]
 
 
 def _normalize_agent_name(name: str) -> str:
@@ -146,7 +135,7 @@ async def run_agent(args: argparse.Namespace) -> None:
             result = response.model_dump(mode="json")
 
         case _:
-            known = ", ".join(info["name"] for info in AGENT_INFO)
+            known = ", ".join(info["name"] for info in AGENT_CATALOG)
             msg = f"Unknown agent: {args.agent}. Available: {known}"
             raise ValueError(msg)
 
@@ -159,27 +148,6 @@ async def run_agent(args: argparse.Namespace) -> None:
         result["synthesis"] = synthesis.content
 
     _output(result, args)
-
-
-def _get_all_agents() -> list[BaseAgent]:
-    """Instantiate all available agents."""
-    from src.agents.adversarial import AdversarialAgent
-    from src.agents.earnings_interpreter import EarningsInterpreterAgent
-    from src.agents.filing_analyst import FilingAnalystAgent
-    from src.agents.macro_regime import MacroRegimeAgent
-    from src.agents.quant_signal import QuantSignalAgent
-    from src.agents.risk_agent import RiskAgent
-    from src.agents.thesis_guardian import ThesisGuardianAgent
-
-    return [
-        MacroRegimeAgent(),
-        FilingAnalystAgent(),
-        EarningsInterpreterAgent(),
-        QuantSignalAgent(),
-        ThesisGuardianAgent(),
-        RiskAgent(),
-        AdversarialAgent(),
-    ]
 
 
 # Default research pipeline: agents and their prompts for a given ticker
@@ -196,10 +164,7 @@ DEFAULT_PIPELINE_AGENTS = [
 async def run_pipeline(args: argparse.Namespace) -> None:
     """Run multi-agent research pipeline."""
     config = _load_config()
-    service = PipelineService()
-
-    for agent in _get_all_agents():
-        service.register_agent(agent)
+    service = create_pipeline_service()
 
     # Build task list
     if args.agents:
@@ -259,10 +224,10 @@ async def run_digest(args: argparse.Namespace) -> None:
 def list_agents(args: argparse.Namespace) -> None:
     """List available agents."""
     if args.output == "json":
-        print(json.dumps(AGENT_INFO, indent=2))
+        print(json.dumps(AGENT_CATALOG, indent=2))
     else:
         print("Available agents:\n")
-        for info in AGENT_INFO:
+        for info in AGENT_CATALOG:
             aliases = [k for k, v in AGENT_ALIASES.items() if v == info["name"]]
             alias_str = f" (alias: {aliases[0]})" if aliases else ""
             print(f"  {info['name']}{alias_str}")

@@ -6,7 +6,7 @@ finance-os has two MCP servers:
 
 1. **TypeScript MCP server** (`mcp-server/`) — data tools that fetch, parse, and compute financial data. These are stateless request handlers callable by any LLM via the Model Context Protocol.
 
-2. **Python MCP server** (planned, `agents/src/mcp_server.py`) — agent tools that expose the Python agent framework to LLMs. Wraps the shared application layer. When a host LLM calls these tools, the LLM gateway is skipped (the host LLM does the reasoning).
+2. **Python MCP server** (`agents/src/mcp_server.py`) — agent tools that expose the Python agent framework to LLMs. Wraps the shared application layer via FastMCP with stdio transport. When a host LLM calls these tools, the LLM gateway is skipped (the host LLM does the reasoning).
 
 Both servers are configured as separate MCP servers in the client (Copilot, Claude Desktop, etc.).
 
@@ -52,21 +52,48 @@ Queries personal financial data from Quicken Interchange Format files.
 - **Filters**: date range, account, category, limit
 - **Parser**: handles banking, investment, and split transactions
 
-## Python Agent Tool Catalog (planned)
+## Python Agent Tool Catalog
 
-The Python MCP server will expose agents via the application layer's typed contracts. Each tool maps to a Pydantic request/response pair in `agents/src/application/contracts/agents.py`.
+The Python MCP server exposes agents via the application layer's typed contracts. Run with `finance-os-mcp` or `python -m src.mcp_server` (stdio transport).
 
 | Tool | Contract | Purpose | Status |
 |---|---|---|---|
-| `analyze-earnings` | `AnalyzeEarningsRequest/Response` | Sentiment, tone, guidance extraction from transcripts | Planned |
-| `classify-macro` | `ClassifyMacroRequest/Response` | Macro regime classification from FRED indicators | Planned |
-| `search-filings` | `SearchFilingsRequest/Response` | SEC EDGAR filing search and listing | Planned |
-| `generate-signals` | `GenerateSignalsRequest/Response` | Composite quant signal scoring | Planned |
-| `evaluate-thesis` | `EvaluateThesisRequest/Response` | Thesis assumption evaluation against observed data | Planned |
-| `assess-risk` | `AssessRiskRequest/Response` | VaR/CVaR, scenarios, stress tests | Planned |
-| `challenge-thesis` | `ChallengeThesisRequest/Response` | Adversarial counter-arguments, blind spots, conviction | Planned |
-| `run-pipeline` | `RunPipelineRequest/Response` | Multi-agent orchestrated pipeline with memo generation | Planned |
-| `run-digest` | `RunDigestRequest/Response` | Research digest with alerts and materiality scoring | Planned |
+| `analyze_earnings` | `AnalyzeEarningsRequest/Response` | Sentiment, tone, guidance extraction from transcripts | ✅ |
+| `classify_macro` | `ClassifyMacroRequest/Response` | Macro regime classification from FRED indicators | ✅ |
+| `research_digest` | `RunDigestRequest/Response` | Research digest with alerts and materiality scoring | ✅ |
+| `orchestrate` | `RunPipelineRequest/Response` | Multi-agent orchestrated pipeline with memo generation | ✅ |
+
+### Tool details
+
+#### analyze_earnings
+
+Analyzes an earnings call transcript for tone, sentiment, and forward guidance.
+
+- **Input**: `transcript` (required), `ticker` (optional)
+- **Output**: `tone`, `net_sentiment`, `confidence`, `guidance_direction`, `guidance_count`, `key_phrase_count`, `content`
+
+#### classify_macro
+
+Classifies the current macroeconomic regime from FRED data.
+
+- **Input**: `indicators` (optional FRED series IDs — uses sensible defaults if omitted)
+- **Output**: `regime` (expansion/contraction/transition), `indicators_fetched`, `indicators_with_data`, `content`
+- **Note**: FRED API key is read from server-side config, not exposed as a tool input
+
+#### research_digest
+
+Runs a research digest for a watchlist of tickers.
+
+- **Input**: `tickers` (required), `lookback_days` (default 7), `alert_threshold` (default 0.5)
+- **Output**: `ticker_count`, `entry_count`, `alert_count`, `material_count`, `content`
+
+#### orchestrate
+
+Runs a multi-agent pipeline with dependency ordering.
+
+- **Input**: `tasks` (required — list of task definitions with `agent_name`, `prompt`, optional `kwargs`, `priority`, `depends_on`, `task_id`), `ticker`, `date`
+- **Output**: `results`, `total_duration_ms`, `successful`, `failed`, `memo`
+- **Note**: Rejects unknown agent names upfront (no silent skip). Valid agents: `macro_regime`, `filing_analyst`, `earnings_interpreter`, `quant_signal`, `thesis_guardian`, `risk_analyst`, `adversarial`
 
 ### LLM Gateway behavior in MCP path
 
@@ -86,5 +113,6 @@ When called via MCP, the host LLM does the reasoning — the LLM gateway is **sk
 
 1. If the agent exists, add a contract pair in `agents/src/application/contracts/agents.py`
 2. Add a service method in `agents/src/application/services/agent_service.py`
-3. Register the tool in `agents/src/mcp_server.py` (when Python MCP server exists)
-4. Add tests in `agents/tests/test_services.py` and `agents/tests/test_mcp_server.py`
+3. Add a `@mcp.tool()` function in `agents/src/mcp_server.py`
+4. Register the agent in `agents/src/application/registry.py` (if new agent)
+5. Add tests in `agents/tests/test_services.py` and `agents/tests/test_mcp_server.py`

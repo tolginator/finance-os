@@ -51,6 +51,35 @@ The `VectorMemory` class (`agents/src/core/memory.py`) provides RAG capabilities
 - Deterministic document IDs for deduplication
 - Optional dependency — graceful error if chromadb not installed
 
+## MCP Server (Python)
+
+The Python MCP server (`agents/src/mcp_server.py`) exposes agents as tools for any MCP-compatible client (Copilot CLI, Claude Desktop, Cursor, etc.) via stdio transport.
+
+### Running
+
+```bash
+cd agents && source .venv/bin/activate
+finance-os-mcp          # via console script
+python -m src.mcp_server  # direct invocation
+```
+
+### Tool Catalog
+
+| Tool | Wraps | Purpose |
+|---|---|---|
+| `analyze_earnings` | `AgentService.analyze_earnings()` | Earnings transcript analysis — tone, sentiment, guidance |
+| `classify_macro` | `AgentService.classify_macro()` | Macro regime classification from FRED data |
+| `research_digest` | `DigestService.run_digest()` | Watchlist digest — materiality scoring, alerts |
+| `orchestrate` | `PipelineService.run_pipeline()` | Multi-agent pipeline with dependency ordering |
+
+### Design
+
+- **Per-request services** — fresh agent instances per tool call to avoid state leakage
+- **Structured responses** — tools return dicts (not JSON strings); MCP protocol handles serialization
+- **Server-side config** — secrets (FRED API key) come from `AppConfig`, not tool inputs
+- **Agent validation** — `orchestrate` rejects unknown agent names upfront (no silent skip)
+- **LLM gateway skipped** — host LLM reasons; agents return structured data
+
 ## Research Pipeline
 
 The `ResearchPipeline` (`agents/src/pipelines/research_digest.py`) automates analysis:

@@ -114,5 +114,44 @@ When called via MCP, the host LLM does the reasoning — the LLM gateway is **sk
 1. If the agent exists, add a contract pair in `agents/src/application/contracts/agents.py`
 2. Add a service method in `agents/src/application/services/agent_service.py`
 3. Add a `@mcp.tool()` function in `agents/src/mcp_server.py`
-4. Register the agent in `agents/src/application/registry.py` (if new agent)
-5. Add tests in `agents/tests/test_services.py` and `agents/tests/test_mcp_server.py`
+4. Add a `@app.post()` route in `agents/src/web_api.py`
+5. Register the agent in `agents/src/application/registry.py` (if new agent)
+6. Add tests in `agents/tests/test_services.py`, `agents/tests/test_mcp_server.py`, and `agents/tests/test_web_api.py`
+
+## Web API (REST)
+
+The Web API (`agents/src/web_api.py`) exposes the same application services as the Python MCP server, but over HTTP/REST. It uses the same Pydantic contracts for request/response validation.
+
+### Running
+
+```bash
+finance-os-api                        # console script (127.0.0.1:8000)
+uvicorn src.web_api:app --reload      # development mode with auto-reload
+```
+
+### REST Endpoint Catalog
+
+| Method | Path | Contract | Purpose | Status |
+|--------|------|----------|---------|--------|
+| GET | `/health` | — | Health check | ✅ |
+| GET | `/agents` | — | List available agents | ✅ |
+| POST | `/agents/earnings_interpreter` | `AnalyzeEarningsRequest/Response` | Earnings transcript analysis | ✅ |
+| POST | `/agents/macro_regime` | `ClassifyMacroRequest/Response` | Macro regime classification | ✅ |
+| POST | `/agents/filing_analyst` | `SearchFilingsRequest/Response` | SEC filing search | ✅ |
+| POST | `/agents/quant_signal` | `GenerateSignalsRequest/Response` | Quant signal generation | ✅ |
+| POST | `/agents/thesis_guardian` | `EvaluateThesisRequest/Response` | Thesis evaluation | ✅ |
+| POST | `/agents/risk_analyst` | `AssessRiskRequest/Response` | Portfolio risk analysis | ✅ |
+| POST | `/agents/adversarial` | `ChallengeThesisRequest/Response` | Adversarial thesis challenge | ✅ |
+| POST | `/pipeline` | `RunPipelineRequest/Response` | Multi-agent pipeline | ✅ |
+| POST | `/digest` | `RunDigestRequest/Response` | Research digest | ✅ |
+
+### Design differences from MCP server
+
+| Aspect | MCP Server | Web API |
+|--------|-----------|---------|
+| Transport | stdio (MCP protocol) | HTTP/REST (JSON) |
+| Client | LLM host (Copilot, Claude) | Web browser, curl, frontend |
+| LLM gateway | Skipped (host LLM reasons) | Available for synthesis |
+| Discovery | MCP tool listing | OpenAPI schema at `/docs` |
+| Error format | MCP error response | HTTP status codes (400/422/500) |
+| Config injection | Per-call `AppConfig()` | Lazy `@lru_cache` singleton |

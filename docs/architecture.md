@@ -133,7 +133,7 @@ Host LLM ──→ MCP Protocol ──→ TS MCP Server ──→ Data Tools (Ya
                                                   (gateway skipped)
 ```
 
-### Direct Path (CLI / future Web)
+### Direct Path (CLI / Web API)
 ```
 User ──→ CLI / Web API ──→ Application Layer ──→ Agents ──→ structured data
                                 │                              │
@@ -144,6 +144,27 @@ User ──→ CLI / Web API ──→ Application Layer ──→ Agents ──
                                         │
                                         ↓
                                  synthesized output
+```
+
+### Web API Path Detail
+```
+Client ──→ HTTP request ──→ FastAPI ──→ Application Layer ──→ Agents
+  ↑           (JSON)           │              │                  │
+  │                            │         AppConfig               │
+  │                            │         (@lru_cache)            │
+  │                            │              │                  │
+  │                            │         Fresh service           │
+  │                            │         per request             │
+  │                            │              │                  │
+  │                            ↓              ↓                  │
+  │                      Pydantic         AgentService /         │
+  │                      validation       PipelineService /      │
+  │                      (422 on fail)    DigestService           │
+  │                            │              │                  │
+  │                            │         ValueError ──→ 400      │
+  │                            │              │                  │
+  │                            ↓              ↓                  │
+  └──── JSON response ←── model_dump(mode="json") ←─────────────┘
 ```
 
 ## Component Details
@@ -171,6 +192,38 @@ The shared core that all interfaces wrap. Implemented as:
 - **Config** (`config.py`) — `AppConfig` via pydantic-settings. Loads from `~/.config/finance-os/config.json` (user settings) and `FINANCE_OS_*` environment variables (highest priority).
 
 CLI, Python MCP server, and Web API are thin wrappers over this layer.
+
+### Web API (`agents/src/web_api.py`)
+
+FastAPI REST service exposing the application layer over HTTP. Same shared services as CLI and MCP server — the Web API is the third thin wrapper.
+
+**Entry points:**
+- `finance-os-api` — console script (uvicorn on 127.0.0.1:8000)
+- `uvicorn src.web_api:app --reload` — development mode
+
+**Endpoints:**
+
+| Method | Path | Service | Description |
+|--------|------|---------|-------------|
+| GET | `/health` | — | Health check |
+| GET | `/agents` | — | List agent catalog |
+| POST | `/agents/earnings_interpreter` | `AgentService.analyze_earnings()` | Earnings transcript analysis |
+| POST | `/agents/macro_regime` | `AgentService.classify_macro()` | Macro regime classification |
+| POST | `/agents/filing_analyst` | `AgentService.search_filings()` | SEC filing search |
+| POST | `/agents/quant_signal` | `AgentService.generate_signals()` | Quant signal generation |
+| POST | `/agents/thesis_guardian` | `AgentService.evaluate_thesis()` | Thesis evaluation |
+| POST | `/agents/risk_analyst` | `AgentService.assess_risk()` | Portfolio risk analysis |
+| POST | `/agents/adversarial` | `AgentService.challenge_thesis()` | Adversarial challenge |
+| POST | `/pipeline` | `PipelineService.run_pipeline()` | Multi-agent pipeline |
+| POST | `/digest` | `DigestService.run_digest()` | Research digest |
+
+**Design:**
+- **Per-request services** — fresh `AgentService` / `PipelineService` / `DigestService` per request (agents maintain internal history, so shared instances would leak state)
+- **Lazy config** — `AppConfig` loaded via `@lru_cache` on first request, not at import time
+- **Pydantic validation** — request bodies auto-validated by FastAPI; invalid input → 422
+- **Domain errors** — `ValueError` from agents mapped to HTTP 400 (not 500)
+- **CORS** — enabled for local frontend development (`allow_origins=["*"]`)
+- **OpenAPI** — auto-generated schema at `/docs` (Swagger UI) and `/redoc`
 
 ### Agent Framework (`agents/`)
 

@@ -9,6 +9,20 @@ tools:
   - shell
 ---
 
+## Environment Setup
+
+Before running any `finance-os` CLI commands, activate the Python environment:
+
+```bash
+cd agents && source .venv/bin/activate
+```
+
+If the venv doesn't exist, create it first:
+
+```bash
+cd agents && python3 -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]"
+```
+
 ## Procedure
 
 1. **Gather the thesis.** Ask the user for:

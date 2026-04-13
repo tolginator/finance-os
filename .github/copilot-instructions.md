@@ -256,6 +256,12 @@ finance-os/
 ├── package.json                    # Root workspace config
 ├── .github/
 │   ├── copilot-instructions.md     # This file
+│   ├── skills/                     # Copilot Skills (SKILL.md workflows)
+│   │   ├── earnings-analysis/      # Earnings transcript analysis
+│   │   ├── thesis-evaluation/      # Thesis challenge + conviction scoring
+│   │   ├── research-digest/        # Watchlist digest + pipeline
+│   │   ├── risk-assessment/        # Portfolio risk + stress tests
+│   │   └── macro-overview/         # Macro regime classification
 │   ├── workflows/                  # CI/CD
 │   ├── ISSUE_TEMPLATE/             # Issue templates
 │   ├── acl/                        # CODEOWNERS, access

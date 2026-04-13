@@ -122,6 +122,18 @@ python -m src.mcp_server    # direct invocation
 
 Tools available: `analyze_earnings`, `classify_macro`, `research_digest`, `orchestrate`. See [docs/tools.md](docs/tools.md) for details.
 
+### Copilot Skills
+
+Copilot Skills (`.github/skills/`) teach Copilot how to use finance-os tools together for investment analysis workflows. They are auto-detected by Copilot in IDE and CLI.
+
+| Skill | Trigger | What it does |
+|-------|---------|-------------|
+| `earnings-analysis` | "analyze earnings for AAPL" | Run earnings interpreter, score sentiment, extract guidance |
+| `thesis-evaluation` | "challenge my bull thesis on MSFT" | Adversarial challenge + blind spots + conviction scoring |
+| `research-digest` | "daily briefing for my watchlist" | Auto-fetch filings, classify macro, generate alerts |
+| `risk-assessment` | "stress test my portfolio" | VaR, concentration, scenario analysis |
+| `macro-overview` | "what's the macro regime?" | FRED-based regime classification + implications |
+
 ### Preflight (run before every push)
 
 From the repo root:

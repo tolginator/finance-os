@@ -1,9 +1,11 @@
 """Tests for application services — agent, pipeline, and digest."""
 
 from decimal import Decimal
+from unittest.mock import patch
 
 import pytest
 
+from src.application.config import AppConfig
 from src.application.contracts.agents import (
     AnalyzeEarningsRequest,
     AssessRiskRequest,
@@ -16,6 +18,7 @@ from src.application.services.agent_service import AgentService
 from src.application.services.digest_service import DigestService
 from src.application.services.pipeline_service import PipelineService
 from src.core.agent import AgentResponse, BaseAgent
+from src.pipelines.research_digest import DataSource
 
 # --- Test helpers ---
 
@@ -355,17 +358,21 @@ class TestPipelineSoftFailure:
 
 
 class TestDigestService:
-    @pytest.mark.asyncio
-    async def test_empty_digest(self):
-        service = DigestService()
-        request = RunDigestRequest(tickers=["AAPL"])
-        result = await service.run_digest(request)
+    async def test_empty_digest_with_no_sources_and_no_api(self) -> None:
+        """Digest with no sources and no API access returns empty."""
+        config = AppConfig(fred_api_key="")
+        service = DigestService(config)
+        request = RunDigestRequest(tickers=["ZZZZZ"])
+        with patch(
+            "src.application.services.digest_service._fetch_filing_sources",
+            return_value=[],
+        ):
+            result = await service.run_digest(request)
         assert result.ticker_count == 1
         assert result.entry_count == 0
-        assert result.alert_count == 0
 
-    @pytest.mark.asyncio
-    async def test_digest_with_sources(self):
+    async def test_digest_with_explicit_sources(self) -> None:
+        """Digest with explicit sources skips auto-fetch."""
         service = DigestService()
         request = RunDigestRequest(
             tickers=["AAPL"],
@@ -374,9 +381,96 @@ class TestDigestService:
                 "ticker": "AAPL",
                 "date": "2026-04-01",
                 "content": "Revenue increased significantly",
-                "metadata": {},
+                "metadata": {"sentiment": "0.6"},
             }],
         )
         result = await service.run_digest(request)
         assert result.entry_count == 1
         assert "AAPL" in result.content
+
+    async def test_auto_fetch_produces_entries(self) -> None:
+        """When no sources provided, auto-fetch creates entries."""
+        config = AppConfig(fred_api_key="")
+        service = DigestService(config)
+
+        mock_sources = [
+            DataSource(
+                source_type="edgar",
+                ticker="MSFT",
+                date="2026-04-01",
+                content="10-K filed 2026-04-01: Annual report",
+                metadata={"form_type": "10-K", "sentiment": "0.1"},
+            ),
+        ]
+        with patch(
+            "src.application.services.digest_service._fetch_filing_sources",
+            return_value=mock_sources,
+        ):
+            request = RunDigestRequest(tickers=["MSFT"])
+            result = await service.run_digest(request)
+        assert result.entry_count >= 1
+        assert result.ticker_count == 1
+        assert "MSFT" in result.content
+
+    async def test_auto_fetch_with_macro(self) -> None:
+        """Auto-fetch includes macro regime when FRED key available."""
+        config = AppConfig(fred_api_key="test_key")
+        service = DigestService(config)
+
+        mock_filing_sources = [
+            DataSource(
+                source_type="edgar",
+                ticker="AAPL",
+                date="2026-04-01",
+                content="10-K filing",
+                metadata={"sentiment": "0.1"},
+            ),
+        ]
+        mock_macro_source = DataSource(
+            source_type="macro",
+            ticker="MACRO",
+            date="2026-04-01",
+            content="Macro regime: EXPANSION",
+            metadata={"regime": "EXPANSION", "sentiment": "0.5"},
+        )
+        with (
+            patch(
+                "src.application.services.digest_service._fetch_filing_sources",
+                return_value=mock_filing_sources,
+            ),
+            patch(
+                "src.application.services.digest_service._fetch_macro_source",
+                return_value=mock_macro_source,
+            ),
+        ):
+            request = RunDigestRequest(tickers=["AAPL"])
+            result = await service.run_digest(request)
+        # Should have filing + macro entries
+        assert result.entry_count >= 2
+
+    async def test_material_entries_generate_alerts(self) -> None:
+        """Entries with high sentiment become material and generate alerts."""
+        config = AppConfig(fred_api_key="")
+        service = DigestService(config)
+
+        mock_sources = [
+            DataSource(
+                source_type="edgar",
+                ticker="TSLA",
+                date="2026-04-01",
+                content="8-K material event",
+                metadata={"form_type": "8-K", "sentiment": "-0.6"},
+            ),
+        ]
+        with patch(
+            "src.application.services.digest_service._fetch_filing_sources",
+            return_value=mock_sources,
+        ):
+            request = RunDigestRequest(
+                tickers=["TSLA"],
+                alert_threshold=Decimal("0.5"),
+            )
+            result = await service.run_digest(request)
+        assert result.entry_count == 1
+        assert result.material_count == 1
+        assert result.alert_count == 1

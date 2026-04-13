@@ -1,6 +1,7 @@
 """Tests for the Python MCP server."""
 
 import json
+from unittest.mock import patch
 
 import pytest
 from mcp.server.fastmcp.exceptions import ToolError
@@ -115,9 +116,19 @@ class TestResearchDigest:
     """Test the research-digest tool."""
 
     async def test_returns_structured_response(self) -> None:
-        content_list, _ = await mcp.call_tool(
-            "research_digest", {"tickers": ["AAPL", "MSFT"]}
-        )
+        with (
+            patch(
+                "src.application.services.digest_service._fetch_filing_sources",
+                return_value=[],
+            ),
+            patch(
+                "src.application.services.digest_service._fetch_macro_source",
+                return_value=None,
+            ),
+        ):
+            content_list, _ = await mcp.call_tool(
+                "research_digest", {"tickers": ["AAPL", "MSFT"]}
+            )
         parsed = json.loads(content_list[0].text)
         assert parsed["ticker_count"] == 2
         assert isinstance(parsed["entry_count"], int)
@@ -126,9 +137,19 @@ class TestResearchDigest:
         assert "content" in parsed
 
     async def test_custom_lookback(self) -> None:
-        content_list, _ = await mcp.call_tool(
-            "research_digest", {"tickers": ["GOOGL"], "lookback_days": 30}
-        )
+        with (
+            patch(
+                "src.application.services.digest_service._fetch_filing_sources",
+                return_value=[],
+            ),
+            patch(
+                "src.application.services.digest_service._fetch_macro_source",
+                return_value=None,
+            ),
+        ):
+            content_list, _ = await mcp.call_tool(
+                "research_digest", {"tickers": ["GOOGL"], "lookback_days": 30}
+            )
         parsed = json.loads(content_list[0].text)
         assert parsed["ticker_count"] == 1
 

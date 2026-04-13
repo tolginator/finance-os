@@ -180,3 +180,34 @@ class TestPipelineSoftFailureLive:
         assert result.successful == 0
         macro_result = result.results[0]
         assert macro_result["metadata"].get("error") == "missing_api_key"
+
+
+@pytest.mark.integration
+@requires_edgar
+class TestDigestAutoFetchLive:
+    """Digest auto-fetch with live EDGAR data."""
+
+    async def test_digest_returns_entries_for_known_ticker(self) -> None:
+        """Digest auto-fetches filings and returns entries for MSFT."""
+        from src.application.contracts.agents import RunDigestRequest
+        from src.application.services.digest_service import DigestService
+
+        config = AppConfig(fred_api_key="")
+        service = DigestService(config)
+        request = RunDigestRequest(tickers=["MSFT"])
+        result = await service.run_digest(request)
+        assert result.entry_count > 0
+        assert result.ticker_count == 1
+        assert "MSFT" in result.content
+
+    async def test_digest_multiple_tickers(self) -> None:
+        """Digest auto-fetches for multiple tickers."""
+        from src.application.contracts.agents import RunDigestRequest
+        from src.application.services.digest_service import DigestService
+
+        config = AppConfig(fred_api_key="")
+        service = DigestService(config)
+        request = RunDigestRequest(tickers=["MSFT", "AAPL"])
+        result = await service.run_digest(request)
+        assert result.entry_count > 0
+        assert result.ticker_count == 2

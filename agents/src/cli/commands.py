@@ -238,6 +238,7 @@ async def run_pipeline(args: argparse.Namespace) -> None:
 
 async def run_digest(args: argparse.Namespace) -> None:
     """Run research digest."""
+    config = _load_config()
     tickers = [t.strip().upper() for t in args.tickers.split(",")]
 
     request = RunDigestRequest(
@@ -245,7 +246,7 @@ async def run_digest(args: argparse.Namespace) -> None:
         lookback_days=args.lookback_days,
         alert_threshold=Decimal(str(args.alert_threshold)),
     )
-    service = DigestService()
+    service = DigestService(config)
     response = await service.run_digest(request)
 
     result = response.model_dump(mode="json")

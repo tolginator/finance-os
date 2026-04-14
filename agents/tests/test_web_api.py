@@ -147,6 +147,12 @@ class TestMacroEndpoint:
         call_req = mock_svc.classify_macro.call_args[0][0]
         assert call_req.api_key == "USER_PROVIDED_KEY"
 
+    def test_classify_macro_wrong_type_indicators_422(self, client):
+        resp = client.post("/agents/macro_regime", json={
+            "indicators": "GDP",
+        })
+        assert resp.status_code == 422
+
 
 class TestFilingEndpoint:
     @patch("src.web_api.AgentService")
@@ -165,6 +171,16 @@ class TestFilingEndpoint:
         assert call_req.ticker == "AAPL"
         assert call_req.form_type == "10-Q"
         assert resp.json()["filing_count"] == 5
+
+    @patch("src.web_api.AgentService")
+    def test_search_filings_service_error_returns_400(self, mock_cls, client):
+        mock_svc = mock_cls.return_value
+        mock_svc.search_filings = AsyncMock(
+            side_effect=ValueError("CIK not found for ticker"),
+        )
+        resp = client.post("/agents/filing_analyst", json={"ticker": "INVALID"})
+        assert resp.status_code == 400
+        assert "detail" in resp.json()
 
 
 class TestQuantSignalEndpoint:
@@ -188,6 +204,12 @@ class TestQuantSignalEndpoint:
         assert call_req.signals[0]["name"] == "momentum"
         assert call_req.method == "weighted"
 
+    def test_generate_signals_invalid_sentiment_422(self, client):
+        resp = client.post("/agents/quant_signal", json={
+            "sentiment": "not_a_number",
+        })
+        assert resp.status_code == 422
+
 
 class TestThesisGuardianEndpoint:
     @patch("src.web_api.AgentService")
@@ -206,6 +228,10 @@ class TestThesisGuardianEndpoint:
         assert call_req.theses == theses_input
         assert resp.json()["theses_checked"] == 2
 
+    def test_evaluate_thesis_missing_theses_422(self, client):
+        resp = client.post("/agents/thesis_guardian", json={})
+        assert resp.status_code == 422
+
 
 class TestRiskEndpoint:
     @patch("src.web_api.AgentService")
@@ -222,6 +248,12 @@ class TestRiskEndpoint:
         call_req = mock_svc.assess_risk.call_args[0][0]
         assert len(call_req.positions) == 1
         assert call_req.positions[0]["ticker"] == "AAPL"
+
+    def test_assess_risk_wrong_type_returns_422(self, client):
+        resp = client.post("/agents/risk_analyst", json={
+            "returns": "not_a_list",
+        })
+        assert resp.status_code == 422
 
 
 class TestAdversarialEndpoint:
@@ -240,6 +272,12 @@ class TestAdversarialEndpoint:
         call_req = mock_svc.challenge_thesis.call_args[0][0]
         assert call_req.claims == claims_input
         assert resp.json()["counter_count"] == 4
+
+    def test_challenge_thesis_wrong_type_claims_422(self, client):
+        resp = client.post("/agents/adversarial", json={
+            "claims": "not a list",
+        })
+        assert resp.status_code == 422
 
 
 # --- Pipeline & Digest ---
@@ -385,17 +423,6 @@ class TestErrorHandling:
         })
         assert resp.status_code == 400
         assert resp.json()["detail"] is not None
-
-    @patch("src.web_api.AgentService")
-    def test_value_error_body_has_detail_key(self, mock_cls, client):
-        mock_svc = mock_cls.return_value
-        mock_svc.search_filings = AsyncMock(
-            side_effect=ValueError("Bad CIK")
-        )
-        resp = client.post("/agents/filing_analyst", json={"ticker": "BAD"})
-        assert resp.status_code == 400
-        body = resp.json()
-        assert "detail" in body
 
     def test_malformed_json_body_422(self, client):
         resp = client.post(

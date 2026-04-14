@@ -19,7 +19,7 @@
 - **Framework**: Custom agent base classes in `src/core/`
 - **LLM Gateway**: Pluggable inference client in the application layer — supports OpenAI, Anthropic, ollama, or skip when host LLM reasons (MCP path)
 - **Domain Agents**: `src/agents/` — filing analyst, earnings interpreter, macro regime, quant signal, thesis guardian, risk, adversarial
-- **Application Layer**: `src/application/` — shared contracts (Pydantic), LLM gateway, services. CLI, MCP server, and future web API are thin wrappers over this.
+- **Application Layer**: `src/application/` — shared contracts (Pydantic), LLM gateway, services. CLI, MCP server, and Web API are thin wrappers over this.
 - **Quant Tools**: `src/tools/` — regression, factor analysis, Monte Carlo, Bayesian updates
 - **Data Pipelines**: `src/pipelines/` — EDGAR, FRED, market data, research digest
 - **Tests**: pytest in `tests/`
@@ -69,6 +69,7 @@ Research Output (memos, alerts, signals)
 | Data Sources | SEC EDGAR (free), FRED (free), Yahoo Finance (yfinance), QIF files |
 | CLI | Python (`finance-os` console script) |
 | Web API | Python (`finance-os-api` console script, FastAPI + uvicorn) |
+| Web UI | React 19, TypeScript, Vite |
 | MCP Server entry | Python (`finance-os-mcp` console script, stdio transport) |
 | Copilot Skills | Markdown workflow definitions (`.github/skills/`) |
 | Testing | Vitest (TS), pytest (Python) |
@@ -288,6 +289,12 @@ finance-os/
 │   │   ├── web_api.py              # FastAPI web server (finance-os-api command)
 │   │   ├── tools/                  # Quant tools
 │   │   └── pipelines/             # Data ingestion pipelines
+│   └── tests/
+├── web-ui/                         # React frontend (Vite + TypeScript)
+│   ├── src/
+│   │   ├── App.tsx                  # Root component
+│   │   ├── api.ts                   # API client for Web API
+│   │   └── components/              # UI components
 │   └── tests/
 ├── prompts/                        # Shared prompt library
 │   ├── roles/                      # Role-stacking personas

@@ -12,7 +12,7 @@ Not a chatbot. A **system**. The personal Bloomberg terminal + quant lab + resea
 - **Adversarial challenge**: Every thesis gets systematically attacked before capital is deployed
 - **Quantitative signals**: Transform unstructured text into structured, timestamped, confidence-weighted quant features
 - **Multi-agent orchestration**: Agents collaborate and debate to produce consolidated research memos
-- **LLM-native**: Pluggable LLM gateway for direct inference (CLI, future web) or delegate to host LLM (Copilot, Claude Desktop via MCP)
+- **LLM-native**: Pluggable LLM gateway for direct inference (CLI, web) or delegate to host LLM (Copilot, Claude Desktop via MCP)
 
 ## Project Structure
 
@@ -28,6 +28,7 @@ finance-os/
 │       ├── mcp_server.py # Python MCP server (finance-os-mcp command)
 │       ├── web_api.py   # FastAPI web server (finance-os-api command)
 │       └── pipelines/   # Research digest pipeline
+├── web-ui/              # React frontend (Vite + TypeScript)
 ├── prompts/             # Shared prompt library
 ├── docs/                # Architecture, agent, and tool documentation
 └── .github/             # CI, copilot instructions, skills, templates
@@ -173,6 +174,25 @@ curl -X POST http://127.0.0.1:8000/digest \
 curl -X POST http://127.0.0.1:8000/agents/filing_analyst \
   -H "Content-Type: application/json" \
   -d '{"ticker": "AAPL", "form_type": "10-K"}'
+```
+
+### Web UI
+
+React frontend consuming the Web API. Requires the API server to be running.
+
+```bash
+# Start the API server first (in a separate terminal)
+cd agents && source .venv/bin/activate && finance-os-api
+
+# Start the frontend dev server
+cd web-ui
+npm run dev    # opens http://localhost:5173 with API proxy
+```
+
+The dev server proxies `/api/*` requests to the backend at `http://127.0.0.1:8000`. For production builds:
+
+```bash
+cd web-ui && npm run build    # outputs to web-ui/dist/
 ```
 
 ### Copilot Skills

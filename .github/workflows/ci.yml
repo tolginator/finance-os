@@ -44,6 +44,23 @@ jobs:
       - run: npm run build
       - run: npm run test:integration
 
+  web-ui:
+    name: Web UI – Unit (TypeScript)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web-ui
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+      - run: npm run lint
+
   agents:
     name: Agents – Unit (Python)
     runs-on: ubuntu-latest

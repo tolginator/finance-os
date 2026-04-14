@@ -69,6 +69,7 @@ Research Output (memos, alerts, signals)
 | Data Sources | SEC EDGAR (free), FRED (free), Yahoo Finance (yfinance), QIF files |
 | CLI | Python (`finance-os` console script) |
 | Web API | Python (`finance-os-api` console script, FastAPI + uvicorn) |
+| Web UI | React 19, TypeScript, Vite |
 | MCP Server entry | Python (`finance-os-mcp` console script, stdio transport) |
 | Copilot Skills | Markdown workflow definitions (`.github/skills/`) |
 | Testing | Vitest (TS), pytest (Python) |
@@ -288,6 +289,12 @@ finance-os/
 │   │   ├── web_api.py              # FastAPI web server (finance-os-api command)
 │   │   ├── tools/                  # Quant tools
 │   │   └── pipelines/             # Data ingestion pipelines
+│   └── tests/
+├── web-ui/                         # React frontend (Vite + TypeScript)
+│   ├── src/
+│   │   ├── App.tsx                  # Root component
+│   │   ├── api.ts                   # API client for Web API
+│   │   └── components/              # UI components
 │   └── tests/
 ├── prompts/                        # Shared prompt library
 │   ├── roles/                      # Role-stacking personas

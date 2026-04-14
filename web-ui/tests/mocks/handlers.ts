@@ -1,0 +1,27 @@
+import { http, HttpResponse } from 'msw';
+
+export const handlers = [
+  http.get('/api/health', () => {
+    return HttpResponse.json({ status: 'ok' });
+  }),
+
+  http.get('/api/agents', () => {
+    return HttpResponse.json([
+      { name: 'macro_regime', description: 'Classifies macro regime from FRED indicators' },
+      { name: 'filing_analyst', description: 'Searches and analyzes SEC filings' },
+      { name: 'adversarial', description: 'Challenges investment theses adversarially' },
+    ]);
+  }),
+
+  http.post('/api/digest', async ({ request }) => {
+    const body = (await request.json()) as Record<string, unknown>;
+    const tickers = body.tickers as string[];
+    return HttpResponse.json({
+      ticker_count: tickers.length,
+      entry_count: 3,
+      alert_count: 1,
+      material_count: 1,
+      content: `Digest for ${tickers.join(', ')}`,
+    });
+  }),
+];

@@ -5,13 +5,14 @@
   "description": "Personal Investment Intelligence OS",
   "type": "module",
   "workspaces": [
-    "mcp-server"
+    "mcp-server",
+    "web-ui"
   ],
   "scripts": {
-    "build": "npm run build --workspace=mcp-server",
-    "test": "npm run test --workspace=mcp-server",
-    "lint": "npm run lint --workspace=mcp-server",
-    "preflight": "npm run build && npm test && npm run lint && bash -c 'cd agents && source .venv/bin/activate && ruff check src/ tests/ && python3 -m pytest -m \"not integration\"' || echo '⚠ Python preflight skipped (venv not set up). CI will catch Python issues.'"
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "preflight": "npm run build && npm test && npm run lint && bash -c 'cd agents && if [ -d .venv ]; then source .venv/bin/activate && ruff check src/ tests/ && python3 -m pytest -m \"not integration\"; else echo \"⚠ Python preflight skipped (venv not set up). CI will catch Python issues.\"; fi'"
   },
   "license": "MIT"
 }

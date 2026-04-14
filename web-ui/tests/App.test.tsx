@@ -71,14 +71,14 @@ describe('AgentList', () => {
   it('shows loading state initially', () => {
     server.use(http.get('/api/agents', () => new Promise(() => {})));
     render(<AgentList />);
-    expect(screen.getByText('Loading agents…')).toBeInTheDocument();
+    expect(screen.getByTestId('agents-loading')).toBeInTheDocument();
   });
 
   it('shows error when agent fetch fails', async () => {
     server.use(http.get('/api/agents', () => HttpResponse.json({ detail: 'Server error' }, { status: 500 })));
     render(<AgentList />);
     await waitFor(() => {
-      expect(screen.getByText(/Error:/)).toBeInTheDocument();
+      expect(screen.getByTestId('agents-error')).toBeInTheDocument();
     });
   });
 
@@ -86,7 +86,7 @@ describe('AgentList', () => {
     server.use(http.get('/api/agents', () => HttpResponse.json([])));
     render(<AgentList />);
     await waitFor(() => {
-      expect(screen.getByText('No agents available.')).toBeInTheDocument();
+      expect(screen.getByTestId('agents-empty')).toBeInTheDocument();
     });
   });
 });

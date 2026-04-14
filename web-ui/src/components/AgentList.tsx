@@ -14,9 +14,9 @@ export function AgentList() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <p>Loading agents…</p>;
-  if (error) return <p style={{ color: '#ef4444' }}>Error: {error}</p>;
-  if (agents.length === 0) return <p>No agents available.</p>;
+  if (loading) return <p data-testid="agents-loading">Loading agents…</p>;
+  if (error) return <p data-testid="agents-error" style={{ color: '#ef4444' }}>Error: {error}</p>;
+  if (agents.length === 0) return <p data-testid="agents-empty">No agents available.</p>;
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>

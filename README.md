@@ -26,6 +26,7 @@ finance-os/
 │       ├── application/ # Contracts, LLM gateway, services, config, registry
 │       ├── cli/         # CLI entry points (finance-os command)
 │       ├── mcp_server.py # Python MCP server (finance-os-mcp command)
+│       ├── web_api.py   # FastAPI web server (finance-os-api command)
 │       └── pipelines/   # Research digest pipeline
 ├── prompts/             # Shared prompt library
 ├── docs/                # Architecture, agent, and tool documentation
@@ -121,6 +122,58 @@ python -m src.mcp_server    # direct invocation
 ```
 
 Tools available: `analyze_earnings`, `classify_macro`, `research_digest`, `orchestrate`. See [docs/tools.md](docs/tools.md) for details.
+
+### Web API
+
+REST API wrapping the same application layer as CLI and MCP server.
+
+```bash
+# Setup (one-time, from agents/ directory)
+cd agents
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+
+# Start the server
+finance-os-api                              # production (127.0.0.1:8000)
+uvicorn src.web_api:app --reload            # development with auto-reload
+uvicorn src.web_api:app --host 0.0.0.0      # expose to local network
+```
+
+Once running, open http://127.0.0.1:8000/docs for interactive Swagger UI.
+
+**Endpoints:**
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/health` | Health check |
+| GET | `/agents` | List available agents |
+| POST | `/agents/earnings_interpreter` | Analyze earnings transcripts |
+| POST | `/agents/macro_regime` | Classify macro regime |
+| POST | `/agents/filing_analyst` | Search SEC filings |
+| POST | `/agents/quant_signal` | Generate quant signals |
+| POST | `/agents/thesis_guardian` | Evaluate investment theses |
+| POST | `/agents/risk_analyst` | Portfolio risk analysis |
+| POST | `/agents/adversarial` | Challenge thesis adversarially |
+| POST | `/pipeline` | Multi-agent research pipeline |
+| POST | `/digest` | Research digest for watchlist |
+
+**Example:**
+
+```bash
+# Health check
+curl http://127.0.0.1:8000/health
+
+# Run a research digest
+curl -X POST http://127.0.0.1:8000/digest \
+  -H "Content-Type: application/json" \
+  -d '{"tickers": ["AAPL", "MSFT"], "lookback_days": 7}'
+
+# Search SEC filings
+curl -X POST http://127.0.0.1:8000/agents/filing_analyst \
+  -H "Content-Type: application/json" \
+  -d '{"ticker": "AAPL", "form_type": "10-K"}'
+```
 
 ### Copilot Skills
 

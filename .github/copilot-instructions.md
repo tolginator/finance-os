@@ -38,7 +38,7 @@ Agents perform deterministic data processing and construct prompts but **do not 
 |---|---|---|
 | MCP (Copilot, Claude Desktop) | Host LLM reasons | Skipped |
 | CLI | LLM gateway calls provider | Used |
-| Web API (future) | LLM gateway calls provider | Used |
+| Web API | LLM gateway calls provider | Used |
 
 ## Data Flow
 
@@ -68,6 +68,7 @@ Research Output (memos, alerts, signals)
 | LLM Gateway | Pluggable — OpenAI, Anthropic, ollama, or host LLM via MCP |
 | Data Sources | SEC EDGAR (free), FRED (free), Yahoo Finance (yfinance), QIF files |
 | CLI | Python (`finance-os` console script) |
+| Web API | Python (`finance-os-api` console script, FastAPI + uvicorn) |
 | MCP Server entry | Python (`finance-os-mcp` console script, stdio transport) |
 | Copilot Skills | Markdown workflow definitions (`.github/skills/`) |
 | Testing | Vitest (TS), pytest (Python) |
@@ -284,6 +285,7 @@ finance-os/
 │   │   ├── application/            # Shared contracts, LLM gateway, services, registry
 │   │   ├── cli/                    # CLI entry points (finance-os command)
 │   │   ├── mcp_server.py           # Python MCP server (finance-os-mcp command)
+│   │   ├── web_api.py              # FastAPI web server (finance-os-api command)
 │   │   ├── tools/                  # Quant tools
 │   │   └── pipelines/             # Data ingestion pipelines
 │   └── tests/

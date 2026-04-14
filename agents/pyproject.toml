@@ -12,6 +12,8 @@ dependencies = [
     "azure-identity>=1.19",
     "aiohttp>=3.11",
     "mcp>=1.27.0",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.34.0",
 ]
 
 [project.optional-dependencies]
@@ -29,6 +31,7 @@ dev = [
 [project.scripts]
 finance-os = "src.cli.main:main"
 finance-os-mcp = "src.mcp_server:main"
+finance-os-api = "src.web_api:main"
 
 [build-system]
 requires = ["hatchling"]

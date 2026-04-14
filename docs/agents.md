@@ -80,6 +80,43 @@ python -m src.mcp_server  # direct invocation
 - **Agent validation** — `orchestrate` rejects unknown agent names upfront (no silent skip)
 - **LLM gateway skipped** — host LLM reasons; agents return structured data
 
+## Web API (FastAPI)
+
+The Web API (`agents/src/web_api.py`) exposes the same application layer services as the MCP server, but over HTTP/REST for web frontends and programmatic access.
+
+### Running
+
+```bash
+cd agents && source .venv/bin/activate
+finance-os-api            # via console script (127.0.0.1:8000)
+uvicorn src.web_api:app --reload  # development mode
+```
+
+### Endpoint Catalog
+
+| Endpoint | Wraps | Purpose |
+|---|---|---|
+| `POST /agents/earnings_interpreter` | `AgentService.analyze_earnings()` | Earnings transcript analysis — tone, sentiment, guidance |
+| `POST /agents/macro_regime` | `AgentService.classify_macro()` | Macro regime classification from FRED data |
+| `POST /agents/filing_analyst` | `AgentService.search_filings()` | SEC filing search |
+| `POST /agents/quant_signal` | `AgentService.generate_signals()` | Quant signal generation |
+| `POST /agents/thesis_guardian` | `AgentService.evaluate_thesis()` | Thesis evaluation |
+| `POST /agents/risk_analyst` | `AgentService.assess_risk()` | Portfolio risk analysis |
+| `POST /agents/adversarial` | `AgentService.challenge_thesis()` | Adversarial thesis challenge |
+| `POST /pipeline` | `PipelineService.run_pipeline()` | Multi-agent pipeline with dependency ordering |
+| `POST /digest` | `DigestService.run_digest()` | Watchlist digest — materiality scoring, alerts |
+| `GET /agents` | `AGENT_CATALOG` | List available agents |
+| `GET /health` | — | Health check |
+
+### Design
+
+- **Per-request services** — fresh agent instances per request to avoid state leakage
+- **Pydantic contracts** — same request/response models as MCP server; FastAPI auto-validates and generates OpenAPI schema
+- **Lazy config** — `AppConfig` via `@lru_cache`, injected into services on each request
+- **Error mapping** — domain `ValueError` → HTTP 400; Pydantic validation → 422
+- **CORS** — enabled for local frontend development
+- **LLM gateway available** — Web API path can invoke LLM gateway for synthesis (unlike MCP path)
+
 ## Research Pipeline
 
 The `ResearchPipeline` (`agents/src/pipelines/research_digest.py`) automates analysis:

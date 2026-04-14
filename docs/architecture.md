@@ -5,11 +5,11 @@
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │                        UX Layer                              │
-│  Copilot CLI │ Agent CLI │ Copilot Skills │ Web UI (future)  │
+│  Copilot CLI │ Agent CLI │ Copilot Skills │ Web API │ Web UI (future)  │
 ├──────────────────────────────────────────────────────────────┤
 │                    Interface Layer                            │
 │  TS MCP Server (data tools) │ Python MCP Server (agents)     │
-│                             │ Web API / FastAPI (future)      │
+│                             │ FastAPI Web API                 │
 ├──────────────────────────────────────────────────────────────┤
 │                  Application Layer                            │
 │  Pydantic Contracts │ LLM Gateway │ Agent Services            │
@@ -122,7 +122,7 @@ The LLM gateway is a first-class component in the application layer. It resolves
 | **MCP** (Copilot, Claude Desktop) | Host LLM | `SkipProvider` (no-op) | Included in host |
 | **CLI** (no `--synthesize`) | Nobody — raw output | Not called | Zero |
 | **CLI** (`--synthesize`) | LLM via gateway | `LiteLLMProvider` | Pay-per-call |
-| **Web API** (future) | LLM via gateway | `LiteLLMProvider` | Pay-per-call |
+| **Web API** | LLM via gateway | `LiteLLMProvider` | Pay-per-call |
 
 ## Data Flow
 
@@ -133,7 +133,7 @@ Host LLM ──→ MCP Protocol ──→ TS MCP Server ──→ Data Tools (Ya
                                                   (gateway skipped)
 ```
 
-### Direct Path (CLI / future Web)
+### Direct Path (CLI / Web API)
 ```
 User ──→ CLI / Web API ──→ Application Layer ──→ Agents ──→ structured data
                                 │                              │
@@ -144,6 +144,27 @@ User ──→ CLI / Web API ──→ Application Layer ──→ Agents ──
                                         │
                                         ↓
                                  synthesized output
+```
+
+### Web API Path Detail
+```
+Client ──→ HTTP request ──→ FastAPI ──→ Application Layer ──→ Agents
+  ↑           (JSON)           │              │                  │
+  │                            │         AppConfig               │
+  │                            │         (@lru_cache)            │
+  │                            │              │                  │
+  │                            │         Fresh service           │
+  │                            │         per request             │
+  │                            │              │                  │
+  │                            ↓              ↓                  │
+  │                      Pydantic         AgentService /         │
+  │                      validation       PipelineService /      │
+  │                      (422 on fail)    DigestService           │
+  │                            │              │                  │
+  │                            │         ValueError ──→ 400      │
+  │                            │              │                  │
+  │                            ↓              ↓                  │
+  └──── JSON response ←── model_dump(mode="json") ←─────────────┘
 ```
 
 ## Component Details
@@ -170,7 +191,39 @@ The shared core that all interfaces wrap. Implemented as:
   - `DigestService` — wraps research pipeline with typed I/O
 - **Config** (`config.py`) — `AppConfig` via pydantic-settings. Loads from `~/.config/finance-os/config.json` (user settings) and `FINANCE_OS_*` environment variables (highest priority).
 
-CLI, Python MCP server, and future Web API are thin wrappers over this layer.
+CLI, Python MCP server, and Web API are thin wrappers over this layer.
+
+### Web API (`agents/src/web_api.py`)
+
+FastAPI REST service exposing the application layer over HTTP. Same shared services as CLI and MCP server — the Web API is the third thin wrapper.
+
+**Entry points:**
+- `finance-os-api` — console script (uvicorn on 127.0.0.1:8000)
+- `uvicorn src.web_api:app --reload` — development mode
+
+**Endpoints:**
+
+| Method | Path | Service | Description |
+|--------|------|---------|-------------|
+| GET | `/health` | — | Health check |
+| GET | `/agents` | — | List agent catalog |
+| POST | `/agents/earnings_interpreter` | `AgentService.analyze_earnings()` | Earnings transcript analysis |
+| POST | `/agents/macro_regime` | `AgentService.classify_macro()` | Macro regime classification |
+| POST | `/agents/filing_analyst` | `AgentService.search_filings()` | SEC filing search |
+| POST | `/agents/quant_signal` | `AgentService.generate_signals()` | Quant signal generation |
+| POST | `/agents/thesis_guardian` | `AgentService.evaluate_thesis()` | Thesis evaluation |
+| POST | `/agents/risk_analyst` | `AgentService.assess_risk()` | Portfolio risk analysis |
+| POST | `/agents/adversarial` | `AgentService.challenge_thesis()` | Adversarial challenge |
+| POST | `/pipeline` | `PipelineService.run_pipeline()` | Multi-agent pipeline |
+| POST | `/digest` | `DigestService.run_digest()` | Research digest |
+
+**Design:**
+- **Per-request services** — fresh `AgentService` / `PipelineService` / `DigestService` per request (agents maintain internal history, so shared instances would leak state)
+- **Lazy config** — `AppConfig` loaded via `@lru_cache` on first request, not at import time
+- **Pydantic validation** — request bodies auto-validated by FastAPI; invalid input → 422
+- **Domain errors** — `ValueError` from agents mapped to HTTP 400 (not 500)
+- **CORS** — enabled for local frontend development (`allow_origins=["*"]`)
+- **OpenAPI** — auto-generated schema at `/docs` (Swagger UI) and `/redoc`
 
 ### Agent Framework (`agents/`)
 
@@ -202,9 +255,16 @@ Shared prompt templates organized by strategy:
 | 0 | Repository foundation, MCP server, agent framework | ✅ Complete |
 | 1 | Core tools and agents (SEC, earnings, macro, quant, portfolio) | ✅ Complete |
 | 2 | Intelligence layer (thesis, risk, adversarial, orchestrator, pipeline) | ✅ Complete |
-| 3 | Integration layer (application layer + LLM gateway, CLI, Python MCP, Skills) | 🔧 In Progress |
+| 3 | Integration layer (application layer + LLM gateway, CLI, Python MCP, Skills) | ✅ Complete |
 | 4 | Advanced (knowledge graph, alt data, fine-tuning) — Copilot-first | Planned |
-| 5 | Web layer (FastAPI + Web UI) — after Copilot CLI is mostly complete | Planned |
+| 5 | Web layer (FastAPI + Web UI) | 🔧 In Progress |
+
+### Phase 5 Progress
+
+| Component | Issue | Status |
+|---|---|---|
+| Web API (FastAPI) | #58 | ✅ Complete |
+| Web UI | #57 | Planned |
 
 ### Phase 3 Progress
 

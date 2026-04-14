@@ -19,7 +19,7 @@
 - **Framework**: Custom agent base classes in `src/core/`
 - **LLM Gateway**: Pluggable inference client in the application layer — supports OpenAI, Anthropic, ollama, or skip when host LLM reasons (MCP path)
 - **Domain Agents**: `src/agents/` — filing analyst, earnings interpreter, macro regime, quant signal, thesis guardian, risk, adversarial
-- **Application Layer**: `src/application/` — shared contracts (Pydantic), LLM gateway, services. CLI, MCP server, and future web API are thin wrappers over this.
+- **Application Layer**: `src/application/` — shared contracts (Pydantic), LLM gateway, services. CLI, MCP server, and Web API are thin wrappers over this.
 - **Quant Tools**: `src/tools/` — regression, factor analysis, Monte Carlo, Bayesian updates
 - **Data Pipelines**: `src/pipelines/` — EDGAR, FRED, market data, research digest
 - **Tests**: pytest in `tests/`

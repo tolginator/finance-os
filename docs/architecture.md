@@ -5,7 +5,7 @@
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │                        UX Layer                              │
-│  Copilot CLI │ Agent CLI │ Copilot Skills │ Web API │ Web UI (future)  │
+│  Copilot CLI │ Agent CLI │ Copilot Skills │ Web API │ Web UI │
 ├──────────────────────────────────────────────────────────────┤
 │                    Interface Layer                            │
 │  TS MCP Server (data tools) │ Python MCP Server (agents)     │
@@ -45,6 +45,8 @@
 | LLM Gateway | Pluggable — OpenAI, Anthropic, ollama, or host LLM via MCP |
 | Data Sources | SEC EDGAR (free), FRED (free API key), Yahoo Finance, QIF |
 | CLI | Python (`finance-os` console script) |
+| Web API | Python, FastAPI, uvicorn (`finance-os-api` console script) |
+| Web UI | React 19, TypeScript, Vite (`web-ui/`) |
 | Copilot Skills | Markdown workflow definitions (`.github/skills/`) — earnings, thesis, digest, risk, macro |
 | Testing | Vitest (TypeScript), pytest with markers (Python) — unit and integration separated |
 | Linting | ESLint (TypeScript), ruff (Python) |
@@ -225,6 +227,26 @@ FastAPI REST service exposing the application layer over HTTP. Same shared servi
 - **CORS** — enabled for local frontend development (`allow_origins=["*"]`)
 - **OpenAPI** — auto-generated schema at `/docs` (Swagger UI) and `/redoc`
 
+### Web UI (`web-ui/`)
+
+React 19 + TypeScript frontend consuming the Web API. Built with Vite, tested with Vitest + MSW.
+
+**Running:**
+- `npm run dev` — dev server at http://localhost:5173 with `/api/*` proxy to backend
+- `npm run build` — production build to `web-ui/dist/`
+
+**MVP Panels:**
+- **Health Status** — green/red dot showing API connectivity (`GET /health`)
+- **Agent List** — cards for all registered agents (`GET /agents`)
+- **Research Digest** — ticker input form → `POST /digest` → formatted results with metrics
+
+**Design:**
+- **API client** (`src/api.ts`) — fetch wrapper with configurable base URL (`VITE_API_URL` env var, defaults to `/api`)
+- **Vite proxy** — dev server proxies `/api/*` to `http://127.0.0.1:8000` (avoids CORS in dev)
+- **Error handling** — all panels show loading, error, and empty states
+- **Client-side validation** — ticker input parsed (comma/space-separated), uppercased, empty values filtered
+- **MSW tests** — API mocked at the network layer for realistic test coverage
+
 ### Agent Framework (`agents/`)
 
 Domain-tuned Python agents built on a shared `BaseAgent` ABC (`src/core/agent.py`). Each agent has:
@@ -264,7 +286,7 @@ Shared prompt templates organized by strategy:
 | Component | Issue | Status |
 |---|---|---|
 | Web API (FastAPI) | #58 | ✅ Complete |
-| Web UI | #57 | Planned |
+| Web UI (React) | #57 | 🔧 In Progress |
 
 ### Phase 3 Progress
 

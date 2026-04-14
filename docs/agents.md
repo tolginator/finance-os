@@ -9,7 +9,7 @@ All agents extend `BaseAgent` in `agents/src/core/agent.py`, which defines:
 
 ### Current state: no LLM calls
 
-Agents currently perform deterministic data processing (regex, heuristics, statistics) and construct prompts, but **do not call an LLM directly**. This is by design for the MCP path, where the host LLM (Copilot, Claude Desktop) does the reasoning. For the CLI and future web paths, the **LLM gateway** in the application layer handles inference — see [architecture.md](architecture.md#llm-gateway).
+Agents currently perform deterministic data processing (regex, heuristics, statistics) and construct prompts, but **do not call an LLM directly**. This is by design for the MCP path, where the host LLM (Copilot, Claude Desktop) does the reasoning. For the CLI and web paths, the **LLM gateway** in the application layer handles inference — see [architecture.md](architecture.md#llm-gateway).
 
 ## Agent Catalog
 

@@ -12,7 +12,7 @@ Not a chatbot. A **system**. The personal Bloomberg terminal + quant lab + resea
 - **Adversarial challenge**: Every thesis gets systematically attacked before capital is deployed
 - **Quantitative signals**: Transform unstructured text into structured, timestamped, confidence-weighted quant features
 - **Multi-agent orchestration**: Agents collaborate and debate to produce consolidated research memos
-- **LLM-native**: Pluggable LLM gateway for direct inference (CLI, future web) or delegate to host LLM (Copilot, Claude Desktop via MCP)
+- **LLM-native**: Pluggable LLM gateway for direct inference (CLI, web) or delegate to host LLM (Copilot, Claude Desktop via MCP)
 
 ## Project Structure
 

@@ -54,7 +54,10 @@ export function DigestPanel() {
           <input
             type="number"
             value={lookback}
-            onChange={(e) => setLookback(Number(e.target.value))}
+            onChange={(e) => {
+              const raw = Number(e.target.value);
+              setLookback(Number.isFinite(raw) ? Math.max(1, Math.min(90, raw)) : 7);
+            }}
             min={1}
             max={90}
             style={{ padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: 6 }}

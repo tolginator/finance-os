@@ -29,7 +29,8 @@ from src.web_api import app, get_config
 def client():
     """TestClient for the FastAPI app."""
     get_config.cache_clear()
-    yield TestClient(app)
+    with TestClient(app) as test_client:
+        yield test_client
     get_config.cache_clear()
 
 
@@ -288,12 +289,21 @@ class TestPipelineEndpoint:
         })
         assert resp.status_code == 422
 
-    def test_run_pipeline_empty_tasks_422(self, client):
+    @patch("src.web_api.create_pipeline_service")
+    def test_run_pipeline_empty_tasks_accepted(self, mock_create, client):
+        mock_svc = mock_create.return_value
+        mock_svc.run_pipeline = AsyncMock(return_value=RunPipelineResponse(
+            results=[],
+            total_duration_ms=0,
+            successful=0,
+            failed=0,
+            memo=None,
+        ))
         resp = client.post("/pipeline", json={"tasks": []})
-        # Empty list should still be accepted (Pydantic allows it)
-        # but the endpoint validates agent names; empty list → no validation → 200 or service call
-        # This documents current behavior: empty tasks is valid at the API level
-        assert resp.status_code in {200, 422}
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["results"] == []
+        assert data["successful"] == 0
 
 
 class TestDigestEndpoint:

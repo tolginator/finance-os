@@ -48,11 +48,17 @@ describe('HealthStatus', () => {
     });
   });
 
-  it('shows loading state initially', () => {
-    server.use(http.get('/api/health', () => new Promise(() => {})));
+  it('shows loading state initially', async () => {
+    server.use(http.get('/api/health', async () => {
+      await new Promise((r) => setTimeout(r, 500));
+      return HttpResponse.json({ status: 'ok' });
+    }));
     render(<HealthStatus />);
     expect(screen.getByTestId('health-label')).toHaveTextContent('Checking');
     expect(screen.getByTestId('health-dot')).toHaveStyle({ backgroundColor: '#a3a3a3' });
+    await waitFor(() => {
+      expect(screen.getByTestId('health-label')).toHaveTextContent('API Connected');
+    });
   });
 });
 
@@ -68,10 +74,16 @@ describe('AgentList', () => {
     });
   });
 
-  it('shows loading state initially', () => {
-    server.use(http.get('/api/agents', () => new Promise(() => {})));
+  it('shows loading state initially', async () => {
+    server.use(http.get('/api/agents', async () => {
+      await new Promise((r) => setTimeout(r, 500));
+      return HttpResponse.json([]);
+    }));
     render(<AgentList />);
     expect(screen.getByTestId('agents-loading')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByTestId('agents-empty')).toBeInTheDocument();
+    });
   });
 
   it('shows error when agent fetch fails', async () => {

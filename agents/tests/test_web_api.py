@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
+import src.web_api as _web_api_module
 from src.application.contracts.agents import (
     AnalyzeEarningsResponse,
     AssessRiskResponse,
@@ -22,15 +23,19 @@ from src.application.contracts.agents import (
     SearchFilingsResponse,
 )
 from src.application.registry import AGENT_CATALOG
+from src.core.knowledge_graph import KnowledgeGraph
 from src.web_api import app, get_config
 
 
 @pytest.fixture
 def client():
-    """TestClient for the FastAPI app."""
+    """TestClient for the FastAPI app with fresh KG graph per test."""
     get_config.cache_clear()
+    original_graph = _web_api_module._kg_graph
+    _web_api_module._kg_graph = KnowledgeGraph()
     with TestClient(app) as test_client:
         yield test_client
+    _web_api_module._kg_graph = original_graph
     get_config.cache_clear()
 
 
@@ -451,3 +456,143 @@ class TestCORS:
     def test_response_includes_cors_header(self, client):
         resp = client.get("/health", headers={"Origin": "http://localhost:3000"})
         assert resp.headers.get("access-control-allow-origin") is not None
+
+
+# --- Knowledge Graph Endpoints ---
+
+
+class TestKGExtract:
+    def test_extract_entities_from_text(self, client):
+        resp = client.post("/kg/extract", json={
+            "text": "Apple Inc. faces cybersecurity and regulatory risk.",
+            "source_doc": "10-K-2024",
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["entity_count"] >= 1
+        assert len(data["entities"]) == data["entity_count"]
+
+    def test_extract_with_ticker(self, client):
+        resp = client.post("/kg/extract", json={
+            "text": "Apple Inc. reported record revenue.",
+            "ticker": "AAPL",
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        apple_entities = [e for e in data["entities"] if "Apple" in e["name"]]
+        assert len(apple_entities) >= 1
+        assert apple_entities[0]["ticker"] == "AAPL"
+
+    def test_extract_empty_text_422(self, client):
+        resp = client.post("/kg/extract", json={"text": ""})
+        assert resp.status_code == 422
+
+    def test_extract_missing_text_422(self, client):
+        resp = client.post("/kg/extract", json={})
+        assert resp.status_code == 422
+
+
+class TestKGQueryRelated:
+    def test_query_related_returns_response(self, client):
+        # Seed the graph first
+        client.post("/kg/extract", json={
+            "text": "Intel Corp. supplies chips to Apple Inc. every year.",
+        })
+        resp = client.post("/kg/query/related", json={
+            "entity_id": "name:intel corp",
+            "max_depth": 1,
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["count"] >= 1
+        assert len(data["related"]) == data["count"]
+
+    def test_query_related_nonexistent_entity(self, client):
+        resp = client.post("/kg/query/related", json={
+            "entity_id": "ticker:NONEXISTENT",
+        })
+        assert resp.status_code == 200
+        assert resp.json()["count"] == 0
+
+    def test_query_related_empty_id_422(self, client):
+        resp = client.post("/kg/query/related", json={"entity_id": ""})
+        assert resp.status_code == 422
+
+
+class TestKGQuerySupplyChain:
+    def test_supply_chain_returns_response(self, client):
+        # Seed a supplier relationship
+        client.post("/kg/extract", json={
+            "text": "Intel Corp. supplies chips to Dell Inc.",
+        })
+        resp = client.post("/kg/query/supply-chain", json={
+            "entity_id": "name:dell inc",
+            "direction": "upstream",
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["direction"] == "upstream"
+        chain_names = [e["name"] for e in data["chain"]]
+        assert any("intel" in n.lower() for n in chain_names)
+
+    def test_supply_chain_invalid_direction_422(self, client):
+        resp = client.post("/kg/query/supply-chain", json={
+            "entity_id": "ticker:AAPL",
+            "direction": "sideways",
+        })
+        assert resp.status_code == 422
+
+
+class TestKGQuerySharedRisks:
+    def test_shared_risks_returns_response(self, client):
+        # Seed graph directly — extract doesn't create company→risk relationships
+        from src.core.knowledge_graph import Entity, EntityType, Relationship, RelationshipType
+
+        graph = _web_api_module._kg_graph
+        graph.add_entity(Entity(name="Apple Inc", entity_type=EntityType.COMPANY, ticker="AAPL"))
+        graph.add_entity(Entity(
+            name="Microsoft Corp", entity_type=EntityType.COMPANY, ticker="MSFT",
+        ))
+        graph.add_entity(Entity(name="cybersecurity", entity_type=EntityType.RISK))
+        graph.add_relationship(Relationship(
+            source_id="ticker:AAPL", target_id="name:cybersecurity",
+            rel_type=RelationshipType.PARTNER, evidence="AAPL faces cyber risk",
+        ))
+        graph.add_relationship(Relationship(
+            source_id="ticker:MSFT", target_id="name:cybersecurity",
+            rel_type=RelationshipType.PARTNER, evidence="MSFT faces cyber risk",
+        ))
+        resp = client.post("/kg/query/shared-risks", json={
+            "entity_ids": ["ticker:AAPL", "ticker:MSFT"],
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["count"] >= 1
+        risk_names = [r["name"] for r in data["shared_risks"]]
+        assert any("cyber" in n.lower() for n in risk_names)
+
+    def test_shared_risks_fewer_than_two_422(self, client):
+        resp = client.post("/kg/query/shared-risks", json={
+            "entity_ids": ["ticker:AAPL"],
+        })
+        assert resp.status_code == 422
+
+
+class TestKGStats:
+    def test_stats_returns_counts(self, client):
+        resp = client.get("/kg/stats")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert isinstance(data["entity_count"], int)
+        assert isinstance(data["relationship_count"], int)
+        assert isinstance(data["entities_by_type"], dict)
+        assert isinstance(data["relationships_by_type"], dict)
+
+    def test_stats_reflects_extraction(self, client):
+        client.post("/kg/extract", json={
+            "text": "Apple Inc. is facing cybersecurity concerns.",
+        })
+        resp = client.get("/kg/stats")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["entity_count"] >= 1

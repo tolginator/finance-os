@@ -1,14 +1,19 @@
 """FastAPI web service wrapping the finance-os application layer.
 
 Thin REST wrapper over the same services used by CLI and MCP server.
-Each endpoint creates fresh service instances per request to avoid
+Agent endpoints create fresh service instances per request to avoid
 cross-request state leakage (agents maintain internal history).
+
+Knowledge graph endpoints share a process-level graph store that
+persists across requests (like a database), guarded by an asyncio
+lock for thread safety.
 
 Run locally:
     uvicorn src.web_api:app --reload
     finance-os-api              # console script
 """
 
+import asyncio
 import logging
 from functools import lru_cache
 from typing import Any
@@ -39,11 +44,28 @@ from src.application.contracts.agents import (
     SearchFilingsRequest,
     SearchFilingsResponse,
 )
+from src.application.contracts.knowledge_graph import (
+    ExtractEntitiesRequest,
+    ExtractEntitiesResponse,
+    KGStatsResponse,
+    QueryRelatedRequest,
+    QueryRelatedResponse,
+    QuerySharedRisksRequest,
+    QuerySharedRisksResponse,
+    QuerySupplyChainRequest,
+    QuerySupplyChainResponse,
+)
 from src.application.registry import AGENT_CATALOG, create_pipeline_service
 from src.application.services.agent_service import AgentService
 from src.application.services.digest_service import DigestService
+from src.application.services.kg_service import KnowledgeGraphService
+from src.core.knowledge_graph import KnowledgeGraph
 
 logger = logging.getLogger(__name__)
+
+# Process-level knowledge graph store (persists across requests like a DB)
+_kg_graph = KnowledgeGraph()
+_kg_lock = asyncio.Lock()
 
 app = FastAPI(
     title="finance-os",
@@ -175,6 +197,69 @@ async def run_digest(request: RunDigestRequest) -> Any:
     """Run a research digest for a watchlist of tickers."""
     service = DigestService(get_config())
     response = await service.run_digest(request)
+    return response.model_dump(mode="json")
+
+
+# --- Knowledge Graph ---
+
+
+def _kg_service() -> KnowledgeGraphService:
+    """Create a KG service wrapping the process-level graph."""
+    return KnowledgeGraphService(_kg_graph)
+
+
+@app.post("/kg/extract", response_model=ExtractEntitiesResponse)
+async def kg_extract(request: ExtractEntitiesRequest) -> Any:
+    """Extract entities and relationships from text and ingest into the graph."""
+    async with _kg_lock:
+        loop = asyncio.get_running_loop()
+        response = await loop.run_in_executor(
+            None, _kg_service().extract_and_ingest, request,
+        )
+    return response.model_dump(mode="json")
+
+
+@app.post("/kg/query/related", response_model=QueryRelatedResponse)
+async def kg_query_related(request: QueryRelatedRequest) -> Any:
+    """Find entities related to a given entity."""
+    async with _kg_lock:
+        loop = asyncio.get_running_loop()
+        response = await loop.run_in_executor(
+            None, _kg_service().query_related, request,
+        )
+    return response.model_dump(mode="json")
+
+
+@app.post("/kg/query/supply-chain", response_model=QuerySupplyChainResponse)
+async def kg_query_supply_chain(request: QuerySupplyChainRequest) -> Any:
+    """Trace the supply chain from an entity."""
+    async with _kg_lock:
+        loop = asyncio.get_running_loop()
+        response = await loop.run_in_executor(
+            None, _kg_service().query_supply_chain, request,
+        )
+    return response.model_dump(mode="json")
+
+
+@app.post("/kg/query/shared-risks", response_model=QuerySharedRisksResponse)
+async def kg_query_shared_risks(request: QuerySharedRisksRequest) -> Any:
+    """Find risks shared across multiple entities."""
+    async with _kg_lock:
+        loop = asyncio.get_running_loop()
+        response = await loop.run_in_executor(
+            None, _kg_service().query_shared_risks, request,
+        )
+    return response.model_dump(mode="json")
+
+
+@app.get("/kg/stats", response_model=KGStatsResponse)
+async def kg_stats() -> Any:
+    """Get knowledge graph summary statistics."""
+    async with _kg_lock:
+        loop = asyncio.get_running_loop()
+        response = await loop.run_in_executor(
+            None, _kg_service().get_stats,
+        )
     return response.model_dump(mode="json")
 
 

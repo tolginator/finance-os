@@ -181,11 +181,12 @@ curl -X POST http://127.0.0.1:8000/agents/filing_analyst \
 React frontend consuming the Web API. Requires the API server to be running.
 
 ```bash
-# Start the API server first (in a separate terminal)
+# Terminal 1 — start the API server
 cd agents && source .venv/bin/activate && finance-os-api
 
-# Start the frontend dev server
+# Terminal 2 — install dependencies and start the frontend dev server
 cd web-ui
+npm install
 npm run dev    # opens http://localhost:5173 with API proxy
 ```
 

@@ -220,7 +220,7 @@ def extract_relationships(
     # Build entity mention positions
     entity_positions: list[tuple[int, int, Entity]] = []
     for entity in entities:
-        pattern = re.compile(re.escape(entity.name), re.IGNORECASE)
+        pattern = re.compile(r"\b" + re.escape(entity.name) + r"\b", re.IGNORECASE)
         for match in pattern.finditer(text):
             entity_positions.append((match.start(), match.end(), entity))
     entity_positions.sort(key=lambda x: x[0])

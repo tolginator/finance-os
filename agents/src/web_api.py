@@ -223,7 +223,10 @@ async def kg_extract(request: ExtractEntitiesRequest) -> Any:
 async def kg_query_related(request: QueryRelatedRequest) -> Any:
     """Find entities related to a given entity."""
     async with _kg_lock:
-        response = _kg_service().query_related(request)
+        loop = asyncio.get_running_loop()
+        response = await loop.run_in_executor(
+            None, _kg_service().query_related, request,
+        )
     return response.model_dump(mode="json")
 
 
@@ -231,7 +234,10 @@ async def kg_query_related(request: QueryRelatedRequest) -> Any:
 async def kg_query_supply_chain(request: QuerySupplyChainRequest) -> Any:
     """Trace the supply chain from an entity."""
     async with _kg_lock:
-        response = _kg_service().query_supply_chain(request)
+        loop = asyncio.get_running_loop()
+        response = await loop.run_in_executor(
+            None, _kg_service().query_supply_chain, request,
+        )
     return response.model_dump(mode="json")
 
 
@@ -239,7 +245,10 @@ async def kg_query_supply_chain(request: QuerySupplyChainRequest) -> Any:
 async def kg_query_shared_risks(request: QuerySharedRisksRequest) -> Any:
     """Find risks shared across multiple entities."""
     async with _kg_lock:
-        response = _kg_service().query_shared_risks(request)
+        loop = asyncio.get_running_loop()
+        response = await loop.run_in_executor(
+            None, _kg_service().query_shared_risks, request,
+        )
     return response.model_dump(mode="json")
 
 
@@ -247,7 +256,10 @@ async def kg_query_shared_risks(request: QuerySharedRisksRequest) -> Any:
 async def kg_stats() -> Any:
     """Get knowledge graph summary statistics."""
     async with _kg_lock:
-        response = _kg_service().get_stats()
+        loop = asyncio.get_running_loop()
+        response = await loop.run_in_executor(
+            None, _kg_service().get_stats,
+        )
     return response.model_dump(mode="json")
 
 

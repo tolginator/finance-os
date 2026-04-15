@@ -28,8 +28,8 @@ export const handlers = [
   http.get('/api/watchlists', () => {
     return HttpResponse.json({
       active: 'default',
-      watchlists: { default: { tickers: ['AAPL', 'MSFT'] } },
-      active_watchlist: { tickers: ['AAPL', 'MSFT'] },
+      watchlists: { default: { tickers: [] } },
+      active_watchlist: { tickers: [] },
     });
   }),
 

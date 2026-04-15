@@ -54,7 +54,9 @@ export function DigestPanel() {
     setResult(null);
     setLoading(true);
     try {
-      await updateWatchlist(activeWatchlistRef.current, tickers);
+      await updateWatchlist(activeWatchlistRef.current, tickers).catch((err) => {
+        console.warn('Failed to update watchlist before digest', err);
+      });
       const resp = await runDigest({ tickers, lookback_days: lookback });
       setResult(resp);
     } catch (err) {

@@ -72,20 +72,22 @@ class WatchlistStore:
         content = json.dumps(
             data.model_dump(), indent=2, ensure_ascii=False,
         )
-        fd = tempfile.NamedTemporaryFile(
-            mode="w",
-            dir=self._path.parent,
-            suffix=".tmp",
-            delete=False,
-            encoding="utf-8",
-        )
+        temp_path: Path | None = None
         try:
-            fd.write(content)
-            fd.flush()
-            fd.close()
-            Path(fd.name).replace(self._path)
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                dir=self._path.parent,
+                suffix=".tmp",
+                delete=False,
+                encoding="utf-8",
+            ) as fd:
+                temp_path = Path(fd.name)
+                fd.write(content)
+                fd.flush()
+            temp_path.replace(self._path)
         except BaseException:
-            Path(fd.name).unlink(missing_ok=True)
+            if temp_path is not None:
+                temp_path.unlink(missing_ok=True)
             raise
 
     @staticmethod

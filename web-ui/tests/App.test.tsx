@@ -243,4 +243,144 @@ describe('DigestPanel', () => {
     });
     expect(capturedLookback).toBe(30);
   });
+
+  it('continues digest when watchlist save fails', async () => {
+    server.use(
+      http.put('/api/watchlists/:name', () => HttpResponse.json({ detail: 'fail' }, { status: 500 })),
+    );
+    render(<DigestPanel />);
+    const input = screen.getByPlaceholderText('AAPL, MSFT, GOOGL');
+    fireEvent.change(input, { target: { value: 'AAPL' } });
+    fireEvent.click(screen.getByText('Run Digest'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('digest-result')).toBeInTheDocument();
+    });
+  });
+
+  it('loads active watchlist tickers on mount', async () => {
+    server.use(
+      http.get('/api/watchlists', () => HttpResponse.json({
+        active: 'default',
+        watchlists: { default: { tickers: ['TSLA', 'GOOG'] } },
+        active_watchlist: { tickers: ['TSLA', 'GOOG'] },
+      })),
+    );
+    render(<DigestPanel />);
+    await waitFor(() => {
+      const input = screen.getByPlaceholderText('AAPL, MSFT, GOOGL') as HTMLInputElement;
+      expect(input.value).toBe('TSLA, GOOG');
+    });
+  });
+
+  it('updates ticker input when switching watchlists', async () => {
+    let activated = false;
+    server.use(
+      http.get('/api/watchlists', () => {
+        if (!activated) {
+          return HttpResponse.json({
+            active: 'default',
+            watchlists: {
+              default: { tickers: ['AAPL'] },
+              tech: { tickers: ['MSFT', 'GOOG'] },
+            },
+            active_watchlist: { tickers: ['AAPL'] },
+          });
+        }
+        return HttpResponse.json({
+          active: 'tech',
+          watchlists: {
+            default: { tickers: ['AAPL'] },
+            tech: { tickers: ['MSFT', 'GOOG'] },
+          },
+          active_watchlist: { tickers: ['MSFT', 'GOOG'] },
+        });
+      }),
+      http.put('/api/watchlists/:name/activate', ({ params }) => {
+        activated = true;
+        return HttpResponse.json({
+          active: params.name as string,
+          watchlist: { tickers: ['MSFT', 'GOOG'] },
+        });
+      }),
+    );
+    render(<DigestPanel />);
+    await waitFor(() => {
+      expect(screen.getByText('tech')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByText('tech'));
+    await waitFor(() => {
+      const input = screen.getByPlaceholderText('AAPL, MSFT, GOOGL') as HTMLInputElement;
+      expect(input.value).toBe('MSFT, GOOG');
+    });
+  });
+
+  it('creates a new watchlist and re-renders selector', async () => {
+    let callCount = 0;
+    server.use(
+      http.get('/api/watchlists', () => {
+        callCount++;
+        if (callCount <= 1) {
+          return HttpResponse.json({
+            active: 'default',
+            watchlists: { default: { tickers: [] } },
+            active_watchlist: { tickers: [] },
+          });
+        }
+        return HttpResponse.json({
+          active: 'default',
+          watchlists: {
+            default: { tickers: [] },
+            growth: { tickers: [] },
+          },
+          active_watchlist: { tickers: [] },
+        });
+      }),
+      http.post('/api/watchlists', () => HttpResponse.json({ tickers: [] }, { status: 201 })),
+    );
+    render(<DigestPanel />);
+    await waitFor(() => {
+      expect(screen.getByText('Watchlist:')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByText('+ New'));
+    const nameInput = screen.getByPlaceholderText('name');
+    fireEvent.change(nameInput, { target: { value: 'growth' } });
+    fireEvent.click(screen.getByText('✓'));
+    await waitFor(() => {
+      expect(screen.getByText('growth')).toBeInTheDocument();
+    });
+  });
+
+  it('deletes a non-active watchlist', async () => {
+    let callCount = 0;
+    server.use(
+      http.get('/api/watchlists', () => {
+        callCount++;
+        if (callCount <= 1) {
+          return HttpResponse.json({
+            active: 'default',
+            watchlists: {
+              default: { tickers: [] },
+              old: { tickers: ['X'] },
+            },
+            active_watchlist: { tickers: [] },
+          });
+        }
+        return HttpResponse.json({
+          active: 'default',
+          watchlists: { default: { tickers: [] } },
+          active_watchlist: { tickers: [] },
+        });
+      }),
+      http.delete('/api/watchlists/:name', () => new HttpResponse(null, { status: 204 })),
+    );
+    render(<DigestPanel />);
+    await waitFor(() => {
+      expect(screen.getByText('old')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByLabelText('Delete watchlist old'));
+    await waitFor(() => {
+      expect(screen.queryByText('old')).not.toBeInTheDocument();
+    });
+  });
 });

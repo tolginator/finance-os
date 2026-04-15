@@ -92,6 +92,7 @@ export function WatchlistSelector({ onWatchlistChange, activeTickers }: Watchlis
                   color: '#9ca3af', fontSize: '0.75rem', padding: 0,
                 }}
                 title={`Delete ${name}`}
+                aria-label={`Delete watchlist ${name}`}
               >
                 ✕
               </button>

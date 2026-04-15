@@ -25,6 +25,7 @@ import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
 
 from src.application.config import AppConfig
 from src.application.contracts.agents import (
@@ -67,6 +68,19 @@ from src.core.knowledge_graph import KnowledgeGraph
 
 logger = logging.getLogger(__name__)
 
+
+class CreateWatchlistRequest(BaseModel):
+    """Request body for creating a watchlist."""
+
+    name: str
+    tickers: list[str] = Field(default_factory=list)
+
+
+class UpdateWatchlistRequest(BaseModel):
+    """Request body for updating a watchlist's tickers."""
+
+    tickers: list[str]
+
 # Process-level knowledge graph store (persists across requests like a DB)
 _kg_graph = KnowledgeGraph()
 _kg_lock = asyncio.Lock()
@@ -106,7 +120,8 @@ async def value_error_handler(_request: Request, exc: ValueError) -> JSONRespons
 @app.exception_handler(KeyError)
 async def key_error_handler(_request: Request, exc: KeyError) -> JSONResponse:
     """Map KeyError (not found) to 404."""
-    return JSONResponse(status_code=404, content={"detail": str(exc)})
+    detail = exc.args[0] if exc.args else str(exc)
+    return JSONResponse(status_code=404, content={"detail": detail})
 
 
 # --- Health & Info ---
@@ -286,11 +301,11 @@ async def list_watchlists() -> Any:
 
 
 @app.post("/watchlists", status_code=201)
-async def create_watchlist(body: dict[str, Any]) -> Any:
+async def create_watchlist(body: CreateWatchlistRequest) -> Any:
     """Create a new named watchlist."""
-    name = body.get("name", "")
-    tickers = body.get("tickers", [])
-    return await asyncio.to_thread(_watchlist_store.create, name, tickers)
+    return await asyncio.to_thread(
+        _watchlist_store.create, body.name, body.tickers,
+    )
 
 
 @app.get("/watchlists/{name}")
@@ -300,10 +315,11 @@ async def get_watchlist(name: str) -> Any:
 
 
 @app.put("/watchlists/{name}")
-async def update_watchlist(name: str, body: dict[str, Any]) -> Any:
+async def update_watchlist(name: str, body: UpdateWatchlistRequest) -> Any:
     """Update tickers in a watchlist."""
-    tickers = body.get("tickers", [])
-    return await asyncio.to_thread(_watchlist_store.update, name, tickers)
+    return await asyncio.to_thread(
+        _watchlist_store.update, name, body.tickers,
+    )
 
 
 @app.delete("/watchlists/{name}", status_code=204)

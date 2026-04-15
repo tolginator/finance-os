@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { runDigest, updateWatchlist } from '../api';
 import type { DigestResponse } from '../types';
 import { WatchlistSelector } from './WatchlistSelector';
@@ -19,15 +19,17 @@ export function DigestPanel() {
   const activeWatchlistRef = useRef('default');
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
+  useEffect(() => {
+    return () => clearTimeout(saveTimerRef.current);
+  }, []);
+
   const saveToWatchlist = useCallback((text: string) => {
     clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
       const tickers = parseTickers(text);
-      if (tickers.length > 0) {
-        updateWatchlist(activeWatchlistRef.current, tickers).catch(() => {
-          /* silent — best-effort save */
-        });
-      }
+      updateWatchlist(activeWatchlistRef.current, tickers).catch(() => {
+        /* silent — best-effort save */
+      });
     }, 1000);
   }, []);
 
@@ -36,7 +38,8 @@ export function DigestPanel() {
     saveToWatchlist(value);
   };
 
-  const handleWatchlistChange = (tickers: string[]) => {
+  const handleWatchlistChange = (name: string, tickers: string[]) => {
+    activeWatchlistRef.current = name;
     setInput(tickers.join(', '));
   };
 

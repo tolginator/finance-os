@@ -3,7 +3,7 @@ import { activateWatchlist, createWatchlist, deleteWatchlist, fetchWatchlists } 
 import type { WatchlistsResponse } from '../types';
 
 interface WatchlistSelectorProps {
-  onWatchlistChange: (tickers: string[]) => void;
+  onWatchlistChange: (name: string, tickers: string[]) => void;
   activeTickers: string[];
 }
 
@@ -17,7 +17,7 @@ export function WatchlistSelector({ onWatchlistChange, activeTickers }: Watchlis
     try {
       const resp = await fetchWatchlists();
       setData(resp);
-      onWatchlistChange(resp.active_watchlist.tickers);
+      onWatchlistChange(resp.active, resp.active_watchlist.tickers);
     } catch {
       /* ignore load errors — default empty state is fine */
     }
@@ -28,7 +28,7 @@ export function WatchlistSelector({ onWatchlistChange, activeTickers }: Watchlis
   const handleSwitch = async (name: string) => {
     try {
       const resp = await activateWatchlist(name);
-      onWatchlistChange(resp.watchlist.tickers);
+      onWatchlistChange(name, resp.watchlist.tickers);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to switch');

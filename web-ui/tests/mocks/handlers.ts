@@ -45,9 +45,10 @@ export const handlers = [
     return new HttpResponse(null, { status: 204 });
   }),
 
-  http.put('/api/watchlists/:name/activate', () => {
+  http.put('/api/watchlists/:name/activate', ({ params }) => {
+    const name = params.name as string;
     return HttpResponse.json({
-      active: 'default',
+      active: name,
       watchlist: { tickers: ['AAPL', 'MSFT'] },
     });
   }),

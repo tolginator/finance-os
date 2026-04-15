@@ -15,7 +15,7 @@ import threading
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from src.application.config import CONFIG_DIR
 
@@ -28,14 +28,14 @@ logger = logging.getLogger(__name__)
 class Watchlist(BaseModel):
     """A named list of ticker symbols."""
 
-    tickers: list[str] = []
+    tickers: list[str] = Field(default_factory=list)
 
 
 class WatchlistData(BaseModel):
     """Root schema for watchlists.json."""
 
     active: str = "default"
-    watchlists: dict[str, Watchlist] = {}
+    watchlists: dict[str, Watchlist] = Field(default_factory=dict)
 
 
 class WatchlistStore:
@@ -52,16 +52,19 @@ class WatchlistStore:
     def _load(self) -> WatchlistData:
         """Load watchlist data from disk, creating defaults if needed."""
         if not self._path.is_file():
-            return self._default_data()
-        try:
-            raw = json.loads(self._path.read_text(encoding="utf-8"))
-            return WatchlistData.model_validate(raw)
-        except (json.JSONDecodeError, ValueError):
-            logger.warning(
-                "Corrupt watchlists.json at %s — resetting to defaults",
-                self._path,
-            )
-            return self._default_data()
+            data = self._default_data()
+        else:
+            try:
+                raw = json.loads(self._path.read_text(encoding="utf-8"))
+                data = WatchlistData.model_validate(raw)
+            except (json.JSONDecodeError, ValueError):
+                logger.warning(
+                    "Corrupt watchlists.json at %s — resetting to defaults",
+                    self._path,
+                )
+                data = self._default_data()
+        self._ensure_invariants(data)
+        return data
 
     def _save(self, data: WatchlistData) -> None:
         """Atomically write watchlist data to disk."""
@@ -112,7 +115,7 @@ class WatchlistStore:
         if not _SLUG_PATTERN.match(slug):
             msg = (
                 f"Invalid watchlist name '{name}'. "
-                "Use lowercase letters, digits, and hyphens (2-50 chars)."
+                "Use lowercase letters, digits, and hyphens (1-50 chars)."
             )
             raise ValueError(msg)
         return slug
@@ -121,7 +124,6 @@ class WatchlistStore:
         """Return all watchlists with active indicator."""
         with self._lock:
             data = self._load()
-            self._ensure_invariants(data)
             return {
                 "active": data.active,
                 "watchlists": {
@@ -149,7 +151,6 @@ class WatchlistStore:
         normalized = self._normalize_tickers(tickers or [])
         with self._lock:
             data = self._load()
-            self._ensure_invariants(data)
             if slug in data.watchlists:
                 msg = f"Watchlist '{slug}' already exists"
                 raise ValueError(msg)
@@ -175,7 +176,6 @@ class WatchlistStore:
         slug = self.validate_name(name)
         with self._lock:
             data = self._load()
-            self._ensure_invariants(data)
             if slug not in data.watchlists:
                 msg = f"Watchlist '{slug}' not found"
                 raise KeyError(msg)

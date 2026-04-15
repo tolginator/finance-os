@@ -107,7 +107,7 @@ class KnowledgeGraph:
             "entity_type": entity.entity_type.value,
             "ticker": entity.ticker,
             "cik": entity.cik,
-            "metadata": entity.metadata,
+            "metadata": dict(entity.metadata),
         }
         if eid in self._graph:
             # Merge metadata when same entity_id is added again
@@ -139,7 +139,7 @@ class KnowledgeGraph:
             evidence=rel.evidence,
             source_doc=rel.source_doc,
             confidence=str(rel.confidence),
-            metadata=rel.metadata,
+            metadata=dict(rel.metadata),
         )
         return key
 

@@ -106,18 +106,20 @@ class KnowledgeGraphService:
         for rel in relationships:
             src = entity_ids.get(rel.source_id, rel.source_id)
             tgt = entity_ids.get(rel.target_id, rel.target_id)
-            if src in self._graph._graph and tgt in self._graph._graph:
-                mapped_rel = Relationship(
-                    source_id=src,
-                    target_id=tgt,
-                    rel_type=rel.rel_type,
-                    evidence=rel.evidence,
-                    source_doc=rel.source_doc,
-                    confidence=rel.confidence,
-                    metadata=rel.metadata,
-                )
+            mapped_rel = Relationship(
+                source_id=src,
+                target_id=tgt,
+                rel_type=rel.rel_type,
+                evidence=rel.evidence,
+                source_doc=rel.source_doc,
+                confidence=rel.confidence,
+                metadata=rel.metadata,
+            )
+            try:
                 self._graph.add_relationship(mapped_rel)
-                added_rels.append(mapped_rel)
+            except ValueError:
+                continue
+            added_rels.append(mapped_rel)
 
         entity_models = [_entity_to_model(e) for e in entities]
         rel_models = [_rel_to_model(r) for r in added_rels]

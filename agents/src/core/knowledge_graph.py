@@ -6,6 +6,7 @@ financial-domain query operations.
 
 import hashlib
 import json
+from collections import deque
 from dataclasses import dataclass, field
 from decimal import Decimal
 from enum import StrEnum
@@ -263,16 +264,16 @@ class KnowledgeGraph:
         Args:
             entity_id: Starting entity.
             direction: "upstream" follows SUPPLIER edges backward (who supplies to me),
-                       "downstream" follows CUSTOMER edges forward (who buys from me).
+                       "downstream" follows SUPPLIER edges forward (who I supply to).
         """
         if entity_id not in self._graph:
             return []
         chain: list[str] = []
         visited: set[str] = {entity_id}
-        frontier = [entity_id]
+        frontier: deque[str] = deque([entity_id])
 
         while frontier:
-            current = frontier.pop(0)
+            current = frontier.popleft()
             if direction == "upstream":
                 edges = self._graph.in_edges(current, data=True)
                 candidates = [
@@ -283,7 +284,7 @@ class KnowledgeGraph:
                 edges = self._graph.out_edges(current, data=True)
                 candidates = [
                     v for _, v, d in edges
-                    if d.get("rel_type") == RelationshipType.CUSTOMER.value
+                    if d.get("rel_type") == RelationshipType.SUPPLIER.value
                 ]
             for nid in candidates:
                 if nid not in visited:

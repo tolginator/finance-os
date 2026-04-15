@@ -320,6 +320,22 @@ class TestTraceSupplyChain:
         assert "ticker:CMP" in ids
         assert "ticker:RAW" in ids
 
+    def test_trace_downstream(self) -> None:
+        kg = KnowledgeGraph()
+        kg.add_entity(_company("Raw Materials Inc.", ticker="RAW"))
+        kg.add_entity(_company("Components Corp.", ticker="CMP"))
+        kg.add_entity(_company("Final Product Co.", ticker="FIN"))
+        kg.add_relationship(
+            _relationship("ticker:RAW", "ticker:CMP", RelationshipType.SUPPLIER),
+        )
+        kg.add_relationship(
+            _relationship("ticker:CMP", "ticker:FIN", RelationshipType.SUPPLIER),
+        )
+        chain = kg.trace_supply_chain("ticker:RAW", direction="downstream")
+        ids = [e.entity_id for e in chain]
+        assert "ticker:CMP" in ids
+        assert "ticker:FIN" in ids
+
     def test_trace_nonexistent_entity(self) -> None:
         kg = KnowledgeGraph()
         assert kg.trace_supply_chain("ticker:FAKE") == []

@@ -110,11 +110,11 @@ class KnowledgeGraph:
             "metadata": entity.metadata,
         }
         if eid in self._graph:
-            # Merge metadata, prefer new values
+            # Merge metadata when same entity_id is added again
             existing = self._graph.nodes[eid]
             merged_meta = {**existing.get("metadata", {}), **entity.metadata}
             attrs["metadata"] = merged_meta
-            # Promote ticker/cik if previously missing
+            # Enrich ticker/cik on the existing node if previously missing
             if entity.ticker and not existing.get("ticker"):
                 attrs["ticker"] = entity.ticker
             if entity.cik and not existing.get("cik"):
@@ -337,12 +337,14 @@ class KnowledgeGraph:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Self:
-        """Deserialize a graph from a dict."""
+        """Deserialize a graph from a dict (does not mutate the input)."""
         kg = cls()
         for node in data.get("entities", []):
+            node = dict(node)
             nid = node.pop("id")
             kg._graph.add_node(nid, **node)
         for edge in data.get("relationships", []):
+            edge = dict(edge)
             src = edge.pop("source")
             tgt = edge.pop("target")
             key = edge.pop("key", None)

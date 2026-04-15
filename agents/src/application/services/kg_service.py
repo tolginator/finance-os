@@ -5,6 +5,8 @@ within the same process (like a database connection), unlike agent services
 which are fresh per request.
 """
 
+import logging
+
 from src.application.contracts.knowledge_graph import (
     EntityModel,
     ExtractEntitiesRequest,
@@ -53,6 +55,8 @@ class KnowledgeGraphService:
     Wraps a KnowledgeGraph instance and provides typed contract-based
     methods for extraction, querying, and statistics.
     """
+
+    _logger = logging.getLogger(__name__)
 
     def __init__(self, graph: KnowledgeGraph | None = None) -> None:
         self._graph = graph or KnowledgeGraph()
@@ -118,6 +122,10 @@ class KnowledgeGraphService:
             try:
                 self._graph.add_relationship(mapped_rel)
             except ValueError:
+                self._logger.warning(
+                    "Dropped relationship %s -> %s (%s): missing entity in graph",
+                    src, tgt, rel.rel_type.value,
+                )
                 continue
             added_rels.append(mapped_rel)
 

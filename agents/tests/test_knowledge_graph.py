@@ -391,6 +391,15 @@ class TestSerialization:
         assert rels[0].evidence == "A partners with B"
         assert rels[0].source_doc == "annual-report-2024"
 
+    def test_from_dict_does_not_mutate_input(self) -> None:
+        """from_dict must not mutate the caller-provided data structure."""
+        kg = KnowledgeGraph()
+        kg.add_entity(_company("A Corp.", ticker="A"))
+        data = kg.to_dict()
+        original_entity_keys = set(data["entities"][0].keys())
+        KnowledgeGraph.from_dict(data)
+        assert set(data["entities"][0].keys()) == original_entity_keys
+
 
 # ── Merge ─────────────────────────────────────────────────────
 

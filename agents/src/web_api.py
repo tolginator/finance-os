@@ -212,35 +212,42 @@ def _kg_service() -> KnowledgeGraphService:
 async def kg_extract(request: ExtractEntitiesRequest) -> Any:
     """Extract entities and relationships from text and ingest into the graph."""
     async with _kg_lock:
-        response = _kg_service().extract_and_ingest(request)
+        loop = asyncio.get_running_loop()
+        response = await loop.run_in_executor(
+            None, _kg_service().extract_and_ingest, request,
+        )
     return response.model_dump(mode="json")
 
 
 @app.post("/kg/query/related", response_model=QueryRelatedResponse)
-def kg_query_related(request: QueryRelatedRequest) -> Any:
+async def kg_query_related(request: QueryRelatedRequest) -> Any:
     """Find entities related to a given entity."""
-    response = _kg_service().query_related(request)
+    async with _kg_lock:
+        response = _kg_service().query_related(request)
     return response.model_dump(mode="json")
 
 
 @app.post("/kg/query/supply-chain", response_model=QuerySupplyChainResponse)
-def kg_query_supply_chain(request: QuerySupplyChainRequest) -> Any:
+async def kg_query_supply_chain(request: QuerySupplyChainRequest) -> Any:
     """Trace the supply chain from an entity."""
-    response = _kg_service().query_supply_chain(request)
+    async with _kg_lock:
+        response = _kg_service().query_supply_chain(request)
     return response.model_dump(mode="json")
 
 
 @app.post("/kg/query/shared-risks", response_model=QuerySharedRisksResponse)
-def kg_query_shared_risks(request: QuerySharedRisksRequest) -> Any:
+async def kg_query_shared_risks(request: QuerySharedRisksRequest) -> Any:
     """Find risks shared across multiple entities."""
-    response = _kg_service().query_shared_risks(request)
+    async with _kg_lock:
+        response = _kg_service().query_shared_risks(request)
     return response.model_dump(mode="json")
 
 
 @app.get("/kg/stats", response_model=KGStatsResponse)
-def kg_stats() -> Any:
+async def kg_stats() -> Any:
     """Get knowledge graph summary statistics."""
-    response = _kg_service().get_stats()
+    async with _kg_lock:
+        response = _kg_service().get_stats()
     return response.model_dump(mode="json")
 
 

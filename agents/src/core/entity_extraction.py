@@ -17,12 +17,6 @@ from src.core.knowledge_graph import (
 
 # ── Company patterns ─────────────────────────────────────────
 
-_TICKER_PATTERN = re.compile(
-    r"\b([A-Z]{1,5})\b"
-    r"(?=\s*\(|,|\s+(?:Inc|Corp|Ltd|LLC|Company|Co\.|Group|Holdings|Enterprises))",
-    re.IGNORECASE,
-)
-
 _COMPANY_SUFFIX_PATTERN = re.compile(
     r"\b([A-Z][A-Za-z&\s]+?)"
     r"\s*(?:Inc\.?|Corp\.?|Corporation|Ltd\.?|LLC|Company|Co\.|Group|Holdings|Enterprises)"

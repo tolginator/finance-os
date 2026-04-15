@@ -1,6 +1,6 @@
 /** Fetch wrapper for the finance-os Web API. */
 
-import type { AgentInfo, DigestRequest, DigestResponse, HealthResponse } from './types';
+import type { AgentInfo, DigestRequest, DigestResponse, HealthResponse, WatchlistData, WatchlistsResponse } from './types';
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? '/api';
 
@@ -36,5 +36,35 @@ export function runDigest(req: DigestRequest): Promise<DigestResponse> {
   return request('/digest', {
     method: 'POST',
     body: JSON.stringify(req),
+  });
+}
+
+export function fetchWatchlists(): Promise<WatchlistsResponse> {
+  return request('/watchlists');
+}
+
+export function updateWatchlist(name: string, tickers: string[]): Promise<WatchlistData> {
+  return request(`/watchlists/${encodeURIComponent(name)}`, {
+    method: 'PUT',
+    body: JSON.stringify({ tickers }),
+  });
+}
+
+export function createWatchlist(name: string, tickers: string[] = []): Promise<WatchlistData> {
+  return request('/watchlists', {
+    method: 'POST',
+    body: JSON.stringify({ name, tickers }),
+  });
+}
+
+export function deleteWatchlist(name: string): Promise<void> {
+  return request(`/watchlists/${encodeURIComponent(name)}`, {
+    method: 'DELETE',
+  });
+}
+
+export function activateWatchlist(name: string): Promise<{ active: string; watchlist: WatchlistData }> {
+  return request(`/watchlists/${encodeURIComponent(name)}/activate`, {
+    method: 'PUT',
   });
 }

@@ -28,13 +28,19 @@ from src.web_api import app, get_config
 
 
 @pytest.fixture
-def client():
-    """TestClient for the FastAPI app with fresh KG graph per test."""
+def client(tmp_path):
+    """TestClient with fresh KG graph and temp watchlist store per test."""
     get_config.cache_clear()
     original_graph = _web_api_module._kg_graph
     _web_api_module._kg_graph = KnowledgeGraph()
+    from src.application.watchlists import WatchlistStore
+    original_store = _web_api_module._watchlist_store
+    _web_api_module._watchlist_store = WatchlistStore(
+        path=tmp_path / "watchlists.json",
+    )
     with TestClient(app) as test_client:
         yield test_client
+    _web_api_module._watchlist_store = original_store
     _web_api_module._kg_graph = original_graph
     get_config.cache_clear()
 
@@ -596,3 +602,89 @@ class TestKGStats:
         assert resp.status_code == 200
         data = resp.json()
         assert data["entity_count"] >= 1
+
+
+# --- Watchlists ---
+
+
+class TestWatchlistList:
+    def test_list_returns_default(self, client):
+        resp = client.get("/watchlists")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["active"] == "default"
+        assert "default" in data["watchlists"]
+        assert data["active_watchlist"]["tickers"] == []
+
+
+class TestWatchlistCreate:
+    def test_create_new(self, client):
+        resp = client.post("/watchlists", json={
+            "name": "tech", "tickers": ["NVDA", "AAPL"],
+        })
+        assert resp.status_code == 201
+        assert resp.json()["tickers"] == ["AAPL", "NVDA"]
+
+    def test_create_duplicate_400(self, client):
+        client.post("/watchlists", json={"name": "tech"})
+        resp = client.post("/watchlists", json={"name": "tech"})
+        assert resp.status_code == 400
+
+    def test_create_invalid_name_400(self, client):
+        resp = client.post("/watchlists", json={"name": "Bad Name!"})
+        assert resp.status_code == 400
+
+
+class TestWatchlistGet:
+    def test_get_existing(self, client):
+        resp = client.get("/watchlists/default")
+        assert resp.status_code == 200
+        assert "tickers" in resp.json()
+
+    def test_get_nonexistent_404(self, client):
+        resp = client.get("/watchlists/nonexistent")
+        assert resp.status_code == 404
+
+
+class TestWatchlistUpdate:
+    def test_update_tickers(self, client):
+        resp = client.put("/watchlists/default", json={
+            "tickers": ["MSFT", "GOOG"],
+        })
+        assert resp.status_code == 200
+        assert resp.json()["tickers"] == ["GOOG", "MSFT"]
+        resp2 = client.get("/watchlists/default")
+        assert resp2.json()["tickers"] == ["GOOG", "MSFT"]
+
+    def test_update_nonexistent_404(self, client):
+        resp = client.put("/watchlists/nope", json={"tickers": []})
+        assert resp.status_code == 404
+
+
+class TestWatchlistDelete:
+    def test_delete_non_active(self, client):
+        client.post("/watchlists", json={"name": "temp"})
+        resp = client.delete("/watchlists/temp")
+        assert resp.status_code == 204
+        resp2 = client.get("/watchlists/temp")
+        assert resp2.status_code == 404
+
+    def test_delete_active_400(self, client):
+        resp = client.delete("/watchlists/default")
+        assert resp.status_code == 400
+
+
+class TestWatchlistActivate:
+    def test_activate_switches(self, client):
+        client.post("/watchlists", json={
+            "name": "energy", "tickers": ["XOM"],
+        })
+        resp = client.put("/watchlists/energy/activate")
+        assert resp.status_code == 200
+        assert resp.json()["active"] == "energy"
+        listing = client.get("/watchlists").json()
+        assert listing["active"] == "energy"
+
+    def test_activate_nonexistent_404(self, client):
+        resp = client.put("/watchlists/nope/activate")
+        assert resp.status_code == 404

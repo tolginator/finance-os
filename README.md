@@ -184,8 +184,9 @@ React frontend consuming the Web API. Requires the API server to be running.
 # Terminal 1 — start the API server
 cd agents && source .venv/bin/activate && finance-os-api
 
-# Terminal 2 — start the frontend dev server
+# Terminal 2 — install dependencies and start the frontend dev server
 cd web-ui
+npm install
 npm run dev    # opens http://localhost:5173 with API proxy
 ```
 

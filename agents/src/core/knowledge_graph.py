@@ -155,7 +155,7 @@ class KnowledgeGraph:
             entity_type=EntityType(data["entity_type"]),
             ticker=data.get("ticker"),
             cik=data.get("cik"),
-            metadata=data.get("metadata", {}),
+            metadata=dict(data.get("metadata", {})),
         )
 
     def find_by_name(self, name: str) -> Entity | None:
@@ -215,7 +215,7 @@ class KnowledgeGraph:
                 evidence=data.get("evidence", ""),
                 source_doc=data.get("source_doc", ""),
                 confidence=Decimal(data.get("confidence", "0.5")),
-                metadata=data.get("metadata", {}),
+                metadata=dict(data.get("metadata", {})),
             ))
         return result
 

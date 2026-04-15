@@ -20,7 +20,7 @@ from src.core.knowledge_graph import (
 _COMPANY_SUFFIX_PATTERN = re.compile(
     r"\b([A-Z][A-Za-z&\s]+?)"
     r"\s*(?:Inc\.?|Corp\.?|Corporation|Ltd\.?|LLC|Company|Co\.|Group|Holdings|Enterprises)"
-    r"\b",
+    r"(?:\b|(?=\s|$|,|;))",
 )
 
 # ── Risk taxonomy ─────────────────────────────────────────────
@@ -154,7 +154,7 @@ def extract_entities(text: str, source_doc: str = "") -> list[Entity]:
 
     # Companies via suffix pattern (e.g., "Apple Inc.")
     for match in _COMPANY_SUFFIX_PATTERN.finditer(text):
-        name = match.group(0).strip()
+        name = match.group(0).strip().rstrip(".")
         entity = Entity(
             name=name,
             entity_type=EntityType.COMPANY,

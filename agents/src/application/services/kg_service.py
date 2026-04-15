@@ -21,7 +21,7 @@ from src.application.contracts.knowledge_graph import (
     RelationshipModel,
 )
 from src.core.entity_extraction import extract_entities, extract_relationships
-from src.core.knowledge_graph import Entity, KnowledgeGraph, Relationship
+from src.core.knowledge_graph import Entity, EntityType, KnowledgeGraph, Relationship
 
 
 def _entity_to_model(entity: Entity) -> EntityModel:
@@ -82,7 +82,7 @@ class KnowledgeGraphService:
             promoted: list[Entity] = []
             ticker_assigned = False
             for ent in entities:
-                if ent.entity_type.value == "company" and not ticker_assigned and not ent.ticker:
+                if ent.entity_type == EntityType.COMPANY and not ticker_assigned and not ent.ticker:
                     promoted.append(Entity(
                         name=ent.name,
                         entity_type=ent.entity_type,

@@ -521,13 +521,19 @@ class TestKGQueryRelated:
 
 class TestKGQuerySupplyChain:
     def test_supply_chain_returns_response(self, client):
+        # Seed a supplier relationship
+        client.post("/kg/extract", json={
+            "text": "Intel Corp. supplies chips to Dell Inc.",
+        })
         resp = client.post("/kg/query/supply-chain", json={
-            "entity_id": "ticker:AAPL",
+            "entity_id": "name:dell inc",
+            "direction": "upstream",
         })
         assert resp.status_code == 200
         data = resp.json()
         assert data["direction"] == "upstream"
-        assert "chain" in data
+        chain_names = [e["name"] for e in data["chain"]]
+        assert any("intel" in n.lower() for n in chain_names)
 
     def test_supply_chain_invalid_direction_422(self, client):
         resp = client.post("/kg/query/supply-chain", json={
@@ -539,19 +545,29 @@ class TestKGQuerySupplyChain:
 
 class TestKGQuerySharedRisks:
     def test_shared_risks_returns_response(self, client):
-        # Seed: two companies sharing the same risk
-        client.post("/kg/extract", json={
-            "text": (
-                "Apple Inc. faces cybersecurity threats."
-                " Microsoft Corp. also faces cybersecurity risks."
-            ),
-        })
+        # Seed graph directly — extract doesn't create company→risk relationships
+        from src.core.knowledge_graph import Entity, EntityType, Relationship, RelationshipType
+
+        graph = _web_api_module._kg_graph
+        graph.add_entity(Entity(name="Apple Inc", entity_type=EntityType.COMPANY, ticker="AAPL"))
+        graph.add_entity(Entity(name="Microsoft Corp", entity_type=EntityType.COMPANY, ticker="MSFT"))
+        graph.add_entity(Entity(name="cybersecurity", entity_type=EntityType.RISK))
+        graph.add_relationship(Relationship(
+            source_id="ticker:AAPL", target_id="name:cybersecurity",
+            rel_type=RelationshipType.PARTNER, evidence="AAPL faces cyber risk",
+        ))
+        graph.add_relationship(Relationship(
+            source_id="ticker:MSFT", target_id="name:cybersecurity",
+            rel_type=RelationshipType.PARTNER, evidence="MSFT faces cyber risk",
+        ))
         resp = client.post("/kg/query/shared-risks", json={
-            "entity_ids": ["name:apple inc.", "name:microsoft corp."],
+            "entity_ids": ["ticker:AAPL", "ticker:MSFT"],
         })
         assert resp.status_code == 200
         data = resp.json()
-        assert len(data["shared_risks"]) == data["count"]
+        assert data["count"] >= 1
+        risk_names = [r["name"] for r in data["shared_risks"]]
+        assert any("cyber" in n.lower() for n in risk_names)
 
     def test_shared_risks_fewer_than_two_422(self, client):
         resp = client.post("/kg/query/shared-risks", json={

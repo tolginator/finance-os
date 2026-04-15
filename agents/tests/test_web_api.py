@@ -451,3 +451,110 @@ class TestCORS:
     def test_response_includes_cors_header(self, client):
         resp = client.get("/health", headers={"Origin": "http://localhost:3000"})
         assert resp.headers.get("access-control-allow-origin") is not None
+
+
+# --- Knowledge Graph Endpoints ---
+
+
+class TestKGExtract:
+    def test_extract_entities_from_text(self, client):
+        resp = client.post("/kg/extract", json={
+            "text": "Apple Inc. faces cybersecurity and regulatory risk.",
+            "source_doc": "10-K-2024",
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["entity_count"] >= 1
+        assert len(data["entities"]) == data["entity_count"]
+
+    def test_extract_with_ticker(self, client):
+        resp = client.post("/kg/extract", json={
+            "text": "Apple Inc. reported record revenue.",
+            "ticker": "AAPL",
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        apple_entities = [e for e in data["entities"] if "Apple" in e["name"]]
+        assert len(apple_entities) >= 1
+        assert apple_entities[0]["ticker"] == "AAPL"
+
+    def test_extract_empty_text_422(self, client):
+        resp = client.post("/kg/extract", json={"text": ""})
+        assert resp.status_code == 422
+
+    def test_extract_missing_text_422(self, client):
+        resp = client.post("/kg/extract", json={})
+        assert resp.status_code == 422
+
+
+class TestKGQueryRelated:
+    def test_query_related_returns_response(self, client):
+        # Seed the graph first
+        client.post("/kg/extract", json={
+            "text": "Intel Corp. supplies chips to Apple Inc. every year.",
+        })
+        resp = client.post("/kg/query/related", json={
+            "entity_id": "name:intel corp.",
+            "max_depth": 1,
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "related" in data
+        assert "count" in data
+
+    def test_query_related_nonexistent_entity(self, client):
+        resp = client.post("/kg/query/related", json={
+            "entity_id": "ticker:NONEXISTENT",
+        })
+        assert resp.status_code == 200
+        assert resp.json()["count"] == 0
+
+    def test_query_related_empty_id_422(self, client):
+        resp = client.post("/kg/query/related", json={"entity_id": ""})
+        assert resp.status_code == 422
+
+
+class TestKGQuerySupplyChain:
+    def test_supply_chain_returns_response(self, client):
+        resp = client.post("/kg/query/supply-chain", json={
+            "entity_id": "ticker:AAPL",
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["direction"] == "upstream"
+        assert "chain" in data
+
+    def test_supply_chain_invalid_direction_422(self, client):
+        resp = client.post("/kg/query/supply-chain", json={
+            "entity_id": "ticker:AAPL",
+            "direction": "sideways",
+        })
+        assert resp.status_code == 422
+
+
+class TestKGQuerySharedRisks:
+    def test_shared_risks_returns_response(self, client):
+        resp = client.post("/kg/query/shared-risks", json={
+            "entity_ids": ["ticker:AAPL", "ticker:MSFT"],
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "shared_risks" in data
+        assert "count" in data
+
+    def test_shared_risks_fewer_than_two_422(self, client):
+        resp = client.post("/kg/query/shared-risks", json={
+            "entity_ids": ["ticker:AAPL"],
+        })
+        assert resp.status_code == 422
+
+
+class TestKGStats:
+    def test_stats_returns_counts(self, client):
+        resp = client.get("/kg/stats")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "entity_count" in data
+        assert "relationship_count" in data
+        assert "entities_by_type" in data
+        assert "relationships_by_type" in data

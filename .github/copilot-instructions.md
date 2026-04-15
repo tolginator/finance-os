@@ -81,7 +81,7 @@ Research Output (memos, alerts, signals)
 - **ES Modules**: All TypeScript and JavaScript uses ESM (`"type": "module"`)
 - **Dependencies**: Minimize. Justify every new dependency.
 - **Dependency versions**: Always use the latest stable version. No legacy compatibility — legacy systems must fail. When a dependency ships a breaking change, update all consuming code to work with the new version. Never pin to old versions to avoid migration work. **Legacy compatibility is an anti-pattern** — do not use compatibility shims, polyfills, or `__future__` imports that exist only to support older versions.
-- **No secrets**: Do not store PATs or secrets in GitHub Secrets. Use only the built-in `GITHUB_TOKEN` and native GitHub features (e.g., Project auto-add workflows).
+- **No secrets**: See [Security](#security) section below.
 - **Error handling**: Graceful degradation. Never crash on malformed input — log warnings and continue.
 - **Privacy**: All portfolio/personal data stays local. No PII sent to external APIs unless explicitly configured.
 
@@ -109,6 +109,30 @@ These rules exist because this is financial software. Violations produce incorre
 3. **Data source attribution**: Every data point must trace to its source (API, filing, calculation).
 4. **Timestamp everything**: All market data, signals, and analysis must carry timestamps.
 5. **No stale data assumptions**: Always check data freshness before analysis.
+
+## Security
+
+Security is not optional. This is financial software handling sensitive portfolio data.
+
+### No Portable Credentials
+
+- **No passwords, secrets, API keys, tokens, or credentials anywhere in the codebase** — not in source files, config files, environment files, comments, tests, documentation, or commit messages.
+- **No `.env` files committed to the repository.** Use `.env.example` with placeholder keys only (e.g., `FRED_API_KEY=your-key-here`). Actual `.env` files must be in `.gitignore`.
+- **No GitHub Secrets for PATs or service credentials.** Use only the built-in `GITHUB_TOKEN` and native GitHub features (e.g., OIDC federation for cloud access).
+- **No plaintext credential storage** — not in config files, databases, local files, or environment variable dumps.
+
+### Authentication Standards
+
+- **Prefer credential-free authentication**: OIDC federation, managed identities, workload identity, certificate-based auth.
+- **When credentials are unavoidable** (e.g., third-party API keys like FRED): load from environment variables at runtime via `pydantic-settings` (`AppConfig`). Never hardcode, never log, never serialize.
+- **Reject systems that only support username/password auth** unless they also offer SSO, OIDC, or certificate-based alternatives. Portable credentials are a liability.
+
+### Defense in Depth
+
+- **All portfolio and personal data stays local.** No PII sent to external APIs unless the user explicitly configures it.
+- **Validate all external input** — API responses, file contents, user input. Never trust external data.
+- **Log security-relevant events** (auth failures, config errors) but **never log credentials or sensitive data**.
+- **Fail closed**: if a security check cannot be performed (missing credentials, unreachable auth provider), deny access rather than falling back to insecure defaults.
 
 ## Testing
 

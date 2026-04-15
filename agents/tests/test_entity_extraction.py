@@ -129,16 +129,16 @@ class TestRelationshipExtraction:
         text = "Intel Corp. supplies processors to Apple Inc. every quarter."
         entities = extract_entities(text)
         rels = extract_relationships(text, entities)
-        if rels:
-            assert rels[0].evidence != ""
-            assert len(rels[0].evidence) > 0
+        assert len(rels) >= 1
+        assert rels[0].evidence != ""
+        assert len(rels[0].evidence) > 0
 
     def test_relationship_source_doc_propagated(self) -> None:
         text = "Intel Corp. supplies chips to Apple Inc. for production."
         entities = extract_entities(text, source_doc="10-K")
         rels = extract_relationships(text, entities, source_doc="10-K")
-        if rels:
-            assert rels[0].source_doc == "10-K"
+        assert len(rels) >= 1
+        assert rels[0].source_doc == "10-K"
 
     def test_subsidiary_relationship(self) -> None:
         text = "YouTube LLC is a subsidiary of Alphabet Inc. since 2006."

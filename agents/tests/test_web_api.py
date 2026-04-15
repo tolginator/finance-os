@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
+import src.web_api as _web_api_module
 from src.application.contracts.agents import (
     AnalyzeEarningsResponse,
     AssessRiskResponse,
@@ -22,15 +23,19 @@ from src.application.contracts.agents import (
     SearchFilingsResponse,
 )
 from src.application.registry import AGENT_CATALOG
+from src.core.knowledge_graph import KnowledgeGraph
 from src.web_api import app, get_config
 
 
 @pytest.fixture
 def client():
-    """TestClient for the FastAPI app."""
+    """TestClient for the FastAPI app with fresh KG graph per test."""
     get_config.cache_clear()
+    original_graph = _web_api_module._kg_graph
+    _web_api_module._kg_graph = KnowledgeGraph()
     with TestClient(app) as test_client:
         yield test_client
+    _web_api_module._kg_graph = original_graph
     get_config.cache_clear()
 
 
@@ -494,13 +499,13 @@ class TestKGQueryRelated:
             "text": "Intel Corp. supplies chips to Apple Inc. every year.",
         })
         resp = client.post("/kg/query/related", json={
-            "entity_id": "name:intel corp.",
+            "entity_id": "name:intel corp",
             "max_depth": 1,
         })
         assert resp.status_code == 200
         data = resp.json()
-        assert "related" in data
-        assert "count" in data
+        assert data["count"] >= 1
+        assert len(data["related"]) == data["count"]
 
     def test_query_related_nonexistent_entity(self, client):
         resp = client.post("/kg/query/related", json={
@@ -534,13 +539,19 @@ class TestKGQuerySupplyChain:
 
 class TestKGQuerySharedRisks:
     def test_shared_risks_returns_response(self, client):
+        # Seed: two companies sharing the same risk
+        client.post("/kg/extract", json={
+            "text": (
+                "Apple Inc. faces cybersecurity threats."
+                " Microsoft Corp. also faces cybersecurity risks."
+            ),
+        })
         resp = client.post("/kg/query/shared-risks", json={
-            "entity_ids": ["ticker:AAPL", "ticker:MSFT"],
+            "entity_ids": ["name:apple inc.", "name:microsoft corp."],
         })
         assert resp.status_code == 200
         data = resp.json()
-        assert "shared_risks" in data
-        assert "count" in data
+        assert len(data["shared_risks"]) == data["count"]
 
     def test_shared_risks_fewer_than_two_422(self, client):
         resp = client.post("/kg/query/shared-risks", json={
@@ -554,7 +565,16 @@ class TestKGStats:
         resp = client.get("/kg/stats")
         assert resp.status_code == 200
         data = resp.json()
-        assert "entity_count" in data
-        assert "relationship_count" in data
-        assert "entities_by_type" in data
-        assert "relationships_by_type" in data
+        assert isinstance(data["entity_count"], int)
+        assert isinstance(data["relationship_count"], int)
+        assert isinstance(data["entities_by_type"], dict)
+        assert isinstance(data["relationships_by_type"], dict)
+
+    def test_stats_reflects_extraction(self, client):
+        client.post("/kg/extract", json={
+            "text": "Apple Inc. is facing cybersecurity concerns.",
+        })
+        resp = client.get("/kg/stats")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["entity_count"] >= 1

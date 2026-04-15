@@ -1,5 +1,8 @@
 """Tests for the knowledge graph service layer."""
 
+import pydantic
+import pytest
+
 from src.application.contracts.knowledge_graph import (
     ExtractEntitiesRequest,
     QueryRelatedRequest,
@@ -78,12 +81,8 @@ class TestExtractAndIngest:
         assert apple_entities[0].ticker == "AAPL"
 
     def test_empty_text_rejected(self) -> None:
-        import pydantic
-        try:
+        with pytest.raises(pydantic.ValidationError):
             ExtractEntitiesRequest(text="")
-            assert False, "Should have raised validation error"
-        except pydantic.ValidationError:
-            pass
 
     def test_extract_with_relationships(self) -> None:
         svc = KnowledgeGraphService()
@@ -127,12 +126,8 @@ class TestQueryRelated:
         assert resp.related == []
 
     def test_query_related_empty_id_rejected(self) -> None:
-        import pydantic
-        try:
+        with pytest.raises(pydantic.ValidationError):
             QueryRelatedRequest(entity_id="")
-            assert False, "Should have raised validation error"
-        except pydantic.ValidationError:
-            pass
 
 
 # ── Query Supply Chain ────────────────────────────────────────
@@ -155,12 +150,8 @@ class TestQuerySupplyChain:
         assert resp.count == 0
 
     def test_invalid_direction_rejected(self) -> None:
-        import pydantic
-        try:
+        with pytest.raises(pydantic.ValidationError):
             QuerySupplyChainRequest(entity_id="ticker:AAPL", direction="sideways")
-            assert False, "Should have raised validation error"
-        except pydantic.ValidationError:
-            pass
 
 
 # ── Query Shared Risks ───────────────────────────────────────
@@ -184,12 +175,8 @@ class TestQuerySharedRisks:
         assert resp.count == 0
 
     def test_fewer_than_two_entities_rejected(self) -> None:
-        import pydantic
-        try:
+        with pytest.raises(pydantic.ValidationError):
             QuerySharedRisksRequest(entity_ids=["ticker:AAPL"])
-            assert False, "Should have raised validation error"
-        except pydantic.ValidationError:
-            pass
 
 
 # ── Stats ─────────────────────────────────────────────────────

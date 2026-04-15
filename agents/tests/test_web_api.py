@@ -550,7 +550,9 @@ class TestKGQuerySharedRisks:
 
         graph = _web_api_module._kg_graph
         graph.add_entity(Entity(name="Apple Inc", entity_type=EntityType.COMPANY, ticker="AAPL"))
-        graph.add_entity(Entity(name="Microsoft Corp", entity_type=EntityType.COMPANY, ticker="MSFT"))
+        graph.add_entity(Entity(
+            name="Microsoft Corp", entity_type=EntityType.COMPANY, ticker="MSFT",
+        ))
         graph.add_entity(Entity(name="cybersecurity", entity_type=EntityType.RISK))
         graph.add_relationship(Relationship(
             source_id="ticker:AAPL", target_id="name:cybersecurity",

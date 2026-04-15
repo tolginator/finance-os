@@ -223,7 +223,7 @@ class KnowledgeGraph:
         """Find all entities reachable within max_depth hops (undirected traversal)."""
         if entity_id not in self._graph:
             return []
-        undirected = self._graph.to_undirected()
+        undirected = self._graph.to_undirected(as_view=True)
         visited: set[str] = set()
         frontier = {entity_id}
         for _ in range(max_depth):

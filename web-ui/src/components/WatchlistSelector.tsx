@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { activateWatchlist, createWatchlist, deleteWatchlist, fetchWatchlists } from '../api';
 import type { WatchlistsResponse } from '../types';
 
@@ -7,23 +7,29 @@ interface WatchlistSelectorProps {
   activeTickers: string[];
 }
 
+const DEFAULT_DATA: WatchlistsResponse = {
+  active: 'default',
+  watchlists: { default: { tickers: [] } },
+  active_watchlist: { tickers: [] },
+};
+
 export function WatchlistSelector({ onWatchlistChange, activeTickers }: WatchlistSelectorProps) {
   const [data, setData] = useState<WatchlistsResponse | null>(null);
   const [newName, setNewName] = useState('');
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       const resp = await fetchWatchlists();
       setData(resp);
       onWatchlistChange(resp.active, resp.active_watchlist.tickers);
     } catch {
-      /* ignore load errors — default empty state is fine */
+      setData(DEFAULT_DATA);
     }
-  };
+  }, [onWatchlistChange]);
 
-  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [load]);
 
   const handleSwitch = async (name: string) => {
     try {

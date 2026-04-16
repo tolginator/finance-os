@@ -51,8 +51,10 @@ class WatchlistStore:
 
     def _load(self) -> WatchlistData:
         """Load watchlist data from disk, creating defaults if needed."""
+        repaired = False
         if not self._path.is_file():
             data = self._default_data()
+            repaired = True
         else:
             try:
                 raw = json.loads(self._path.read_text(encoding="utf-8"))
@@ -63,7 +65,11 @@ class WatchlistStore:
                     self._path,
                 )
                 data = self._default_data()
+                repaired = True
+        before = data.model_dump()
         self._ensure_invariants(data)
+        if repaired or data.model_dump() != before:
+            self._save(data)
         return data
 
     def _save(self, data: WatchlistData) -> None:
@@ -117,7 +123,9 @@ class WatchlistStore:
         if not _SLUG_PATTERN.match(slug):
             msg = (
                 f"Invalid watchlist name '{name}'. "
-                "Use lowercase letters, digits, and hyphens (1-50 chars)."
+                "Names are case-insensitive and stored in lowercase; use "
+                "letters, digits, and hyphens only, 1-50 characters, and do "
+                "not start or end with a hyphen."
             )
             raise ValueError(msg)
         return slug

@@ -38,10 +38,10 @@ export function DigestPanel() {
     saveToWatchlist(value);
   };
 
-  const handleWatchlistChange = (name: string, tickers: string[]) => {
+  const handleWatchlistChange = useCallback((name: string, tickers: string[]) => {
     activeWatchlistRef.current = name;
     setInput(tickers.join(', '));
-  };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

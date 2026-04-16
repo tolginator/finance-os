@@ -22,10 +22,13 @@ export function WatchlistSelector({ onWatchlistChange, activeTickers }: Watchlis
   const load = useCallback(async () => {
     try {
       const resp = await fetchWatchlists();
+      setError('');
       setData(resp);
       onWatchlistChange(resp.active, resp.active_watchlist.tickers);
     } catch {
+      setError('');
       setData(DEFAULT_DATA);
+      onWatchlistChange(DEFAULT_DATA.active, DEFAULT_DATA.active_watchlist.tickers);
     }
   }, [onWatchlistChange]);
 
@@ -34,6 +37,7 @@ export function WatchlistSelector({ onWatchlistChange, activeTickers }: Watchlis
   const handleSwitch = async (name: string) => {
     try {
       const resp = await activateWatchlist(name);
+      setError('');
       onWatchlistChange(name, resp.watchlist.tickers);
       await load();
     } catch (err) {
@@ -56,6 +60,7 @@ export function WatchlistSelector({ onWatchlistChange, activeTickers }: Watchlis
   };
 
   const handleDelete = async (name: string) => {
+    setError('');
     try {
       await deleteWatchlist(name);
       await load();
@@ -66,7 +71,7 @@ export function WatchlistSelector({ onWatchlistChange, activeTickers }: Watchlis
 
   if (!data) return null;
 
-  const names = Object.keys(data.watchlists);
+  const names = Object.keys(data.watchlists).sort((a, b) => a.localeCompare(b));
 
   return (
     <div style={{ marginBottom: '0.75rem' }}>

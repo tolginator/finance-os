@@ -19,6 +19,10 @@ from pydantic import BaseModel, Field
 
 from src.application.config import CONFIG_DIR
 
+
+class WatchlistNotFoundError(Exception):
+    """Raised when a watchlist name is not found in the store."""
+
 WATCHLIST_FILE = CONFIG_DIR / "watchlists.json"
 _SLUG_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]{0,48}[a-z0-9]$|^[a-z0-9]$")
 
@@ -152,7 +156,7 @@ class WatchlistStore:
             data = self._load()
             if slug not in data.watchlists:
                 msg = f"Watchlist '{slug}' not found"
-                raise KeyError(msg)
+                raise WatchlistNotFoundError(msg)
             return data.watchlists[slug].model_dump()
 
     def create(self, name: str, tickers: list[str] | None = None) -> dict[str, Any]:
@@ -176,7 +180,7 @@ class WatchlistStore:
             data = self._load()
             if slug not in data.watchlists:
                 msg = f"Watchlist '{slug}' not found"
-                raise KeyError(msg)
+                raise WatchlistNotFoundError(msg)
             data.watchlists[slug] = Watchlist(tickers=normalized)
             self._save(data)
             return data.watchlists[slug].model_dump()
@@ -188,7 +192,7 @@ class WatchlistStore:
             data = self._load()
             if slug not in data.watchlists:
                 msg = f"Watchlist '{slug}' not found"
-                raise KeyError(msg)
+                raise WatchlistNotFoundError(msg)
             if slug == data.active:
                 msg = "Cannot delete the active watchlist"
                 raise ValueError(msg)
@@ -202,7 +206,7 @@ class WatchlistStore:
             data = self._load()
             if slug not in data.watchlists:
                 msg = f"Watchlist '{slug}' not found"
-                raise KeyError(msg)
+                raise WatchlistNotFoundError(msg)
             data.active = slug
             self._save(data)
             return {

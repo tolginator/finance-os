@@ -63,7 +63,7 @@ from src.application.registry import AGENT_CATALOG, create_pipeline_service
 from src.application.services.agent_service import AgentService
 from src.application.services.digest_service import DigestService
 from src.application.services.kg_service import KnowledgeGraphService
-from src.application.watchlists import WatchlistStore
+from src.application.watchlists import WatchlistNotFoundError, WatchlistStore
 from src.core.knowledge_graph import KnowledgeGraph
 
 logger = logging.getLogger(__name__)
@@ -117,11 +117,12 @@ async def value_error_handler(_request: Request, exc: ValueError) -> JSONRespons
     return JSONResponse(status_code=400, content={"detail": str(exc)})
 
 
-@app.exception_handler(KeyError)
-async def key_error_handler(_request: Request, exc: KeyError) -> JSONResponse:
-    """Map KeyError (not found) to 404."""
-    detail = exc.args[0] if exc.args else str(exc)
-    return JSONResponse(status_code=404, content={"detail": detail})
+@app.exception_handler(WatchlistNotFoundError)
+async def watchlist_not_found_handler(
+    _request: Request, exc: WatchlistNotFoundError,
+) -> JSONResponse:
+    """Map WatchlistNotFoundError to 404."""
+    return JSONResponse(status_code=404, content={"detail": str(exc)})
 
 
 # --- Health & Info ---

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from src.application.watchlists import WatchlistStore
+from src.application.watchlists import WatchlistNotFoundError, WatchlistStore
 
 
 @pytest.fixture()
@@ -55,7 +55,7 @@ class TestGet:
         assert result["tickers"] == ["NVDA"]
 
     def test_get_nonexistent_raises(self, store: WatchlistStore) -> None:
-        with pytest.raises(KeyError):
+        with pytest.raises(WatchlistNotFoundError):
             store.get("nonexistent")
 
 
@@ -65,7 +65,7 @@ class TestUpdate:
         assert result["tickers"] == ["AMZN", "GOOG"]
 
     def test_update_nonexistent_raises(self, store: WatchlistStore) -> None:
-        with pytest.raises(KeyError):
+        with pytest.raises(WatchlistNotFoundError):
             store.update("nonexistent", ["AAPL"])
 
     def test_update_deduplicates(self, store: WatchlistStore) -> None:
@@ -77,7 +77,7 @@ class TestDelete:
     def test_delete_non_active(self, store: WatchlistStore) -> None:
         store.create("temp")
         store.delete("temp")
-        with pytest.raises(KeyError):
+        with pytest.raises(WatchlistNotFoundError):
             store.get("temp")
 
     def test_delete_active_raises(self, store: WatchlistStore) -> None:
@@ -85,7 +85,7 @@ class TestDelete:
             store.delete("default")
 
     def test_delete_nonexistent_raises(self, store: WatchlistStore) -> None:
-        with pytest.raises(KeyError):
+        with pytest.raises(WatchlistNotFoundError):
             store.delete("nonexistent")
 
 
@@ -100,7 +100,7 @@ class TestActivate:
     def test_activate_nonexistent_raises(
         self, store: WatchlistStore,
     ) -> None:
-        with pytest.raises(KeyError):
+        with pytest.raises(WatchlistNotFoundError):
             store.activate("nonexistent")
 
 

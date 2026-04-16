@@ -39,6 +39,7 @@ export function DigestPanel() {
   };
 
   const handleWatchlistChange = useCallback((name: string, tickers: string[]) => {
+    clearTimeout(saveTimerRef.current);
     activeWatchlistRef.current = name;
     setInput(tickers.join(', '));
   }, []);

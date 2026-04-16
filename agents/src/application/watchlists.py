@@ -9,6 +9,7 @@ non-blocking access from async endpoints).
 
 import json
 import logging
+import os
 import re
 import tempfile
 import threading
@@ -94,6 +95,7 @@ class WatchlistStore:
                 temp_path = Path(fd.name)
                 fd.write(content)
                 fd.flush()
+                os.fsync(fd.fileno())
             temp_path.replace(self._path)
         except BaseException:
             if temp_path is not None:

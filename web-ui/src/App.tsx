@@ -1,6 +1,7 @@
 import { HealthStatus } from './components/HealthStatus';
 import { AgentList } from './components/AgentList';
 import { DigestPanel } from './components/DigestPanel';
+import { KnowledgeGraphPanel } from './components/KnowledgeGraphPanel';
 
 export function App() {
   return (
@@ -13,6 +14,11 @@ export function App() {
       <section style={{ marginBottom: '2rem' }}>
         <h2 style={{ fontSize: '1.125rem', marginBottom: '0.75rem' }}>Research Digest</h2>
         <DigestPanel />
+      </section>
+
+      <section style={{ marginBottom: '2rem' }}>
+        <h2 style={{ fontSize: '1.125rem', marginBottom: '0.75rem' }}>Knowledge Graph</h2>
+        <KnowledgeGraphPanel />
       </section>
 
       <section>

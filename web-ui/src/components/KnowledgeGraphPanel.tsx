@@ -35,12 +35,16 @@ export function KnowledgeGraphPanel() {
       setExtraction(null);
       setQueryResult(null);
       setSelectedEntities([]);
+      setSelectedEntity('');
+      setQueryError('');
       return;
     }
     setError('');
     setExtraction(null);
     setQueryResult(null);
     setSelectedEntities([]);
+    setSelectedEntity('');
+    setQueryError('');
     setExtracting(true);
     try {
       const resp = await extractEntities({

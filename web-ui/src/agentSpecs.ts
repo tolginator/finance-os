@@ -37,7 +37,6 @@ export const agentSpecs: AgentSpec[] = [
     description: 'Classify current macro environment from FRED indicators.',
     endpoint: '/agents/macro_regime',
     fields: [
-      { name: 'api_key', label: 'FRED API Key', type: 'text', placeholder: 'Optional — uses env default' },
       { name: 'indicators', label: 'Indicators (JSON)', type: 'json', placeholder: '["GDP", "UNRATE", "CPIAUCSL"]' },
     ],
     responseFields: ['regime', 'indicators_fetched', 'indicators_with_data'],

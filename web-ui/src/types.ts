@@ -93,7 +93,7 @@ export interface GenerateSignalsResponse {
 
 export interface EvaluateThesisRequest {
   theses: Record<string, unknown>[];
-  data?: Record<string, string | number>;
+  data?: Record<string, string>;
 }
 
 export interface EvaluateThesisResponse {

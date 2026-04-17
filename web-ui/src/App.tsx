@@ -1,5 +1,6 @@
 import { HealthStatus } from './components/HealthStatus';
 import { AgentList } from './components/AgentList';
+import { AgentRunner } from './components/AgentRunner';
 import { DigestPanel } from './components/DigestPanel';
 import { KnowledgeGraphPanel } from './components/KnowledgeGraphPanel';
 
@@ -21,8 +22,13 @@ export function App() {
         <KnowledgeGraphPanel />
       </section>
 
+      <section style={{ marginBottom: '2rem' }}>
+        <h2 style={{ fontSize: '1.125rem', marginBottom: '0.75rem' }}>Agent Runner</h2>
+        <AgentRunner />
+      </section>
+
       <section>
-        <h2 style={{ fontSize: '1.125rem', marginBottom: '0.75rem' }}>Agents</h2>
+        <h2 style={{ fontSize: '1.125rem', marginBottom: '0.75rem' }}>Agent Catalog</h2>
         <AgentList />
       </section>
     </div>

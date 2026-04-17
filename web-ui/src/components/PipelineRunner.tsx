@@ -1,17 +1,17 @@
-import { useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { agentSpecs } from '../agentSpecs';
 import { normalizeDetail } from '../api';
 import type { TaskDefinition, RunPipelineResponse } from '../types';
 
-let nextId = 1;
-function genTaskId(): string { return `task-${nextId++}`; }
-
-function emptyTask(): TaskDefinition {
-  return { task_id: genTaskId(), agent_name: agentSpecs[0]?.name ?? '', prompt: '', kwargs: {}, depends_on: [] };
-}
-
 export function PipelineRunner() {
-  const [tasks, setTasks] = useState<TaskDefinition[]>([emptyTask()]);
+  const nextIdRef = useRef(1);
+  const genTaskId = useCallback(() => `task-${nextIdRef.current++}`, []);
+
+  const makeEmptyTask = useCallback((): TaskDefinition => {
+    return { task_id: genTaskId(), agent_name: agentSpecs[0]?.name ?? '', prompt: '', kwargs: {}, depends_on: [] };
+  }, [genTaskId]);
+
+  const [tasks, setTasks] = useState<TaskDefinition[]>(() => [makeEmptyTask()]);
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<RunPipelineResponse | null>(null);
   const [error, setError] = useState('');
@@ -20,7 +20,7 @@ export function PipelineRunner() {
     setTasks((prev) => prev.map((t, i) => (i === idx ? { ...t, ...patch } : t)));
   };
 
-  const addTask = () => setTasks((prev) => [...prev, emptyTask()]);
+  const addTask = () => setTasks((prev) => [...prev, makeEmptyTask()]);
 
   const removeTask = (idx: number) => {
     const removedId = tasks[idx].task_id;

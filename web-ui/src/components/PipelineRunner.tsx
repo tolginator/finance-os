@@ -106,15 +106,31 @@ export function PipelineRunner() {
           <p style={{ margin: '0 0 0.5rem', fontWeight: 500 }}>
             Pipeline complete — {result.successful} succeeded, {result.failed} failed ({result.total_duration_ms}ms)
           </p>
-          {result.results.map((r, i) => (
-            <div key={i} style={{ padding: '0.5rem', marginBottom: '0.25rem', background: '#f9fafb', borderRadius: 4, fontSize: '0.85rem' }}>
-              <strong>{(r as Record<string, unknown>).task_id as string ?? `Task ${i + 1}`}</strong>
-              {' — '}
-              <span style={{ color: (r as Record<string, unknown>).status === 'success' ? '#16a34a' : '#ef4444' }}>
-                {String((r as Record<string, unknown>).status ?? 'unknown')}
-              </span>
-            </div>
-          ))}
+          {result.results.map((r, i) => {
+            const task = r as Record<string, unknown>;
+            const success = typeof task.success === 'boolean' ? task.success : undefined;
+            const status = success === true ? 'success' : success === false ? 'failed' : String(task.status ?? 'unknown');
+            const taskId = typeof task.task_id === 'string' ? task.task_id : `Task ${i + 1}`;
+            const durationMs = typeof task.duration_ms === 'number' ? task.duration_ms : undefined;
+            const taskError = typeof task.error === 'string' ? task.error : undefined;
+
+            return (
+              <div key={i} style={{ padding: '0.5rem', marginBottom: '0.25rem', background: '#f9fafb', borderRadius: 4, fontSize: '0.85rem' }}>
+                <strong>{taskId}</strong>
+                {' — '}
+                <span style={{ color: status === 'success' ? '#16a34a' : status === 'failed' ? '#ef4444' : '#6b7280' }}>
+                  {status}
+                </span>
+                {(durationMs !== undefined || taskError) && (
+                  <div style={{ marginTop: '0.25rem', color: '#4b5563' }}>
+                    {durationMs !== undefined && <span>{durationMs}ms</span>}
+                    {durationMs !== undefined && taskError && ' — '}
+                    {taskError && <span>{taskError}</span>}
+                  </div>
+                )}
+              </div>
+            );
+          })}
           {result.memo && (
             <pre style={{ marginTop: '0.5rem', fontSize: '0.8rem', whiteSpace: 'pre-wrap' }}>
               {JSON.stringify(result.memo, null, 2)}

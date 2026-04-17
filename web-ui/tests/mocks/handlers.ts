@@ -124,7 +124,7 @@ export const handlers = [
 
   http.post('/api/pipeline', () => {
     return HttpResponse.json({
-      results: [{ task_id: 'task-1', status: 'success', output: {} }],
+      results: [{ task_id: 'task-1', agent_name: 'macro_regime', success: true, duration_ms: 1200, content: 'Macro regime dashboard', metadata: {}, error: null }],
       total_duration_ms: 1500,
       successful: 1,
       failed: 0,

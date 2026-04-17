@@ -77,7 +77,7 @@ export interface SearchFilingsResponse {
 
 export interface GenerateSignalsRequest {
   signals?: Record<string, unknown>[];
-  sentiment?: string;
+  sentiment?: string | number;
   regime?: string;
   direction?: string;
   source?: string;
@@ -93,7 +93,7 @@ export interface GenerateSignalsResponse {
 
 export interface EvaluateThesisRequest {
   theses: Record<string, unknown>[];
-  data?: Record<string, string>;
+  data?: Record<string, string | number>;
 }
 
 export interface EvaluateThesisResponse {
@@ -106,7 +106,7 @@ export interface EvaluateThesisResponse {
 export interface AssessRiskRequest {
   positions?: Record<string, unknown>[];
   scenarios?: Record<string, unknown>[];
-  returns?: string[];
+  returns?: (string | number)[];
 }
 
 export interface AssessRiskResponse {

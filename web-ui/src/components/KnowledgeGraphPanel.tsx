@@ -37,6 +37,7 @@ export function KnowledgeGraphPanel() {
     setError('');
     setExtraction(null);
     setQueryResult(null);
+    setSelectedEntities([]);
     setExtracting(true);
     try {
       const resp = await extractEntities({

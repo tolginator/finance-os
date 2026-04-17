@@ -49,18 +49,29 @@ describe('PipelineRunner', () => {
     });
   });
 
-  it('detects dependency cycles', () => {
-    // We need at least 2 tasks to form a cycle, but the depends_on UI
-    // uses a multi-select that references other task IDs.
-    // For simplicity, we test that the cycle detection error is surfaced.
+  it('detects dependency cycles', async () => {
     render(<PipelineRunner />);
     fireEvent.click(screen.getByText('+ Add Task'));
 
-    // Both tasks exist (task-3, task-4 due to counter). Select depends
-    // We'll just verify the pipeline can run without cycle error when deps are empty
+    // Get the multi-select elements (depends_on for each task)
+    const allSelects = screen.getAllByRole('listbox') as HTMLSelectElement[];
+    // allSelects[0] = task-1's depends_on (has option for task-2)
+    // allSelects[1] = task-2's depends_on (has option for task-1)
+
+    // Select task-2 as dependency of task-1
+    const opt1 = allSelects[0].options[0]; // task-2
+    opt1.selected = true;
+    fireEvent.change(allSelects[0]);
+
+    // Select task-1 as dependency of task-2
+    const opt2 = allSelects[1].options[0]; // task-1
+    opt2.selected = true;
+    fireEvent.change(allSelects[1]);
+
     fireEvent.click(screen.getByText('Run Pipeline'));
-    // No cycle error should appear
-    expect(screen.queryByTestId('pipeline-error')).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByTestId('pipeline-error')).toHaveTextContent('cycle');
+    });
   });
 });
 

@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { agentSpecs } from '../agentSpecs';
-import { normalizeDetail } from '../api';
+import { runPipeline } from '../api';
 import type { TaskDefinition, RunPipelineResponse } from '../types';
 
 export function PipelineRunner() {
@@ -23,12 +23,15 @@ export function PipelineRunner() {
   const addTask = () => setTasks((prev) => [...prev, makeEmptyTask()]);
 
   const removeTask = (idx: number) => {
-    const removedId = tasks[idx].task_id;
-    setTasks((prev) =>
-      prev
+    setTasks((prev) => {
+      const removedId = prev[idx]?.task_id;
+      return prev
         .filter((_, i) => i !== idx)
-        .map((t) => ({ ...t, depends_on: (t.depends_on ?? []).filter((id) => id !== removedId) })),
-    );
+        .map((t) => ({
+          ...t,
+          depends_on: removedId ? (t.depends_on ?? []).filter((id) => id !== removedId) : t.depends_on ?? [],
+        }));
+    });
   };
 
   const validate = (): string | null => {
@@ -65,17 +68,7 @@ export function PipelineRunner() {
     setResult(null);
     setRunning(true);
     try {
-      const resp = await fetch(`${import.meta.env.VITE_API_URL ?? '/api'}/pipeline`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tasks }),
-      });
-      if (!resp.ok) {
-        const errBody = await resp.json().catch(() => ({}));
-        const detail = (errBody as Record<string, unknown>).detail ?? resp.statusText;
-        throw new Error(normalizeDetail(detail));
-      }
-      setResult(await resp.json() as RunPipelineResponse);
+      setResult(await runPipeline({ tasks }));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Pipeline failed');
     } finally {

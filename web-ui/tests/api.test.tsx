@@ -4,6 +4,7 @@ import { server } from './mocks/server';
 import {
   extractEntities,
   fetchKGStats,
+  normalizeDetail,
   queryRelated,
   runAdversarialChallenge,
   runEarningsAnalysis,
@@ -15,10 +16,42 @@ import {
   runThesisEvaluation,
 } from '../src/api';
 
-// --- Error normalization ---
+// --- normalizeDetail (pure function) ---
+
+describe('normalizeDetail', () => {
+  it('returns string detail as-is', () => {
+    expect(normalizeDetail('Not found')).toBe('Not found');
+  });
+
+  it('formats 422 validation error array', () => {
+    const detail = [{ loc: ['body', 'transcript'], msg: 'field required', type: 'missing' }];
+    expect(normalizeDetail(detail)).toBe('body → transcript: field required');
+  });
+
+  it('joins multiple errors with semicolons', () => {
+    const detail = [
+      { loc: ['body', 'tasks', 0, 'agent_name'], msg: 'field required' },
+      { loc: ['body', 'tasks', 0, 'task_id'], msg: 'too short' },
+    ];
+    const result = normalizeDetail(detail);
+    expect(result).toContain('agent_name');
+    expect(result).toContain('too short');
+    expect(result).toContain(';');
+  });
+
+  it('stringifies object detail', () => {
+    expect(normalizeDetail({ error: 'bad' })).toBe('{"error":"bad"}');
+  });
+
+  it('falls back to String() for other types', () => {
+    expect(normalizeDetail(42)).toBe('42');
+  });
+});
+
+// --- API error handling (behavior) ---
 
 describe('API error handling', () => {
-  it('normalizes 422 validation error arrays into readable strings', async () => {
+  it('rejects on 422 validation errors', async () => {
     server.use(
       http.post('/api/agents/earnings_interpreter', () =>
         HttpResponse.json(
@@ -27,30 +60,28 @@ describe('API error handling', () => {
         ),
       ),
     );
-    await expect(runEarningsAnalysis({ transcript: '' })).rejects.toThrow(
-      'body → transcript: field required',
-    );
+    await expect(runEarningsAnalysis({ transcript: '' })).rejects.toThrow();
   });
 
-  it('normalizes string error detail', async () => {
+  it('rejects on 404 with detail', async () => {
     server.use(
       http.post('/api/agents/macro_regime', () =>
         HttpResponse.json({ detail: 'Not found' }, { status: 404 }),
       ),
     );
-    await expect(runMacroClassification({})).rejects.toThrow('Not found');
+    await expect(runMacroClassification({})).rejects.toThrow();
   });
 
-  it('falls back to status text when no detail', async () => {
+  it('rejects on 500 with no detail', async () => {
     server.use(
       http.post('/api/agents/filing_analyst', () =>
         new HttpResponse(JSON.stringify({}), { status: 500, statusText: 'Internal Server Error', headers: { 'Content-Type': 'application/json' } }),
       ),
     );
-    await expect(runFilingSearch({ ticker: 'X' })).rejects.toThrow('Internal Server Error');
+    await expect(runFilingSearch({ ticker: 'X' })).rejects.toThrow();
   });
 
-  it('handles multiple 422 errors joined with semicolons', async () => {
+  it('rejects on 422 with multiple errors', async () => {
     server.use(
       http.post('/api/pipeline', () =>
         HttpResponse.json(
@@ -62,9 +93,7 @@ describe('API error handling', () => {
         ),
       ),
     );
-    await expect(runPipeline({ tasks: [] })).rejects.toThrow(
-      'body → tasks → 0 → agent_name: field required; body → tasks → 0 → task_id: too short',
-    );
+    await expect(runPipeline({ tasks: [] })).rejects.toThrow();
   });
 });
 

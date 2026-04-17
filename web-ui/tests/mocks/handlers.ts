@@ -24,4 +24,32 @@ export const handlers = [
       content: `Digest for ${tickers.join(', ')}`,
     });
   }),
+
+  http.get('/api/watchlists', () => {
+    return HttpResponse.json({
+      active: 'default',
+      watchlists: { default: { tickers: [] } },
+      active_watchlist: { tickers: [] },
+    });
+  }),
+
+  http.put('/api/watchlists/:name', () => {
+    return HttpResponse.json({ tickers: ['AAPL', 'MSFT'] });
+  }),
+
+  http.post('/api/watchlists', () => {
+    return HttpResponse.json({ tickers: [] }, { status: 201 });
+  }),
+
+  http.delete('/api/watchlists/:name', () => {
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  http.put('/api/watchlists/:name/activate', ({ params }) => {
+    const name = params.name as string;
+    return HttpResponse.json({
+      active: name,
+      watchlist: { tickers: ['AAPL', 'MSFT'] },
+    });
+  }),
 ];

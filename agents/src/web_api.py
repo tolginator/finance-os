@@ -8,6 +8,9 @@ Knowledge graph endpoints share a process-level graph store that
 persists across requests (like a database), guarded by an asyncio
 lock for thread safety.
 
+Watchlist endpoints persist named ticker lists to disk at
+~/.config/finance-os/watchlists.json.
+
 Run locally:
     uvicorn src.web_api:app --reload
     finance-os-api              # console script
@@ -22,6 +25,7 @@ import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
 
 from src.application.config import AppConfig
 from src.application.contracts.agents import (
@@ -59,13 +63,30 @@ from src.application.registry import AGENT_CATALOG, create_pipeline_service
 from src.application.services.agent_service import AgentService
 from src.application.services.digest_service import DigestService
 from src.application.services.kg_service import KnowledgeGraphService
+from src.application.watchlists import WatchlistNotFoundError, WatchlistStore
 from src.core.knowledge_graph import KnowledgeGraph
 
 logger = logging.getLogger(__name__)
 
+
+class CreateWatchlistRequest(BaseModel):
+    """Request body for creating a watchlist."""
+
+    name: str
+    tickers: list[str] = Field(default_factory=list)
+
+
+class UpdateWatchlistRequest(BaseModel):
+    """Request body for updating a watchlist's tickers."""
+
+    tickers: list[str]
+
 # Process-level knowledge graph store (persists across requests like a DB)
 _kg_graph = KnowledgeGraph()
 _kg_lock = asyncio.Lock()
+
+# Process-level watchlist store (persists to ~/.config/finance-os/watchlists.json)
+_watchlist_store = WatchlistStore()
 
 app = FastAPI(
     title="finance-os",
@@ -94,6 +115,14 @@ def get_config() -> AppConfig:
 async def value_error_handler(_request: Request, exc: ValueError) -> JSONResponse:
     """Map domain ValueError (bad input, unknown agent) to 400."""
     return JSONResponse(status_code=400, content={"detail": str(exc)})
+
+
+@app.exception_handler(WatchlistNotFoundError)
+async def watchlist_not_found_handler(
+    _request: Request, exc: WatchlistNotFoundError,
+) -> JSONResponse:
+    """Map WatchlistNotFoundError to 404."""
+    return JSONResponse(status_code=404, content={"detail": str(exc)})
 
 
 # --- Health & Info ---
@@ -261,6 +290,49 @@ async def kg_stats() -> Any:
             None, _kg_service().get_stats,
         )
     return response.model_dump(mode="json")
+
+
+# --- Watchlists ---
+
+
+@app.get("/watchlists")
+async def list_watchlists() -> Any:
+    """List all watchlists with the active watchlist's data."""
+    return await asyncio.to_thread(_watchlist_store.list_all)
+
+
+@app.post("/watchlists", status_code=201)
+async def create_watchlist(body: CreateWatchlistRequest) -> Any:
+    """Create a new named watchlist."""
+    return await asyncio.to_thread(
+        _watchlist_store.create, body.name, body.tickers,
+    )
+
+
+@app.get("/watchlists/{name}")
+async def get_watchlist(name: str) -> Any:
+    """Get a specific watchlist by name."""
+    return await asyncio.to_thread(_watchlist_store.get, name)
+
+
+@app.put("/watchlists/{name}")
+async def update_watchlist(name: str, body: UpdateWatchlistRequest) -> Any:
+    """Update tickers in a watchlist."""
+    return await asyncio.to_thread(
+        _watchlist_store.update, name, body.tickers,
+    )
+
+
+@app.delete("/watchlists/{name}", status_code=204)
+async def delete_watchlist(name: str) -> None:
+    """Delete a watchlist (cannot delete the active one)."""
+    await asyncio.to_thread(_watchlist_store.delete, name)
+
+
+@app.put("/watchlists/{name}/activate")
+async def activate_watchlist(name: str) -> Any:
+    """Set a watchlist as the active one."""
+    return await asyncio.to_thread(_watchlist_store.activate, name)
 
 
 def main() -> None:

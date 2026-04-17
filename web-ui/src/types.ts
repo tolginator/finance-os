@@ -22,3 +22,13 @@ export interface DigestResponse {
 export interface HealthResponse {
   status: string;
 }
+
+export interface WatchlistData {
+  tickers: string[];
+}
+
+export interface WatchlistsResponse {
+  active: string;
+  watchlists: Record<string, WatchlistData>;
+  active_watchlist: WatchlistData;
+}

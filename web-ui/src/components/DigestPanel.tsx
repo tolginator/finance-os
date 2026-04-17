@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { runDigest } from '../api';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { runDigest, updateWatchlist } from '../api';
 import type { DigestResponse } from '../types';
+import { WatchlistSelector } from './WatchlistSelector';
 
 function parseTickers(input: string): string[] {
   return input
@@ -15,6 +16,33 @@ export function DigestPanel() {
   const [result, setResult] = useState<DigestResponse | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const activeWatchlistRef = useRef('default');
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  useEffect(() => {
+    return () => clearTimeout(saveTimerRef.current);
+  }, []);
+
+  const saveToWatchlist = useCallback((text: string) => {
+    clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      const tickers = parseTickers(text);
+      updateWatchlist(activeWatchlistRef.current, tickers).catch(() => {
+        /* silent — best-effort save */
+      });
+    }, 1000);
+  }, []);
+
+  const handleInputChange = (value: string) => {
+    setInput(value);
+    saveToWatchlist(value);
+  };
+
+  const handleWatchlistChange = useCallback((name: string, tickers: string[]) => {
+    clearTimeout(saveTimerRef.current);
+    activeWatchlistRef.current = name;
+    setInput(tickers.join(', '));
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,6 +55,9 @@ export function DigestPanel() {
     setResult(null);
     setLoading(true);
     try {
+      await updateWatchlist(activeWatchlistRef.current, tickers).catch((err) => {
+        console.warn('Failed to update watchlist before digest', err);
+      });
       const resp = await runDigest({ tickers, lookback_days: lookback });
       setResult(resp);
     } catch (err) {
@@ -38,13 +69,17 @@ export function DigestPanel() {
 
   return (
     <div>
+      <WatchlistSelector
+        onWatchlistChange={handleWatchlistChange}
+        activeTickers={parseTickers(input)}
+      />
       <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'end' }}>
         <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', flex: 1 }}>
           <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>Tickers</span>
           <input
             type="text"
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => handleInputChange(e.target.value)}
             placeholder="AAPL, MSFT, GOOGL"
             style={{ padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: 6 }}
           />

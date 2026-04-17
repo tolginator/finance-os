@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { agentSpecs } from '../agentSpecs';
+import { normalizeDetail } from '../api';
 import type { TaskDefinition, RunPipelineResponse } from '../types';
 
 let nextId = 1;
@@ -22,7 +23,12 @@ export function PipelineRunner() {
   const addTask = () => setTasks((prev) => [...prev, emptyTask()]);
 
   const removeTask = (idx: number) => {
-    setTasks((prev) => prev.filter((_, i) => i !== idx));
+    const removedId = tasks[idx].task_id;
+    setTasks((prev) =>
+      prev
+        .filter((_, i) => i !== idx)
+        .map((t) => ({ ...t, depends_on: (t.depends_on ?? []).filter((id) => id !== removedId) })),
+    );
   };
 
   const validate = (): string | null => {
@@ -66,7 +72,8 @@ export function PipelineRunner() {
       });
       if (!resp.ok) {
         const errBody = await resp.json().catch(() => ({}));
-        throw new Error((errBody as Record<string, unknown>).detail as string ?? resp.statusText);
+        const detail = (errBody as Record<string, unknown>).detail ?? resp.statusText;
+        throw new Error(normalizeDetail(detail));
       }
       setResult(await resp.json() as RunPipelineResponse);
     } catch (err) {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { fetchAgents } from '../api';
+import { fetchAgents, normalizeDetail } from '../api';
 import { agentSpecs, type AgentSpec, type FieldSpec } from '../agentSpecs';
 import type { AgentInfo } from '../types';
 
@@ -82,7 +82,7 @@ export function AgentRunner() {
       if (!resp.ok) {
         const errBody = await resp.json().catch(() => ({}));
         const detail = (errBody as Record<string, unknown>).detail ?? resp.statusText;
-        throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));
+        throw new Error(normalizeDetail(detail));
       }
       const data = await resp.json();
       setResult(data as Record<string, unknown>);

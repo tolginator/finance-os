@@ -16,7 +16,7 @@ import type {
 const BASE_URL = import.meta.env.VITE_API_URL ?? '/api';
 
 /** Normalize FastAPI error detail (string, array, or object) to a readable string. */
-function normalizeDetail(detail: unknown): string {
+export function normalizeDetail(detail: unknown): string {
   if (typeof detail === 'string') return detail;
   if (Array.isArray(detail)) {
     return detail

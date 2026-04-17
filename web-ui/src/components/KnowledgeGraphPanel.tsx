@@ -201,11 +201,13 @@ export function KnowledgeGraphPanel() {
       {/* Query Section — only show when entities exist */}
       {allEntities.length > 0 && (
         <div style={{ marginTop: '1rem', padding: '0.75rem', border: '1px solid #e5e7eb', borderRadius: 6 }}>
-          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
+          <div role="tablist" aria-label="Knowledge graph queries" style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
             {(['related', 'supply-chain', 'shared-risks'] as QueryTab[]).map((tab) => (
               <button
                 key={tab}
                 type="button"
+                role="tab"
+                aria-selected={queryTab === tab}
                 onClick={() => { setQueryTab(tab); setQueryResult(null); setQueryError(''); }}
                 style={{
                   padding: '0.25rem 0.75rem', borderRadius: 4, border: '1px solid #d1d5db',

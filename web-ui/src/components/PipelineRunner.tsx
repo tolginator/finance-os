@@ -1,22 +1,31 @@
 import { useCallback, useRef, useState } from 'react';
 import { agentSpecs } from '../agentSpecs';
 import { runPipeline } from '../api';
-import type { TaskDefinition, RunPipelineResponse } from '../types';
+import type { RunPipelineResponse } from '../types';
+
+/** Internal task state with required task_id (API type makes it optional). */
+interface PipelineTask {
+  task_id: string;
+  agent_name: string;
+  prompt?: string;
+  kwargs?: Record<string, unknown>;
+  depends_on?: string[];
+}
 
 export function PipelineRunner() {
   const nextIdRef = useRef(1);
   const genTaskId = useCallback(() => `task-${nextIdRef.current++}`, []);
 
-  const makeEmptyTask = useCallback((): TaskDefinition => {
+  const makeEmptyTask = useCallback((): PipelineTask => {
     return { task_id: genTaskId(), agent_name: agentSpecs[0]?.name ?? '', prompt: '', kwargs: {}, depends_on: [] };
   }, [genTaskId]);
 
-  const [tasks, setTasks] = useState<TaskDefinition[]>(() => [makeEmptyTask()]);
+  const [tasks, setTasks] = useState<PipelineTask[]>(() => [makeEmptyTask()]);
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<RunPipelineResponse | null>(null);
   const [error, setError] = useState('');
 
-  const updateTask = (idx: number, patch: Partial<TaskDefinition>) => {
+  const updateTask = (idx: number, patch: Partial<PipelineTask>) => {
     setTasks((prev) => prev.map((t, i) => (i === idx ? { ...t, ...patch } : t)));
   };
 
@@ -38,12 +47,12 @@ export function PipelineRunner() {
     const ids = new Set<string>();
     for (const t of tasks) {
       if (!t.agent_name) return `Task ${t.task_id}: agent is required.`;
-      if (ids.has(t.task_id!)) return `Duplicate task ID: ${t.task_id}`;
-      ids.add(t.task_id!);
+      if (ids.has(t.task_id)) return `Duplicate task ID: ${t.task_id}`;
+      ids.add(t.task_id);
     }
     // Cycle detection — simple DFS
     const adj = new Map<string, string[]>();
-    for (const t of tasks) adj.set(t.task_id!, t.depends_on ?? []);
+    for (const t of tasks) adj.set(t.task_id, t.depends_on ?? []);
     const visited = new Set<string>();
     const stack = new Set<string>();
     const hasCycle = (node: string): boolean => {
@@ -83,7 +92,7 @@ export function PipelineRunner() {
           <TaskEditor
             key={task.task_id}
             task={task}
-            allTaskIds={tasks.map((t) => t.task_id!)}
+            allTaskIds={tasks.map((t) => t.task_id)}
             onChange={(patch) => updateTask(idx, patch)}
             onRemove={tasks.length > 1 ? () => removeTask(idx) : undefined}
           />
@@ -143,9 +152,9 @@ export function PipelineRunner() {
 }
 
 function TaskEditor({ task, allTaskIds, onChange, onRemove }: {
-  task: TaskDefinition;
+  task: PipelineTask;
   allTaskIds: string[];
-  onChange: (patch: Partial<TaskDefinition>) => void;
+  onChange: (patch: Partial<PipelineTask>) => void;
   onRemove?: () => void;
 }) {
   const inputStyle = { padding: '0.4rem', border: '1px solid #d1d5db', borderRadius: 4, width: '100%', boxSizing: 'border-box' as const };

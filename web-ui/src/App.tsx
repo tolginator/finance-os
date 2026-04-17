@@ -3,6 +3,8 @@ import { AgentList } from './components/AgentList';
 import { AgentRunner } from './components/AgentRunner';
 import { DigestPanel } from './components/DigestPanel';
 import { KnowledgeGraphPanel } from './components/KnowledgeGraphPanel';
+import { PipelineRunner } from './components/PipelineRunner';
+import { StatsDashboard } from './components/StatsDashboard';
 
 export function App() {
   return (
@@ -25,6 +27,16 @@ export function App() {
       <section style={{ marginBottom: '2rem' }}>
         <h2 style={{ fontSize: '1.125rem', marginBottom: '0.75rem' }}>Agent Runner</h2>
         <AgentRunner />
+      </section>
+
+      <section style={{ marginBottom: '2rem' }}>
+        <h2 style={{ fontSize: '1.125rem', marginBottom: '0.75rem' }}>Research Pipeline</h2>
+        <PipelineRunner />
+      </section>
+
+      <section style={{ marginBottom: '2rem' }}>
+        <h2 style={{ fontSize: '1.125rem', marginBottom: '0.75rem' }}>Stats Dashboard</h2>
+        <StatsDashboard />
       </section>
 
       <section>

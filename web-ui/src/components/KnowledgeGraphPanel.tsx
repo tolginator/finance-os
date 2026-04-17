@@ -184,8 +184,8 @@ export function KnowledgeGraphPanel() {
                 </tr>
               </thead>
               <tbody>
-                {extraction.relationships.map((r, i) => (
-                  <tr key={i} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                {extraction.relationships.map((r) => (
+                  <tr key={`${r.source_id}:${r.rel_type}:${r.target_id}`} style={{ borderBottom: '1px solid #f3f4f6' }}>
                     <td style={{ padding: '0.25rem 0.5rem' }}>{r.source_id}</td>
                     <td style={{ padding: '0.25rem 0.5rem' }}>{r.rel_type}</td>
                     <td style={{ padding: '0.25rem 0.5rem' }}>{r.target_id}</td>

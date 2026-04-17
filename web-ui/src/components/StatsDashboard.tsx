@@ -21,8 +21,8 @@ export function StatsDashboard() {
       setHealth(h);
       setAgents(a);
       setKgStats(kg);
-    } catch {
-      setError('Failed to load stats');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load stats');
     } finally {
       setLoading(false);
     }

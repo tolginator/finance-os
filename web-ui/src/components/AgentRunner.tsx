@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { fetchAgents, normalizeDetail } from '../api';
+import { fetchAgents, postJson } from '../api';
 import { agentSpecs, type AgentSpec, type FieldSpec } from '../agentSpecs';
 import type { AgentInfo } from '../types';
 
@@ -83,17 +83,8 @@ export function AgentRunner() {
     setResult(null);
     setRunning(true);
     try {
-      const resp = await fetch(
-        `${import.meta.env.VITE_API_URL ?? '/api'}${currentSpec.endpoint}`,
-        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
-      );
-      if (!resp.ok) {
-        const errBody = await resp.json().catch(() => ({}));
-        const detail = (errBody as Record<string, unknown>).detail ?? resp.statusText;
-        throw new Error(normalizeDetail(detail));
-      }
-      const data = await resp.json();
-      setResult(data as Record<string, unknown>);
+      const data = await postJson<Record<string, unknown>>(currentSpec.endpoint, body);
+      setResult(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Agent execution failed');
     } finally {

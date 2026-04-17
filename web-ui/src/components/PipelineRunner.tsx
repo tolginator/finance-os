@@ -115,7 +115,7 @@ export function PipelineRunner() {
             const taskError = typeof task.error === 'string' ? task.error : undefined;
 
             return (
-              <div key={i} style={{ padding: '0.5rem', marginBottom: '0.25rem', background: '#f9fafb', borderRadius: 4, fontSize: '0.85rem' }}>
+              <div key={taskId} style={{ padding: '0.5rem', marginBottom: '0.25rem', background: '#f9fafb', borderRadius: 4, fontSize: '0.85rem' }}>
                 <strong>{taskId}</strong>
                 {' — '}
                 <span style={{ color: status === 'success' ? '#16a34a' : status === 'failed' ? '#ef4444' : '#6b7280' }}>

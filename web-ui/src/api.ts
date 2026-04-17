@@ -61,6 +61,11 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+/** POST JSON to an API endpoint via the shared request wrapper. */
+export function postJson<T>(path: string, body: unknown): Promise<T> {
+  return request<T>(path, { method: 'POST', body: JSON.stringify(body) });
+}
+
 // --- Health & Info ---
 
 export function fetchHealth(): Promise<HealthResponse> {

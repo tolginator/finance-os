@@ -61,11 +61,11 @@ export function PipelineRunner() {
 
   const handleRun = async (e: React.FormEvent) => {
     e.preventDefault();
+    setResult(null);
     const validationError = validate();
     if (validationError) { setError(validationError); return; }
 
     setError('');
-    setResult(null);
     setRunning(true);
     try {
       setResult(await runPipeline({ tasks }));

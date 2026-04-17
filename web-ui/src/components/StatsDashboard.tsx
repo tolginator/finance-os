@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { fetchHealth, fetchAgents, fetchKGStats } from '../api';
 import type { AgentInfo, KGStatsResponse } from '../types';
 
@@ -9,7 +9,7 @@ export function StatsDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
@@ -26,9 +26,9 @@ export function StatsDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => { refresh(); }, [refresh]);
 
   if (loading) return <p data-testid="stats-loading" style={{ color: '#6b7280' }}>Loading stats…</p>;
   if (error) return <p data-testid="stats-error" style={{ color: '#ef4444' }}>{error}</p>;

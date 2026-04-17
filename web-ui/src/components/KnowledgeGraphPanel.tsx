@@ -32,6 +32,9 @@ export function KnowledgeGraphPanel() {
     e.preventDefault();
     if (!text.trim()) {
       setError('Enter text to extract entities from.');
+      setExtraction(null);
+      setQueryResult(null);
+      setSelectedEntities([]);
       return;
     }
     setError('');

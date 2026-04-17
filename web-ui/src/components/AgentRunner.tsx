@@ -52,6 +52,7 @@ export function AgentRunner() {
     for (const field of currentSpec.fields) {
       const raw = formValues[field.name]?.trim() ?? '';
       if (!raw && field.required) {
+        setResult(null);
         setError(`${field.label} is required.`);
         return;
       }
@@ -61,11 +62,18 @@ export function AgentRunner() {
         try {
           body[field.name] = JSON.parse(raw);
         } catch {
+          setResult(null);
           setError(`${field.label}: invalid JSON.`);
           return;
         }
       } else if (field.type === 'number') {
-        body[field.name] = Number(raw);
+        const value = Number(raw);
+        if (!Number.isFinite(value)) {
+          setResult(null);
+          setError(`${field.label} must be a valid finite number.`);
+          return;
+        }
+        body[field.name] = value;
       } else {
         body[field.name] = raw;
       }

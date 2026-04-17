@@ -15,15 +15,21 @@ import type {
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? '/api';
 
+interface ValidationErrorItem {
+  loc?: unknown[];
+  msg?: string;
+}
+
 /** Normalize FastAPI error detail (string, array, or object) to a readable string. */
 export function normalizeDetail(detail: unknown): string {
   if (typeof detail === 'string') return detail;
   if (Array.isArray(detail)) {
     return detail
-      .map((e) => {
+      .map((e: unknown) => {
         if (typeof e === 'object' && e !== null) {
-          const loc = Array.isArray(e.loc) ? e.loc.join(' → ') : '';
-          const msg = typeof e.msg === 'string' ? e.msg : JSON.stringify(e);
+          const item = e as ValidationErrorItem;
+          const loc = Array.isArray(item.loc) ? item.loc.join(' → ') : '';
+          const msg = typeof item.msg === 'string' ? item.msg : JSON.stringify(e);
           return loc ? `${loc}: ${msg}` : msg;
         }
         return String(e);

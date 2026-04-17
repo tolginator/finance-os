@@ -200,8 +200,8 @@ function AgentField({ field, value, onChange }: { field: FieldSpec; value: strin
   if (field.type === 'select') {
     return (
       <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-        <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>{field.label}</span>
-        <select value={value} onChange={(e) => onChange(e.target.value)} style={baseStyle}>
+        <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>{field.label}{field.required && ' *'}</span>
+        <select value={value} onChange={(e) => onChange(e.target.value)} required={field.required} style={baseStyle}>
           {field.options?.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
         </select>
       </label>
@@ -211,11 +211,12 @@ function AgentField({ field, value, onChange }: { field: FieldSpec; value: strin
   if (field.type === 'json') {
     return (
       <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-        <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>{field.label}</span>
+        <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>{field.label}{field.required && ' *'}</span>
         <textarea
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={field.placeholder}
+          required={field.required}
           rows={2}
           style={{ ...baseStyle, fontFamily: 'monospace', fontSize: '0.8rem', resize: 'vertical' }}
         />

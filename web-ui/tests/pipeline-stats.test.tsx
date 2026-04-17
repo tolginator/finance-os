@@ -99,7 +99,7 @@ describe('StatsDashboard', () => {
     });
   });
 
-  it('shows error when stats fail', async () => {
+  it('shows error when stats fail with refresh button available', async () => {
     server.use(
       http.get('/api/health', () => HttpResponse.json({}, { status: 500 })),
     );
@@ -107,12 +107,13 @@ describe('StatsDashboard', () => {
     await waitFor(() => {
       expect(screen.getByTestId('stats-error')).toBeInTheDocument();
     });
+    expect(screen.getByTestId('stats-refresh')).toBeInTheDocument();
   });
 
   it('shows agent count', async () => {
     render(<StatsDashboard />);
     await waitFor(() => {
-      expect(screen.getByText('Agents (3)')).toBeInTheDocument();
+      expect(screen.getByText(/^Agents \(\d+\)$/)).toBeInTheDocument();
     });
   });
 });

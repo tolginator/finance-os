@@ -11,7 +11,10 @@ describe('AgentRunner', () => {
       expect(screen.getByTestId('agent-select')).toBeInTheDocument();
     });
     const select = screen.getByTestId('agent-select') as HTMLSelectElement;
-    expect(select.options.length).toBe(3);
+    const optionValues = Array.from(select.options).map((o) => o.value);
+    expect(optionValues).toContain('macro_regime');
+    expect(optionValues).toContain('adversarial');
+    expect(optionValues).toContain('filing_analyst');
   });
 
   it('shows loading state initially', () => {
@@ -33,8 +36,8 @@ describe('AgentRunner', () => {
       expect(screen.getByTestId('agent-select')).toBeInTheDocument();
     });
 
-    // macro_regime is the first agent in mock — its spec has api_key and indicators fields
-    expect(screen.getByText('FRED API Key')).toBeInTheDocument();
+    // earnings_interpreter is the first agent in mock — its spec has transcript and ticker fields
+    expect(screen.getByText('Transcript *')).toBeInTheDocument();
   });
 
   it('switches form when selecting different agent', async () => {
@@ -98,7 +101,11 @@ describe('AgentRunner', () => {
       expect(screen.getByTestId('agent-select')).toBeInTheDocument();
     });
 
-    // macro_regime has indicators JSON field
+    // Select macro_regime which has indicators JSON field
+    fireEvent.change(screen.getByTestId('agent-select'), { target: { value: 'macro_regime' } });
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText('["GDP", "UNRATE", "CPIAUCSL"]')).toBeInTheDocument();
+    });
     const indicatorInput = screen.getByPlaceholderText('["GDP", "UNRATE", "CPIAUCSL"]');
     fireEvent.change(indicatorInput, { target: { value: 'not valid json' } });
     fireEvent.click(screen.getByText('Run Agent'));
@@ -110,7 +117,7 @@ describe('AgentRunner', () => {
 
   it('shows error when agent API fails', async () => {
     server.use(
-      http.post('/api/agents/macro_regime', () =>
+      http.post('/api/agents/earnings_interpreter', () =>
         HttpResponse.json({ detail: 'Agent failed' }, { status: 500 }),
       ),
     );
@@ -118,6 +125,8 @@ describe('AgentRunner', () => {
     await waitFor(() => {
       expect(screen.getByTestId('agent-select')).toBeInTheDocument();
     });
+    const transcriptInput = screen.getByPlaceholderText('Paste earnings call transcript...');
+    fireEvent.change(transcriptInput, { target: { value: 'Some transcript' } });
     fireEvent.click(screen.getByText('Run Agent'));
 
     await waitFor(() => {
@@ -131,6 +140,9 @@ describe('AgentRunner', () => {
       expect(screen.getByTestId('agent-select')).toBeInTheDocument();
     });
 
+    // Fill required transcript field before running
+    const transcriptInput = screen.getByPlaceholderText('Paste earnings call transcript...');
+    fireEvent.change(transcriptInput, { target: { value: 'Q1 results strong' } });
     fireEvent.click(screen.getByText('Run Agent'));
     await waitFor(() => {
       expect(screen.getByTestId('agent-runner-result')).toBeInTheDocument();

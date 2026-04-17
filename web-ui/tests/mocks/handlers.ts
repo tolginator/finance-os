@@ -7,8 +7,12 @@ export const handlers = [
 
   http.get('/api/agents', () => {
     return HttpResponse.json([
+      { name: 'earnings_interpreter', description: 'Analyzes earnings call transcripts for sentiment and guidance' },
       { name: 'macro_regime', description: 'Classifies macro regime from FRED indicators' },
       { name: 'filing_analyst', description: 'Searches and analyzes SEC filings' },
+      { name: 'quant_signal', description: 'Generates composite quant signals from multiple inputs' },
+      { name: 'thesis_guardian', description: 'Evaluates investment theses against observed data' },
+      { name: 'risk_analyst', description: 'Assesses portfolio risk with VaR, CVaR, and scenario analysis' },
       { name: 'adversarial', description: 'Challenges investment theses adversarially' },
     ]);
   }),

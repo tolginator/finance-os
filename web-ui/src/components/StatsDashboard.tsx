@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { fetchHealth, fetchAgents, fetchKGStats } from '../api';
-import type { AgentInfo, KGStatsResponse } from '../types';
+import type { AgentInfo, HealthResponse, KGStatsResponse } from '../types';
 
 export function StatsDashboard() {
-  const [health, setHealth] = useState<{ status: string } | null>(null);
+  const [health, setHealth] = useState<HealthResponse | null>(null);
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [kgStats, setKgStats] = useState<KGStatsResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -31,10 +31,15 @@ export function StatsDashboard() {
   useEffect(() => { refresh(); }, [refresh]);
 
   if (loading) return <p data-testid="stats-loading" style={{ color: '#6b7280' }}>Loading stats…</p>;
-  if (error) return <p data-testid="stats-error" style={{ color: '#ef4444' }}>{error}</p>;
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
+      {error && (
+        <div data-testid="stats-error" style={{ gridColumn: '1 / -1', color: '#ef4444', padding: '0.75rem', border: '1px solid #fecaca', borderRadius: 6, background: '#fef2f2' }}>
+          {error}
+        </div>
+      )}
+
       {/* Health */}
       <div style={{ padding: '0.75rem', border: '1px solid #e5e7eb', borderRadius: 6 }}>
         <h3 style={{ margin: '0 0 0.5rem', fontSize: '0.95rem' }}>System Health</h3>

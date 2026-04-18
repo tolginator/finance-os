@@ -106,7 +106,7 @@ export interface EvaluateThesisResponse {
 export interface AssessRiskRequest {
   positions?: Record<string, unknown>[];
   scenarios?: Record<string, unknown>[];
-  returns?: (string | number)[];
+  returns?: string[];
 }
 
 export interface AssessRiskResponse {

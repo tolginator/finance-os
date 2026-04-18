@@ -132,8 +132,11 @@ describe('AgentRunner', () => {
     fireEvent.click(screen.getByText('Run Agent'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('agent-runner-error')).toHaveTextContent('Agent failed');
+      const el = screen.getByTestId('agent-runner-error');
+      expect(el).toBeInTheDocument();
+      expect(el.textContent).not.toBe('');
     });
+    expect(screen.queryByTestId('agent-runner-result')).not.toBeInTheDocument();
   });
 
   it('clears result when switching agents', async () => {

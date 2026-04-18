@@ -145,6 +145,8 @@ async def _fetch_with_dedup(key: str, ttl: float, fetcher: object) -> object:
 
     loop = asyncio.get_running_loop()
     fut: asyncio.Future[object] = loop.create_future()
+    # Suppress "Future exception was never retrieved" when no concurrent waiters
+    fut.add_done_callback(lambda f: f.exception() if not f.cancelled() else None)
     _inflight[key] = fut
     try:
         result = await asyncio.to_thread(fetcher)  # type: ignore[arg-type]

@@ -71,6 +71,7 @@ export function TickerBar({ onTickerChange }: TickerBarProps) {
         <input
           data-testid="ticker-input"
           type="text"
+          aria-label="Ticker symbol"
           value={input}
           onChange={(e) => setInput(e.target.value.toUpperCase())}
           onKeyDown={(e) => { if (e.key === 'Enter') lookup(); }}
@@ -88,7 +89,7 @@ export function TickerBar({ onTickerChange }: TickerBarProps) {
         </button>
       </div>
 
-      {error && <p data-testid="ticker-error" style={{ color: '#ef4444', marginTop: '0.5rem', fontSize: '0.85rem' }}>{error}</p>}
+      {error && <p data-testid="ticker-error" role="alert" style={{ color: '#ef4444', marginTop: '0.5rem', fontSize: '0.85rem' }}>{error}</p>}
 
       {summary && (
         <div data-testid="ticker-summary" style={{ marginTop: '0.75rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '0.5rem', fontSize: '0.85rem' }}>

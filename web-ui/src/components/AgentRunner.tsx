@@ -52,15 +52,18 @@ export function AgentRunner({ ticker }: AgentRunnerProps) {
   useEffect(() => {
     if (!ticker?.summary || ticker.loading || !selectedAgent) return;
     const sym = ticker.symbol;
-    const prefills: Record<string, Record<string, string>> = {
-      earnings_interpreter: { ticker: sym, ...(ticker.transcript?.available ? { transcript: ticker.transcript.transcript } : {}) },
-      filing_analyst: { ticker: sym },
-      thesis_guardian: { ticker: sym },
-      risk_analyst: {},
-      adversarial: { ticker: sym },
+    const spec = agentSpecs.find((s) => s.name === selectedAgent);
+    if (!spec) return;
+    const fieldNames = new Set(spec.fields.map((f) => f.name));
+    const candidates: Record<string, string> = {
+      ticker: sym,
+      ...(ticker.transcript?.available ? { transcript: ticker.transcript.transcript } : {}),
     };
-    const fills = prefills[selectedAgent];
-    if (!fills) return;
+    const fills: Record<string, string> = {};
+    for (const [k, v] of Object.entries(candidates)) {
+      if (fieldNames.has(k)) fills[k] = v;
+    }
+    if (Object.keys(fills).length === 0) return;
     setFormValues((prev) => {
       const next = { ...prev };
       for (const [k, v] of Object.entries(fills)) {

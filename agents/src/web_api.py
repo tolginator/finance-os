@@ -18,6 +18,7 @@ Run locally:
 
 import asyncio
 import logging
+import re
 from functools import lru_cache
 from typing import Any
 
@@ -68,6 +69,8 @@ from src.application.watchlists import WatchlistNotFoundError, WatchlistStore
 from src.core.knowledge_graph import KnowledgeGraph
 
 logger = logging.getLogger(__name__)
+
+_TICKER_RE = re.compile(r"^[A-Za-z0-9.\-]{1,10}$")
 
 
 class CreateWatchlistRequest(BaseModel):
@@ -178,6 +181,10 @@ async def analyze_earnings(request: AnalyzeEarningsRequest) -> Any:
         from src.application.services.ticker_service import get_ticker_transcript
 
         normalized_ticker = request.ticker.strip().upper()
+        if not _TICKER_RE.match(normalized_ticker):
+            raise ValueError(
+                f"Invalid ticker symbol: {request.ticker!r}"
+            )
         result = await get_ticker_transcript(normalized_ticker)
         if not result.available:
             raise ValueError(

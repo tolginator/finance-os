@@ -151,8 +151,9 @@ async def _fetch_with_dedup(key: str, ttl: float, fetcher: object) -> object:
         _cache_set(key, result)
         fut.set_result(result)
         return result.model_copy(deep=True)  # type: ignore[union-attr]
-    except Exception as exc:
-        fut.set_exception(exc)
+    except BaseException as exc:
+        if not fut.done():
+            fut.set_exception(exc)
         raise
     finally:
         _inflight.pop(key, None)

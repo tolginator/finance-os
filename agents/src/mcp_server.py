@@ -7,6 +7,7 @@ LLM gateway is skipped by default — the host LLM (Copilot, Claude Desktop)
 handles reasoning. Agents return structured data for the host to synthesize.
 """
 
+import re
 import sys
 from decimal import Decimal
 from typing import Any
@@ -24,6 +25,8 @@ from src.application.contracts.agents import (
 from src.application.registry import AGENT_CATALOG, create_pipeline_service
 from src.application.services.agent_service import AgentService
 from src.application.services.digest_service import DigestService
+
+_TICKER_RE = re.compile(r"^[A-Za-z0-9.\-]{1,10}$")
 
 mcp = FastMCP(
     "finance-os-agents",
@@ -57,6 +60,9 @@ async def analyze_earnings(transcript: str = "", ticker: str = "") -> dict[str, 
         from src.application.services.ticker_service import get_ticker_transcript
 
         ticker = ticker.strip().upper()
+        if not _TICKER_RE.match(ticker):
+            msg = f"Invalid ticker symbol: {ticker!r}"
+            raise ValueError(msg)
         result = await get_ticker_transcript(ticker)
         if result.available:
             transcript = result.transcript

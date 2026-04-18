@@ -82,7 +82,7 @@ export function TickerBar({ onTickerChange }: TickerBarProps) {
           type="button"
           onClick={lookup}
           disabled={loading || !input.trim()}
-          style={{ padding: '0.5rem 1rem', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: '0.9rem' }}
+          style={{ padding: '0.5rem 1rem', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 6, cursor: loading || !input.trim() ? 'not-allowed' : 'pointer', fontSize: '0.9rem' }}
         >
           {loading ? 'Looking up…' : 'Look Up'}
         </button>

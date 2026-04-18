@@ -10,7 +10,8 @@ import type {
   QueryRelatedRequest, QueryRelatedResponse, QuerySharedRisksRequest,
   QuerySharedRisksResponse, QuerySupplyChainRequest, QuerySupplyChainResponse,
   RunPipelineRequest, RunPipelineResponse, SearchFilingsRequest,
-  SearchFilingsResponse, WatchlistData, WatchlistsResponse,
+  SearchFilingsResponse, TickerSummary, TickerTranscript, WatchlistData,
+  WatchlistsResponse,
 } from './types';
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? '/api';
@@ -209,4 +210,14 @@ export function querySharedRisks(req: QuerySharedRisksRequest): Promise<QuerySha
 
 export function fetchKGStats(): Promise<KGStatsResponse> {
   return request('/kg/stats');
+}
+
+// --- Ticker Lookup ---
+
+export function fetchTickerSummary(symbol: string): Promise<TickerSummary> {
+  return request(`/ticker/${encodeURIComponent(symbol)}/summary`);
+}
+
+export function fetchTickerTranscript(symbol: string): Promise<TickerTranscript> {
+  return request(`/ticker/${encodeURIComponent(symbol)}/transcript`);
 }

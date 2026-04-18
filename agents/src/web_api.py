@@ -18,11 +18,12 @@ Run locally:
 
 import asyncio
 import logging
+import re
 from functools import lru_cache
 from typing import Any
 
 import uvicorn
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Path, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -59,6 +60,7 @@ from src.application.contracts.knowledge_graph import (
     QuerySupplyChainRequest,
     QuerySupplyChainResponse,
 )
+from src.application.contracts.ticker import TickerSummary, TickerTranscript
 from src.application.registry import AGENT_CATALOG, create_pipeline_service
 from src.application.services.agent_service import AgentService
 from src.application.services.digest_service import DigestService
@@ -67,6 +69,8 @@ from src.application.watchlists import WatchlistNotFoundError, WatchlistStore
 from src.core.knowledge_graph import KnowledgeGraph
 
 logger = logging.getLogger(__name__)
+
+_TICKER_RE = re.compile(r"^[A-Za-z0-9.\-]{1,10}$")
 
 
 class CreateWatchlistRequest(BaseModel):
@@ -140,12 +144,58 @@ async def list_agents() -> list[dict[str, str]]:
     return list(AGENT_CATALOG)
 
 
+# --- Ticker Lookup Endpoints ---
+
+
+@app.get("/ticker/{symbol}/summary", response_model=TickerSummary)
+async def ticker_summary(
+    symbol: str = Path(..., pattern=r"^[A-Za-z0-9.\-]{1,10}$"),
+) -> Any:
+    """Fetch company summary from Yahoo Finance."""
+    from src.application.services.ticker_service import get_ticker_summary
+
+    return await get_ticker_summary(symbol.upper())
+
+
+@app.get("/ticker/{symbol}/transcript", response_model=TickerTranscript)
+async def ticker_transcript(
+    symbol: str = Path(..., pattern=r"^[A-Za-z0-9.\-]{1,10}$"),
+) -> Any:
+    """Fetch latest earnings transcript (best-effort)."""
+    from src.application.services.ticker_service import get_ticker_transcript
+
+    return await get_ticker_transcript(symbol.upper())
+
+
 # --- Agent Endpoints ---
 
 
 @app.post("/agents/earnings_interpreter", response_model=AnalyzeEarningsResponse)
 async def analyze_earnings(request: AnalyzeEarningsRequest) -> Any:
-    """Analyze an earnings call transcript for tone, sentiment, and guidance."""
+    """Analyze an earnings call transcript for tone, sentiment, and guidance.
+
+    If ``transcript`` is empty but ``ticker`` is provided, auto-fetches
+    the latest transcript from Yahoo Finance.
+    """
+    if not request.transcript and request.ticker:
+        from src.application.services.ticker_service import get_ticker_transcript
+
+        normalized_ticker = request.ticker.strip().upper()
+        if not _TICKER_RE.match(normalized_ticker):
+            raise ValueError(
+                f"Invalid ticker symbol: {request.ticker!r}"
+            )
+        result = await get_ticker_transcript(normalized_ticker)
+        if not result.available:
+            raise ValueError(
+                f"No transcript available for {normalized_ticker}. "
+                "Provide transcript text directly."
+            )
+        request = request.model_copy(
+            update={"transcript": result.transcript, "ticker": normalized_ticker},
+        )
+    if not request.transcript:
+        raise ValueError("Provide either a transcript or a ticker symbol.")
     service = AgentService()
     response = await service.analyze_earnings(request)
     return response.model_dump(mode="json")

@@ -12,10 +12,17 @@ from pydantic import BaseModel, Field
 
 
 class AnalyzeEarningsRequest(BaseModel):
-    """Request to analyze an earnings transcript."""
+    """Request to analyze an earnings transcript.
 
-    transcript: str = Field(min_length=1, description="Earnings call transcript text")
-    ticker: str = Field(default="", description="Company ticker for context")
+    Provide either ``transcript`` directly, or ``ticker`` to auto-fetch
+    the latest transcript from Yahoo Finance.
+    """
+
+    transcript: str = Field(default="", description="Earnings call transcript text")
+    ticker: str = Field(
+        default="",
+        description="Company ticker — auto-fetches transcript if transcript is empty",
+    )
 
 
 class AnalyzeEarningsResponse(BaseModel):

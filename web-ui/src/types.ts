@@ -231,3 +231,28 @@ export interface KGStatsResponse {
   entities_by_type: Record<string, number>;
   relationships_by_type: Record<string, number>;
 }
+
+// --- Ticker Lookup ---
+
+export interface TickerSummary {
+  symbol: string;
+  name: string;
+  sector: string;
+  industry: string;
+  market_cap: string;
+  currency: string;
+  current_price: string;
+  previous_close: string;
+  fifty_two_week_high: string;
+  fifty_two_week_low: string;
+  earnings_date: string;
+  description: string;
+}
+
+export interface TickerTranscript {
+  symbol: string;
+  available: boolean;
+  transcript: string;
+  period: string;
+  source: string;
+}

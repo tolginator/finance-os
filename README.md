@@ -122,7 +122,7 @@ finance-os-mcp              # via console script (stdio transport)
 python -m src.mcp_server    # direct invocation
 ```
 
-Tools available: `analyze_earnings`, `classify_macro`, `research_digest`, `orchestrate`. See [docs/tools.md](docs/tools.md) for details.
+Tools available: `analyze_earnings`, `classify_macro`, `research_digest`, `orchestrate`. The `analyze_earnings` tool accepts a ticker symbol and auto-fetches the latest transcript from Yahoo Finance. See [docs/tools.md](docs/tools.md) for details.
 
 ### Web API
 
@@ -138,7 +138,6 @@ pip install -e ".[dev]"
 # Start the server
 finance-os-api                              # production (127.0.0.1:8000)
 uvicorn src.web_api:app --reload            # development with auto-reload
-uvicorn src.web_api:app --host 0.0.0.0      # expose to local network
 ```
 
 Once running, open http://127.0.0.1:8000/docs for interactive Swagger UI.
@@ -149,7 +148,9 @@ Once running, open http://127.0.0.1:8000/docs for interactive Swagger UI.
 |--------|------|-------------|
 | GET | `/health` | Health check |
 | GET | `/agents` | List available agents |
-| POST | `/agents/earnings_interpreter` | Analyze earnings transcripts |
+| GET | `/ticker/{symbol}/summary` | Fetch company summary from Yahoo Finance (cached 5 min) |
+| GET | `/ticker/{symbol}/transcript` | Fetch latest earnings transcript (cached 1 hour) |
+| POST | `/agents/earnings_interpreter` | Analyze earnings transcripts (accepts ticker or transcript) |
 | POST | `/agents/macro_regime` | Classify macro regime |
 | POST | `/agents/filing_analyst` | Search SEC filings |
 | POST | `/agents/quant_signal` | Generate quant signals |
@@ -158,12 +159,26 @@ Once running, open http://127.0.0.1:8000/docs for interactive Swagger UI.
 | POST | `/agents/adversarial` | Challenge thesis adversarially |
 | POST | `/pipeline` | Multi-agent research pipeline |
 | POST | `/digest` | Research digest for watchlist |
+| POST | `/kg/extract` | Extract entities/relationships into knowledge graph |
+| POST | `/kg/query/related` | Find entities related to a given entity |
+| POST | `/kg/query/supply-chain` | Trace supply chain from an entity |
+| POST | `/kg/query/shared-risks` | Find shared risks across entities |
+| GET | `/kg/stats` | Knowledge graph summary statistics |
+| GET | `/watchlists` | List all watchlists |
+| POST | `/watchlists` | Create a new watchlist |
+| GET | `/watchlists/{name}` | Get a specific watchlist |
+| PUT | `/watchlists/{name}` | Update tickers in a watchlist |
+| DELETE | `/watchlists/{name}` | Delete a watchlist |
+| PUT | `/watchlists/{name}/activate` | Set a watchlist as active |
 
 **Example:**
 
 ```bash
 # Health check
 curl http://127.0.0.1:8000/health
+
+# Look up a ticker
+curl http://127.0.0.1:8000/ticker/AAPL/summary
 
 # Run a research digest
 curl -X POST http://127.0.0.1:8000/digest \
@@ -195,6 +210,18 @@ The dev server proxies `/api/*` requests to the backend at `http://127.0.0.1:800
 ```bash
 cd web-ui && npm run build    # outputs to web-ui/dist/
 ```
+
+**UI Features:**
+
+| Feature | Description |
+|---------|-------------|
+| **Ticker Bar** | Enter a ticker symbol to auto-discover company data from Yahoo Finance — name, sector, price, market cap, 52W range, earnings date, and latest transcript |
+| **Agent Runner** | Run any agent with a dynamic form. Fields auto-populate from ticker context (e.g. entering AAPL fills transcript and ticker fields automatically). Dirty-field tracking preserves manual edits. |
+| **Pipeline Runner** | Define and execute multi-agent pipelines with dependency ordering. Visualizes per-task results and overall duration. Detects dependency cycles before execution. |
+| **Knowledge Graph** | Extract entities and relationships from text, then query the graph — related entities, supply chain tracing, shared risk analysis. Displays entity/relationship counts by type. |
+| **Watchlists** | Create, switch, and manage named ticker watchlists. Active watchlist auto-loads into the digest panel. |
+| **Research Digest** | Run a multi-agent digest for your watchlist tickers. Configure lookback period. View materiality alerts and signal counts. |
+| **System Health** | Live API connectivity indicator, agent catalog, and knowledge graph statistics. |
 
 ### Copilot Skills
 

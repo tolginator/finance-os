@@ -23,7 +23,7 @@ class TestToolRegistration:
         props = tool.inputSchema["properties"]
         assert "transcript" in props
         assert "ticker" in props
-        assert "transcript" in tool.inputSchema.get("required", [])
+        # Both are optional (provide either one)
 
     async def test_classify_macro_schema(self) -> None:
         tools = await mcp.list_tools()
@@ -77,7 +77,7 @@ class TestAnalyzeEarnings:
         parsed = json.loads(content_list[0].text)
         assert "content" in parsed
 
-    async def test_empty_transcript_rejected(self) -> None:
+    async def test_empty_transcript_no_ticker_rejected(self) -> None:
         with pytest.raises(ToolError):
             await mcp.call_tool("analyze_earnings", {"transcript": ""})
 

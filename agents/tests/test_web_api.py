@@ -22,6 +22,7 @@ from src.application.contracts.agents import (
     RunPipelineResponse,
     SearchFilingsResponse,
 )
+from src.application.contracts.ticker import TickerSummary, TickerTranscript
 from src.application.registry import AGENT_CATALOG
 from src.core.knowledge_graph import KnowledgeGraph
 from src.web_api import app, get_config
@@ -98,15 +99,34 @@ class TestEarningsEndpoint:
         assert data["tone"] == "positive"
         assert data["guidance_count"] == 3
 
-    def test_analyze_earnings_empty_transcript_422(self, client):
+    def test_analyze_earnings_empty_transcript_no_ticker_400(self, client):
         resp = client.post("/agents/earnings_interpreter", json={
             "transcript": "",
         })
-        assert resp.status_code == 422
+        assert resp.status_code == 400
 
-    def test_analyze_earnings_missing_transcript_422(self, client):
+    def test_analyze_earnings_missing_both_400(self, client):
         resp = client.post("/agents/earnings_interpreter", json={})
-        assert resp.status_code == 422
+        assert resp.status_code == 400
+
+    @patch("src.application.services.ticker_service.get_ticker_transcript", new_callable=AsyncMock)
+    @patch("src.web_api.AgentService")
+    def test_analyze_earnings_ticker_only_auto_fetches(self, mock_cls, mock_tx, client):
+        mock_tx.return_value = MagicMock(available=True, transcript="Auto-fetched transcript")
+        mock_svc = mock_cls.return_value
+        mock_svc.analyze_earnings = AsyncMock(return_value=_mock_response(
+            AnalyzeEarningsResponse,
+            tone="positive", net_sentiment=0.7, confidence="high",
+            guidance_direction="raised", guidance_count=2, key_phrase_count=5,
+        ))
+        resp = client.post("/agents/earnings_interpreter", json={"ticker": "AAPL"})
+        assert resp.status_code == 200
+
+    @patch("src.application.services.ticker_service.get_ticker_transcript", new_callable=AsyncMock)
+    def test_analyze_earnings_ticker_no_transcript_available_400(self, mock_tx, client):
+        mock_tx.return_value = MagicMock(available=False, transcript="")
+        resp = client.post("/agents/earnings_interpreter", json={"ticker": "AAPL"})
+        assert resp.status_code == 400
 
 
 class TestMacroEndpoint:
@@ -688,3 +708,86 @@ class TestWatchlistActivate:
     def test_activate_nonexistent_404(self, client):
         resp = client.put("/watchlists/nope/activate")
         assert resp.status_code == 404
+
+
+# --- Ticker Lookup Endpoints ---
+
+
+class TestTickerSummary:
+    @patch(
+        "src.application.services.ticker_service.get_ticker_summary",
+        new_callable=AsyncMock,
+    )
+    def test_success(self, mock_summary, client):
+        mock_summary.return_value = TickerSummary(
+            symbol="AAPL",
+            name="Apple Inc.",
+            sector="Technology",
+            industry="Consumer Electronics",
+            market_cap="3000000000000",
+            currency="USD",
+            current_price="190.50",
+            previous_close="189.00",
+            fifty_two_week_high="199.62",
+            fifty_two_week_low="155.98",
+            earnings_date="2025-07-24",
+            description="Apple designs consumer electronics.",
+        )
+        resp = client.get("/ticker/AAPL/summary")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["symbol"] == "AAPL"
+        assert data["name"] == "Apple Inc."
+        mock_summary.assert_awaited_once_with("AAPL")
+
+    @patch(
+        "src.application.services.ticker_service.get_ticker_summary",
+        new_callable=AsyncMock,
+    )
+    def test_lowercase_normalized(self, mock_summary, client):
+        mock_summary.return_value = TickerSummary(
+            symbol="AAPL", name="Apple Inc.",
+        )
+        resp = client.get("/ticker/aapl/summary")
+        assert resp.status_code == 200
+        mock_summary.assert_awaited_once_with("AAPL")
+
+    def test_invalid_symbol_422(self, client):
+        resp = client.get("/ticker/INVALID!!!/summary")
+        assert resp.status_code == 422
+
+
+class TestTickerTranscript:
+    @patch(
+        "src.application.services.ticker_service.get_ticker_transcript",
+        new_callable=AsyncMock,
+    )
+    def test_success(self, mock_transcript, client):
+        mock_transcript.return_value = TickerTranscript(
+            symbol="MSFT",
+            available=True,
+            transcript="Q2 earnings call...",
+            period="Q2 2025",
+        )
+        resp = client.get("/ticker/MSFT/transcript")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["available"] is True
+        mock_transcript.assert_awaited_once_with("MSFT")
+
+    @patch(
+        "src.application.services.ticker_service.get_ticker_transcript",
+        new_callable=AsyncMock,
+    )
+    def test_unavailable(self, mock_transcript, client):
+        mock_transcript.return_value = TickerTranscript(
+            symbol="XYZ",
+            available=False,
+        )
+        resp = client.get("/ticker/XYZ/transcript")
+        assert resp.status_code == 200
+        assert resp.json()["available"] is False
+
+    def test_invalid_symbol_422(self, client):
+        resp = client.get("/ticker/@bad/transcript")
+        assert resp.status_code == 422

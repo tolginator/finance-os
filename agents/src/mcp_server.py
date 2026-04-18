@@ -39,17 +39,29 @@ VALID_AGENT_NAMES = frozenset(info["name"] for info in AGENT_CATALOG)
 
 
 @mcp.tool()
-async def analyze_earnings(transcript: str, ticker: str = "") -> dict[str, Any]:
+async def analyze_earnings(transcript: str = "", ticker: str = "") -> dict[str, Any]:
     """Analyze an earnings call transcript for tone, sentiment, and guidance.
+
+    Provide either transcript text directly, or a ticker to auto-fetch
+    the latest earnings transcript from Yahoo Finance.
 
     Args:
         transcript: Full earnings call transcript text.
-        ticker: Company ticker symbol for context (e.g. AAPL).
+        ticker: Company ticker symbol — auto-fetches transcript if transcript is empty.
 
     Returns:
         Analysis with tone, net_sentiment, confidence, guidance_direction,
         guidance_count, key_phrase_count, and human-readable content.
     """
+    if not transcript and ticker:
+        from src.application.services.ticker_service import get_ticker_transcript
+
+        result = await get_ticker_transcript(ticker)
+        if result.available:
+            transcript = result.transcript
+    if not transcript:
+        msg = "Provide either a transcript or a ticker symbol."
+        raise ValueError(msg)
     request = AnalyzeEarningsRequest(transcript=transcript, ticker=ticker)
     service = AgentService()
     response = await service.analyze_earnings(request)

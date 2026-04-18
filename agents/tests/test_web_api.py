@@ -98,15 +98,15 @@ class TestEarningsEndpoint:
         assert data["tone"] == "positive"
         assert data["guidance_count"] == 3
 
-    def test_analyze_earnings_empty_transcript_422(self, client):
+    def test_analyze_earnings_empty_transcript_no_ticker_400(self, client):
         resp = client.post("/agents/earnings_interpreter", json={
             "transcript": "",
         })
-        assert resp.status_code == 422
+        assert resp.status_code == 400
 
-    def test_analyze_earnings_missing_transcript_422(self, client):
+    def test_analyze_earnings_missing_both_400(self, client):
         resp = client.post("/agents/earnings_interpreter", json={})
-        assert resp.status_code == 422
+        assert resp.status_code == 400
 
 
 class TestMacroEndpoint:

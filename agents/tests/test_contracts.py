@@ -2,9 +2,6 @@
 
 from decimal import Decimal
 
-import pytest
-from pydantic import ValidationError
-
 from src.application.contracts.agents import (
     AnalyzeEarningsRequest,
     AssessRiskRequest,
@@ -19,9 +16,14 @@ from src.application.contracts.agents import (
 
 
 class TestAnalyzeEarningsContract:
-    def test_empty_transcript_rejected(self):
-        with pytest.raises(ValidationError):
-            AnalyzeEarningsRequest(transcript="")
+    def test_accepts_empty_transcript_with_ticker(self):
+        req = AnalyzeEarningsRequest(transcript="", ticker="AAPL")
+        assert req.ticker == "AAPL"
+        assert req.transcript == ""
+
+    def test_accepts_transcript_without_ticker(self):
+        req = AnalyzeEarningsRequest(transcript="Some earnings text")
+        assert req.transcript == "Some earnings text"
 
 
 class TestClassifyMacroContract:

@@ -118,7 +118,7 @@ export function PipelineRunner() {
           {result.results.map((r, i) => {
             const task = r as Record<string, unknown>;
             const success = typeof task.success === 'boolean' ? task.success : undefined;
-            const status = success === true ? 'success' : success === false ? 'failed' : String(task.status ?? 'unknown');
+            const status = success === true ? 'success' : success === false ? 'failed' : 'unknown';
             const taskId = typeof task.task_id === 'string' ? task.task_id : `Task ${i + 1}`;
             const durationMs = typeof task.duration_ms === 'number' ? task.duration_ms : undefined;
             const taskError = typeof task.error === 'string' ? task.error : undefined;

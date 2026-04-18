@@ -191,4 +191,35 @@ export const handlers = [
       relationships_by_type: { supplies_to: 12, competes_with: 6, exposed_to: 4 },
     });
   }),
+
+  // --- Ticker Lookup ---
+
+  http.get('/api/ticker/:symbol/summary', ({ params }) => {
+    const symbol = String(params.symbol).toUpperCase();
+    return HttpResponse.json({
+      symbol,
+      name: `${symbol} Inc.`,
+      sector: 'Technology',
+      industry: 'Consumer Electronics',
+      market_cap: '3000000000000',
+      currency: 'USD',
+      current_price: '198.50',
+      previous_close: '197.25',
+      fifty_two_week_high: '220.00',
+      fifty_two_week_low: '155.00',
+      earnings_date: '2025-07-30',
+      description: `${symbol} designs and manufactures consumer electronics.`,
+    });
+  }),
+
+  http.get('/api/ticker/:symbol/transcript', ({ params }) => {
+    const symbol = String(params.symbol).toUpperCase();
+    return HttpResponse.json({
+      symbol,
+      available: true,
+      transcript: `This is the latest earnings call transcript for ${symbol}. Revenue grew 15% year over year.`,
+      period: 'Q1 2025',
+      source: 'yfinance',
+    });
+  }),
 ];

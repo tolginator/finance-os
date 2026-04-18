@@ -1,9 +1,14 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchAgents, postJson } from '../api';
 import { agentSpecs, type AgentSpec, type FieldSpec } from '../agentSpecs';
 import type { AgentInfo } from '../types';
+import type { TickerContext } from './TickerBar';
 
-export function AgentRunner() {
+interface AgentRunnerProps {
+  ticker?: TickerContext | null;
+}
+
+export function AgentRunner({ ticker }: AgentRunnerProps) {
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedAgent, setSelectedAgent] = useState('');
@@ -11,6 +16,7 @@ export function AgentRunner() {
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const [error, setError] = useState('');
+  const userEdited = useRef<Set<string>>(new Set());
 
   const initForm = useCallback((agentName: string) => {
     const spec = agentSpecs.find((s) => s.name === agentName);
@@ -20,6 +26,7 @@ export function AgentRunner() {
       defaults[field.name] = field.defaultValue ?? '';
     }
     setFormValues(defaults);
+    userEdited.current.clear();
   }, []);
 
   useEffect(() => {
@@ -40,6 +47,28 @@ export function AgentRunner() {
     setError('');
     initForm(name);
   };
+
+  // Auto-populate fields from ticker context (only untouched fields)
+  useEffect(() => {
+    if (!ticker?.summary || ticker.loading || !selectedAgent) return;
+    const sym = ticker.symbol;
+    const prefills: Record<string, Record<string, string>> = {
+      earnings_interpreter: { ticker: sym, ...(ticker.transcript?.available ? { transcript: ticker.transcript.transcript } : {}) },
+      filing_analyst: { ticker: sym },
+      thesis_guardian: { ticker: sym },
+      risk_analyst: {},
+      adversarial: { ticker: sym },
+    };
+    const fills = prefills[selectedAgent];
+    if (!fills) return;
+    setFormValues((prev) => {
+      const next = { ...prev };
+      for (const [k, v] of Object.entries(fills)) {
+        if (!userEdited.current.has(k)) next[k] = v;
+      }
+      return next;
+    });
+  }, [ticker, selectedAgent]);
 
   const currentSpec: AgentSpec | undefined = agentSpecs.find((s) => s.name === selectedAgent);
 
@@ -123,7 +152,7 @@ export function AgentRunner() {
               key={field.name}
               field={field}
               value={formValues[field.name] ?? ''}
-              onChange={(val) => setFormValues((prev) => ({ ...prev, [field.name]: val }))}
+              onChange={(val) => { userEdited.current.add(field.name); setFormValues((prev) => ({ ...prev, [field.name]: val })); }}
             />
           ))}
           <button

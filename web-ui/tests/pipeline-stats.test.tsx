@@ -92,12 +92,17 @@ describe('StatsDashboard', () => {
   it('refreshes stats on button click', async () => {
     render(<StatsDashboard />);
     await waitFor(() => {
-      expect(screen.getByTestId('stats-refresh')).toBeInTheDocument();
+      expect(screen.getByText('ok')).toBeInTheDocument();
     });
+
+    // Override health to return a different status on next fetch
+    server.use(
+      http.get('/api/health', () => HttpResponse.json({ status: 'degraded' }), { once: true }),
+    );
 
     fireEvent.click(screen.getByTestId('stats-refresh'));
     await waitFor(() => {
-      expect(screen.getByText('System Health')).toBeInTheDocument();
+      expect(screen.getByText('degraded')).toBeInTheDocument();
     });
   });
 

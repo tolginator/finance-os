@@ -22,7 +22,7 @@ export function TickerBar({ onTickerChange }: TickerBarProps) {
 
   const lookup = useCallback(async () => {
     const symbol = input.trim().toUpperCase();
-    if (!symbol) return;
+    if (!symbol || loading) return;
 
     const thisRequest = ++requestId.current;
 
@@ -63,7 +63,7 @@ export function TickerBar({ onTickerChange }: TickerBarProps) {
         setLoading(false);
       }
     }
-  }, [input, onTickerChange]);
+  }, [input, loading, onTickerChange]);
 
   return (
     <div data-testid="ticker-bar" style={{ padding: '1rem', background: '#f0f4ff', borderRadius: 8, marginBottom: '1rem' }}>

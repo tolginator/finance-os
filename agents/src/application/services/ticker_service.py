@@ -117,8 +117,15 @@ def _fetch_transcript_sync(symbol: str) -> TickerTranscript:
         # yfinance returns list of transcript dicts — take the latest
         if isinstance(transcripts, list) and transcripts:
             latest = transcripts[0]
-            text = latest if isinstance(latest, str) else str(latest.get("content", latest))
-            period = latest.get("period", "") if isinstance(latest, dict) else ""
+            if isinstance(latest, str):
+                text = latest
+                period = ""
+            elif isinstance(latest, dict):
+                text = str(latest.get("content", latest))
+                period = latest.get("period", "")
+            else:
+                text = str(latest)
+                period = ""
             return TickerTranscript(
                 symbol=symbol.upper(),
                 available=True,

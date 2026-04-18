@@ -140,8 +140,18 @@ export interface RunPipelineRequest {
   tasks: TaskDefinition[];
 }
 
+export interface PipelineTaskResult {
+  task_id: string;
+  agent_name: string;
+  success: boolean;
+  duration_ms: number;
+  content: string | null;
+  metadata: Record<string, unknown>;
+  error: string | null;
+}
+
 export interface RunPipelineResponse {
-  results: Record<string, unknown>[];
+  results: PipelineTaskResult[];
   total_duration_ms: number;
   successful: number;
   failed: number;

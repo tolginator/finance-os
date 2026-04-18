@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { agentSpecs } from '../agentSpecs';
 import { runPipeline } from '../api';
-import type { RunPipelineResponse } from '../types';
+import type { PipelineTaskResult, RunPipelineResponse } from '../types';
 
 /** Internal task state with required task_id (API type makes it optional). */
 interface PipelineTask {
@@ -115,26 +115,22 @@ export function PipelineRunner() {
           <p style={{ margin: '0 0 0.5rem', fontWeight: 500 }}>
             Pipeline complete — {result.successful} succeeded, {result.failed} failed ({result.total_duration_ms}ms)
           </p>
-          {result.results.map((r, i) => {
-            const task = r as Record<string, unknown>;
-            const success = typeof task.success === 'boolean' ? task.success : undefined;
-            const status = success === true ? 'success' : success === false ? 'failed' : 'unknown';
-            const taskId = typeof task.task_id === 'string' ? task.task_id : `Task ${i + 1}`;
-            const durationMs = typeof task.duration_ms === 'number' ? task.duration_ms : undefined;
-            const taskError = typeof task.error === 'string' ? task.error : undefined;
+          {result.results.map((r: PipelineTaskResult, i: number) => {
+            const status = r.success ? 'success' : 'failed';
+            const taskId = r.task_id ?? `Task ${i + 1}`;
 
             return (
               <div key={taskId} style={{ padding: '0.5rem', marginBottom: '0.25rem', background: '#f9fafb', borderRadius: 4, fontSize: '0.85rem' }}>
                 <strong>{taskId}</strong>
                 {' — '}
-                <span style={{ color: status === 'success' ? '#16a34a' : status === 'failed' ? '#ef4444' : '#6b7280' }}>
+                <span style={{ color: status === 'success' ? '#16a34a' : '#ef4444' }}>
                   {status}
                 </span>
-                {(durationMs !== undefined || taskError) && (
+                {(r.duration_ms !== undefined || r.error) && (
                   <div style={{ marginTop: '0.25rem', color: '#4b5563' }}>
-                    {durationMs !== undefined && <span>{durationMs}ms</span>}
-                    {durationMs !== undefined && taskError && ' — '}
-                    {taskError && <span>{taskError}</span>}
+                    {r.duration_ms !== undefined && <span>{r.duration_ms}ms</span>}
+                    {r.duration_ms !== undefined && r.error && ' — '}
+                    {r.error && <span>{r.error}</span>}
                   </div>
                 )}
               </div>

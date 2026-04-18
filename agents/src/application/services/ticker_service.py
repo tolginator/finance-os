@@ -20,6 +20,7 @@ _SUMMARY_TTL = 300  # 5 minutes
 _TRANSCRIPT_TTL = 3600  # 1 hour
 
 _cache: dict[str, tuple[float, object]] = {}
+_inflight: dict[str, asyncio.Future[object]] = {}
 
 
 def _cache_get(key: str, ttl: float) -> object | None:
@@ -110,25 +111,44 @@ def _fetch_transcript_sync(symbol: str) -> TickerTranscript:
         return TickerTranscript(symbol=symbol.upper(), available=False)
 
 
+async def _fetch_with_dedup(key: str, ttl: float, fetcher: object) -> object:
+    """Fetch with cache and in-flight request deduplication."""
+    cached = _cache_get(key, ttl)
+    if cached is not None:
+        return cached
+
+    # Deduplicate concurrent requests for the same key
+    if key in _inflight:
+        return await _inflight[key]
+
+    loop = asyncio.get_running_loop()
+    fut: asyncio.Future[object] = loop.create_future()
+    _inflight[key] = fut
+    try:
+        result = await asyncio.to_thread(fetcher)  # type: ignore[arg-type]
+        _cache_set(key, result)
+        fut.set_result(result)
+        return result
+    except Exception as exc:
+        fut.set_exception(exc)
+        raise
+    finally:
+        _inflight.pop(key, None)
+
+
 async def get_ticker_summary(symbol: str) -> TickerSummary:
     """Fetch company summary. Cached for 5 minutes."""
     key = f"summary:{symbol.upper()}"
-    cached = _cache_get(key, _SUMMARY_TTL)
-    if cached is not None:
-        return cached  # type: ignore[return-value]
-
-    result = await asyncio.to_thread(_fetch_summary_sync, symbol)
-    _cache_set(key, result)
-    return result
+    result = await _fetch_with_dedup(
+        key, _SUMMARY_TTL, lambda: _fetch_summary_sync(symbol)
+    )
+    return result  # type: ignore[return-value]
 
 
 async def get_ticker_transcript(symbol: str) -> TickerTranscript:
     """Fetch latest earnings transcript (best-effort). Cached for 1 hour."""
     key = f"transcript:{symbol.upper()}"
-    cached = _cache_get(key, _TRANSCRIPT_TTL)
-    if cached is not None:
-        return cached  # type: ignore[return-value]
-
-    result = await asyncio.to_thread(_fetch_transcript_sync, symbol)
-    _cache_set(key, result)
-    return result
+    result = await _fetch_with_dedup(
+        key, _TRANSCRIPT_TTL, lambda: _fetch_transcript_sync(symbol)
+    )
+    return result  # type: ignore[return-value]

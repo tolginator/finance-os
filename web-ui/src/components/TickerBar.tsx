@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { fetchTickerSummary, fetchTickerTranscript } from '../api';
 import type { TickerSummary, TickerTranscript } from '../types';
 
@@ -18,10 +18,13 @@ export function TickerBar({ onTickerChange }: TickerBarProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [summary, setSummary] = useState<TickerSummary | null>(null);
+  const requestId = useRef(0);
 
   const lookup = useCallback(async () => {
     const symbol = input.trim().toUpperCase();
     if (!symbol) return;
+
+    const thisRequest = ++requestId.current;
 
     setLoading(true);
     setError('');
@@ -33,14 +36,19 @@ export function TickerBar({ onTickerChange }: TickerBarProps) {
         fetchTickerSummary(symbol),
         fetchTickerTranscript(symbol),
       ]);
+      // Ignore stale responses from superseded requests
+      if (thisRequest !== requestId.current) return;
       setSummary(sum);
       onTickerChange({ symbol, summary: sum, transcript: tx, loading: false });
     } catch (err) {
+      if (thisRequest !== requestId.current) return;
       const msg = err instanceof Error ? err.message : 'Lookup failed';
       setError(msg);
       onTickerChange({ symbol, summary: null, transcript: null, loading: false });
     } finally {
-      setLoading(false);
+      if (thisRequest === requestId.current) {
+        setLoading(false);
+      }
     }
   }, [input, onTickerChange]);
 

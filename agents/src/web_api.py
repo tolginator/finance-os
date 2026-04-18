@@ -22,7 +22,7 @@ from functools import lru_cache
 from typing import Any
 
 import uvicorn
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Path, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -145,7 +145,9 @@ async def list_agents() -> list[dict[str, str]]:
 
 
 @app.get("/ticker/{symbol}/summary", response_model=TickerSummary)
-async def ticker_summary(symbol: str) -> Any:
+async def ticker_summary(
+    symbol: str = Path(..., pattern=r"^[A-Z0-9.\-]{1,10}$"),
+) -> Any:
     """Fetch company summary from Yahoo Finance."""
     from src.application.services.ticker_service import get_ticker_summary
 
@@ -153,7 +155,9 @@ async def ticker_summary(symbol: str) -> Any:
 
 
 @app.get("/ticker/{symbol}/transcript", response_model=TickerTranscript)
-async def ticker_transcript(symbol: str) -> Any:
+async def ticker_transcript(
+    symbol: str = Path(..., pattern=r"^[A-Z0-9.\-]{1,10}$"),
+) -> Any:
     """Fetch latest earnings transcript (best-effort)."""
     from src.application.services.ticker_service import get_ticker_transcript
 

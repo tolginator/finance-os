@@ -1,18 +1,20 @@
 # finance-os
 
-Personal Investment Intelligence OS — a modular, LLM-powered investing AI stack with agent orchestration, domain-tuned prompting, custom MCP tools, and deep integration with quant + NLP pipelines.
+Macro ETF Portfolio Intelligence — a modular, LLM-powered system for macroeconomic outlook-driven investment evaluation and goal-driven portfolio rebalancing.
 
-Not a chatbot. A **system**. The personal Bloomberg terminal + quant lab + research team.
+Built for a **wealthy family** ($2M–$10M investable assets): capital preservation with moderate growth, tax-efficient ETF portfolios, retirement readiness, and multi-generational wealth building. US-focused with global economy considerations.
+
+Not a stock picker. Not a chatbot. A **portfolio intelligence system**.
 
 ## Goals
 
-- **Automated research**: Ingest SEC filings, earnings transcripts, and macro data — extract signals, score sentiment, flag material changes
-- **Thesis monitoring**: Define investment theses with explicit assumptions — get alerts when assumptions weaken or break
-- **Risk analysis**: Scenario modeling, stress tests, tail-risk simulation, concentration analysis
-- **Adversarial challenge**: Every thesis gets systematically attacked before capital is deployed
-- **Quantitative signals**: Transform unstructured text into structured, timestamped, confidence-weighted quant features
-- **Multi-agent orchestration**: Agents collaborate and debate to produce consolidated research memos
-- **LLM-native**: Pluggable LLM gateway for direct inference (CLI, web) or delegate to host LLM (Copilot, Claude Desktop via MCP)
+- **Macro outlook**: Multi-dimensional regime classification (growth, rates, inflation, global trade) from FRED, BLS, Treasury, IMF, and World Bank data
+- **Portfolio evaluation**: Dimensioned health metrics — policy drift, concentration risk, macro alignment, liquidity adequacy, tax drag, scenario exposure
+- **Goal-driven rebalancing**: Retirement (3–4% SWR, capital preservation) and wealth building (growth tilt, accumulation) with custom goal support
+- **Scenario stress testing**: Historical scenarios (2008, 2022, stagflation, etc.) applied to your portfolio with loss estimates
+- **ETF taxonomy**: Look-through exposure analysis — asset class, sector, geography, duration breakdown
+- **Policy-first**: Macro tilts are bounded by your Investment Policy Statement — the system never overrides strategic allocation
+- **Credible data only**: Government and institutional sources. No social network data.
 
 ## Project Structure
 
@@ -21,22 +23,26 @@ finance-os/
 ├── mcp-server/          # TypeScript MCP server (data tools for LLMs)
 ├── agents/              # Python agent framework + application layer
 │   └── src/
-│       ├── agents/      # Domain agents (filing, earnings, macro, risk, etc.)
+│       ├── agents/      # Domain agents (macro, risk, outlook, evaluator, rebalancer)
 │       ├── core/        # BaseAgent, orchestrator, vector memory
 │       ├── application/ # Contracts, LLM gateway, services, config, registry
+│       │   └── services/
+│       │       ├── household_service.py   # Portfolio CRUD, import (CSV/QIF)
+│       │       ├── etf_taxonomy.py        # ETF → asset class mapping
+│       │       ├── ticker_service.py      # ETF summary lookup (Yahoo Finance)
+│       │       └── ...
 │       ├── cli/         # CLI entry points (finance-os command)
 │       ├── mcp_server.py # Python MCP server (finance-os-mcp command)
 │       ├── web_api.py   # FastAPI web server (finance-os-api command)
-│       └── pipelines/   # Research digest pipeline
+│       └── pipelines/   # Data ingestion pipelines
 ├── web-ui/              # React frontend (Vite + TypeScript)
 ├── prompts/             # Shared prompt library
 ├── docs/                # Architecture, agent, and tool documentation
 └── .github/             # CI, copilot instructions, skills, templates
 ```
 
-See [docs/architecture.md](docs/architecture.md) for the full system architecture, LLM gateway design, and data flow.
+See [docs/architecture.md](docs/architecture.md) for the full system architecture.
 See [docs/agents.md](docs/agents.md) for agent descriptions and the orchestration model.
-See [docs/tools.md](docs/tools.md) for MCP tool reference and how to add new tools.
 
 ## Getting Started
 
@@ -72,8 +78,8 @@ Create `~/.config/finance-os/config.json`:
 ```json
 {
   "fred_api_key": "your-fred-api-key",
+  "bls_api_key": "your-bls-api-key",
   "llm_provider": "skip",
-  "sec_edgar_email": "your-email@example.com",
   "azure": {
     "endpoint": "",
     "deployment": "",
@@ -86,15 +92,28 @@ Environment variables (`FINANCE_OS_*`) override config file values — use doubl
 
 | Field | Values | Description |
 |-------|--------|-------------|
-| `llm_provider` | `"skip"` (default), `"azure_openai"` | `skip` returns raw agent data without LLM synthesis — ideal for the MCP path where Copilot/Claude reasons over the output. `azure_openai` enables LLM synthesis via Azure OpenAI with Entra ID (OAuth2/OIDC) authentication — no API keys required. |
-| `azure.endpoint` | URL string | Azure OpenAI resource endpoint (e.g. `https://my-instance.openai.azure.com`). Required when provider is `"azure_openai"`. |
-| `azure.deployment` | Deployment name | Azure OpenAI model deployment name (e.g. `gpt-4.1-mini`). This is the deployment you created in Azure AI Studio. Required when provider is `"azure_openai"`. |
+| `llm_provider` | `"skip"` (default), `"azure_openai"` | `skip` returns raw agent data without LLM synthesis — ideal for the MCP path where Copilot/Claude reasons over the output. `azure_openai` enables LLM synthesis via Azure OpenAI. |
+| `azure.endpoint` | URL string | Azure OpenAI resource endpoint. Required when provider is `"azure_openai"`. |
+| `azure.deployment` | Deployment name | Azure OpenAI model deployment name. Required when provider is `"azure_openai"`. |
 | `azure.api_version` | API version string | Azure OpenAI API version. Default `"2024-10-21"`. |
 | `llm_temperature` | `0.0`–`2.0` | Sampling temperature for LLM calls. Default `0.0` (deterministic). |
-| `fred_api_key` | API key string | [FRED API](https://fred.stlouisfed.org/docs/api/api_key.html) key for the macro-regime agent. Free to obtain. |
-| `sec_edgar_email` | Email address | **Required for SEC API access.** SEC requires a valid contact email in request headers — set this to a real email you control. |
+| `fred_api_key` | API key string | [FRED API](https://fred.stlouisfed.org/docs/api/api_key.html) key for macro data. Free to obtain. |
+| `bls_api_key` | API key string | [BLS API](https://www.bls.gov/developers/) key for employment and CPI data. Free to obtain. |
 
-> **Azure authentication**: Uses `DefaultAzureCredential` which supports Azure CLI (`az login`), managed identity, workload identity, and environment credentials. No API keys are stored in config. Requires the `Cognitive Services OpenAI User` RBAC role on the Azure OpenAI resource. See the [Azure Deployment Guide](docs/azure-deployment.md) for step-by-step setup.
+> **Azure authentication**: Uses `DefaultAzureCredential` which supports Azure CLI (`az login`), managed identity, workload identity, and environment credentials. No API keys are stored in config.
+
+### Data Sources
+
+All data comes from credible government and institutional sources. **No social network data.**
+
+| Source | Data | Auth | Cost |
+|--------|------|------|------|
+| [FRED](https://fred.stlouisfed.org/) | GDP, employment, inflation, rates, spreads, sentiment, production | API key | Free |
+| [Yahoo Finance](https://finance.yahoo.com/) | ETF prices, holdings (best-effort), expense ratios, categories | None | Free |
+| [BLS](https://www.bls.gov/developers/) | Detailed CPI components, employment by sector, productivity | API key | Free |
+| [Treasury.gov](https://home.treasury.gov/data) | Yield curves, real yields, fiscal data, auction results | None | Free |
+| [IMF Data](https://data.imf.org/) | Global GDP forecasts, trade balances, exchange rates | None | Free |
+| [World Bank](https://data.worldbank.org/) | Development indicators, global growth trends | None | Free |
 
 ### Agent CLI
 
@@ -103,15 +122,12 @@ After installing the agents package (`pip install -e ".[dev]"`), the `finance-os
 ```bash
 finance-os list                                      # List available agents
 finance-os config                                    # Show current config
-finance-os run macro-regime                          # Run a single agent
-finance-os run filing-analyst --ticker AAPL           # With options
-finance-os pipeline --ticker AAPL                     # Multi-agent research pipeline
-finance-os digest --tickers AAPL,MSFT,GOOG            # Research digest
-finance-os --output json run macro-regime             # JSON output
-finance-os run adversarial --prompt "Bull case" --synthesize  # LLM synthesis
+finance-os run macro-regime                          # Classify macro regime
+finance-os run risk-analyst                          # Portfolio risk analysis
+finance-os run quant-signal                          # Generate macro signals
+finance-os pipeline --ticker VTI                     # Multi-agent research pipeline
+finance-os --output json run macro-regime            # JSON output
 ```
-
-Use `--synthesize` to pass agent output through the LLM gateway (requires a configured LLM provider). Use `--output json` for structured output.
 
 ### Python MCP Server
 
@@ -121,8 +137,6 @@ The Python MCP server exposes agents as tools for any MCP-compatible client (Cop
 finance-os-mcp              # via console script (stdio transport)
 python -m src.mcp_server    # direct invocation
 ```
-
-Tools available: `analyze_earnings`, `classify_macro`, `research_digest`, `orchestrate`. The `analyze_earnings` tool accepts a ticker symbol and auto-fetches the latest transcript from Yahoo Finance. See [docs/tools.md](docs/tools.md) for details.
 
 ### Web API
 
@@ -142,28 +156,19 @@ uvicorn src.web_api:app --reload            # development with auto-reload
 
 Once running, open http://127.0.0.1:8000/docs for interactive Swagger UI.
 
-**Endpoints:**
+**Current Endpoints:**
 
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/health` | Health check |
 | GET | `/agents` | List available agents |
-| GET | `/ticker/{symbol}/summary` | Fetch company summary from Yahoo Finance (cached 5 min) |
+| GET | `/ticker/{symbol}/summary` | Fetch ETF/company summary from Yahoo Finance (cached 5 min) |
 | GET | `/ticker/{symbol}/transcript` | Fetch latest earnings transcript (cached 1 hour) |
-| POST | `/agents/earnings_interpreter` | Analyze earnings transcripts (accepts ticker or transcript) |
-| POST | `/agents/macro_regime` | Classify macro regime |
-| POST | `/agents/filing_analyst` | Search SEC filings |
+| POST | `/agents/macro_regime` | Classify macro regime from FRED data |
 | POST | `/agents/quant_signal` | Generate quant signals |
-| POST | `/agents/thesis_guardian` | Evaluate investment theses |
 | POST | `/agents/risk_analyst` | Portfolio risk analysis |
-| POST | `/agents/adversarial` | Challenge thesis adversarially |
 | POST | `/pipeline` | Multi-agent research pipeline |
 | POST | `/digest` | Research digest for watchlist |
-| POST | `/kg/extract` | Extract entities/relationships into knowledge graph |
-| POST | `/kg/query/related` | Find entities related to a given entity |
-| POST | `/kg/query/supply-chain` | Trace supply chain from an entity |
-| POST | `/kg/query/shared-risks` | Find shared risks across entities |
-| GET | `/kg/stats` | Knowledge graph summary statistics |
 | GET | `/watchlists` | List all watchlists |
 | POST | `/watchlists` | Create a new watchlist |
 | GET | `/watchlists/{name}` | Get a specific watchlist |
@@ -171,25 +176,15 @@ Once running, open http://127.0.0.1:8000/docs for interactive Swagger UI.
 | DELETE | `/watchlists/{name}` | Delete a watchlist |
 | PUT | `/watchlists/{name}/activate` | Set a watchlist as active |
 
-**Example:**
+**Planned Endpoints (coming in Phases 1–4):**
 
-```bash
-# Health check
-curl http://127.0.0.1:8000/health
-
-# Look up a ticker
-curl http://127.0.0.1:8000/ticker/AAPL/summary
-
-# Run a research digest
-curl -X POST http://127.0.0.1:8000/digest \
-  -H "Content-Type: application/json" \
-  -d '{"tickers": ["AAPL", "MSFT"], "lookback_days": 7}'
-
-# Search SEC filings
-curl -X POST http://127.0.0.1:8000/agents/filing_analyst \
-  -H "Content-Type: application/json" \
-  -d '{"ticker": "AAPL", "form_type": "10-K"}'
-```
+| Method | Path | Description |
+|--------|------|-------------|
+| GET/POST | `/portfolio/*` | Household portfolio CRUD, import |
+| POST | `/agents/macro_outlook` | Forward-looking macro outlook with asset-class tilts |
+| POST | `/agents/portfolio_evaluator` | Dimensioned portfolio evaluation |
+| POST | `/agents/rebalance` | Goal-driven rebalancing recommendations |
+| GET | `/scenarios` | Scenario library for stress testing |
 
 ### Web UI
 
@@ -211,30 +206,6 @@ The dev server proxies `/api/*` requests to the backend at `http://127.0.0.1:800
 cd web-ui && npm run build    # outputs to web-ui/dist/
 ```
 
-**UI Features:**
-
-| Feature | Description |
-|---------|-------------|
-| **Ticker Bar** | Enter a ticker symbol to auto-discover company data from Yahoo Finance — name, sector, price, market cap, 52W range, earnings date, and latest transcript |
-| **Agent Runner** | Run any agent with a dynamic form. Fields auto-populate from ticker context (e.g. entering AAPL fills transcript and ticker fields automatically). Dirty-field tracking preserves manual edits. |
-| **Pipeline Runner** | Define and execute multi-agent pipelines with dependency ordering. Visualizes per-task results and overall duration. Detects dependency cycles before execution. |
-| **Knowledge Graph** | Extract entities and relationships from text, then query the graph — related entities, supply chain tracing, shared risk analysis. Displays entity/relationship counts by type. |
-| **Watchlists** | Create, switch, and manage named ticker watchlists. Active watchlist auto-loads into the digest panel. |
-| **Research Digest** | Run a multi-agent digest for your watchlist tickers. Configure lookback period. View materiality alerts and signal counts. |
-| **System Health** | Live API connectivity indicator, agent catalog, and knowledge graph statistics. |
-
-### Copilot Skills
-
-Copilot Skills (`.github/skills/`) teach Copilot how to use finance-os tools together for investment analysis workflows. They are auto-detected by Copilot in IDE and CLI.
-
-| Skill | Trigger | What it does |
-|-------|---------|-------------|
-| `earnings-analysis` | "analyze earnings for AAPL" | Run earnings interpreter, score sentiment, extract guidance |
-| `thesis-evaluation` | "challenge my bull thesis on MSFT" | Adversarial challenge + blind spots + conviction scoring |
-| `research-digest` | "daily briefing for my watchlist" | Auto-fetch filings, classify macro, generate alerts |
-| `risk-assessment` | "stress test my portfolio" | VaR, concentration, scenario analysis |
-| `macro-overview` | "what's the macro regime?" | FRED-based regime classification + implications |
-
 ### Preflight (run before every push)
 
 From the repo root:
@@ -245,6 +216,25 @@ npm run preflight
 
 This mirrors CI: build → unit test → lint (TypeScript), then ruff → unit pytest (Python). Integration tests run in CI only on pushes to `main`.
 
+## Asset Class Taxonomy
+
+The system uses a two-layer taxonomy for ETF classification:
+
+**Canonical** (for allocation decisions): US Equity, International Developed, Emerging Markets, US Treasuries, IG Corporate Bonds, High Yield, TIPS/Inflation-Linked, Real Assets (REITs/Commodities), Cash/Money Market
+
+**Diagnostic** (for deeper analysis): Large/Small cap, Value/Growth, Sector, Duration buckets, Credit quality, Currency exposure
+
+## Wealthy Family Persona
+
+The system is calibrated for a wealthy family, not an average household:
+
+- **$2M–$10M investable assets** — beyond basic financial planning, below institutional complexity
+- **Can retire anytime** — capital preservation priority, not accumulation-only
+- **3–4% safe withdrawal rate** — sustainable, inflation-adjusted spending
+- **Tax-efficiency matters** — account type awareness (taxable, IRA, Roth, 401k, HSA, Trust)
+- **Multi-generational** — wealth transfer considerations, not just single-lifetime planning
+- **Not lavish** — comfortable lifestyle maintenance, not luxury optimization
+
 ## Development
 
 ### Git Workflow
@@ -254,18 +244,6 @@ This mirrors CI: build → unit test → lint (TypeScript), then ruff → unit p
 - Branch naming: `<username>/<MeaningfulDescription>`
 - Every PR must have a corresponding issue created first
 - Run `npm run preflight` before pushing
-
-### Adding a New MCP Tool
-
-1. Create `mcp-server/src/tools/<name>.ts` exporting `registerXxxTool(server)`
-2. Register in `src/index.ts`
-3. Add tests in `mcp-server/tests/<name>.test.ts`
-
-### Adding a New Agent
-
-1. Create `agents/src/agents/<name>.py` extending `BaseAgent`
-2. Implement `run()` and `system_prompt` property
-3. Add tests in `agents/tests/test_<name>.py`
 
 ## License
 

@@ -20,7 +20,9 @@ export function PipelineRunner() {
     return { task_id: genTaskId(), agent_name: agentSpecs[0]?.name ?? '', prompt: '', kwargs: {}, depends_on: [] };
   }, [genTaskId]);
 
-  const [tasks, setTasks] = useState<PipelineTask[]>(() => [makeEmptyTask()]);
+  const [tasks, setTasks] = useState<PipelineTask[]>([
+    { task_id: 'task-0', agent_name: agentSpecs[0]?.name ?? '', prompt: '', kwargs: {}, depends_on: [] },
+  ]);
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<RunPipelineResponse | null>(null);
   const [error, setError] = useState('');

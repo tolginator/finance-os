@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 # Per-endpoint TTL caching (seconds)
 _SUMMARY_TTL = 300  # 5 minutes
 _TRANSCRIPT_TTL = 3600  # 1 hour
+_CACHE_MAX_SIZE = 500
 
 _cache: dict[str, tuple[float, object]] = {}
 _inflight: dict[str, asyncio.Future[object]] = {}
@@ -36,7 +37,17 @@ def _cache_get(key: str, ttl: float) -> object | None:
 
 
 def _cache_set(key: str, val: object) -> None:
+    if len(_cache) >= _CACHE_MAX_SIZE:
+        _cache_evict()
     _cache[key] = (time.monotonic(), val)
+
+
+def _cache_evict() -> None:
+    """Remove oldest entries to stay under max size."""
+    entries = sorted(_cache.items(), key=lambda e: e[1][0])
+    to_remove = len(_cache) - _CACHE_MAX_SIZE + _CACHE_MAX_SIZE // 4
+    for k, _ in entries[:max(to_remove, 1)]:
+        _cache.pop(k, None)
 
 
 def _safe_decimal(val: object) -> str:
@@ -94,8 +105,8 @@ def _fetch_summary_sync(symbol: str) -> TickerSummary:
 
 def _fetch_transcript_sync(symbol: str) -> TickerTranscript:
     """Synchronous earnings transcript fetch (best-effort, runs in thread)."""
-    ticker = yf.Ticker(symbol)
     try:
+        ticker = yf.Ticker(symbol)
         transcripts = getattr(ticker, "earnings_call_transcripts", None)
         if transcripts is not None and callable(transcripts):
             transcripts = transcripts()
@@ -139,7 +150,7 @@ async def _fetch_with_dedup(key: str, ttl: float, fetcher: object) -> object:
         result = await asyncio.to_thread(fetcher)  # type: ignore[arg-type]
         _cache_set(key, result)
         fut.set_result(result)
-        return result
+        return result.model_copy(deep=True)  # type: ignore[union-attr]
     except Exception as exc:
         fut.set_exception(exc)
         raise

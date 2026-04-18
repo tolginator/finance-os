@@ -56,6 +56,7 @@ async def analyze_earnings(transcript: str = "", ticker: str = "") -> dict[str, 
     if not transcript and ticker:
         from src.application.services.ticker_service import get_ticker_transcript
 
+        ticker = ticker.strip().upper()
         result = await get_ticker_transcript(ticker)
         if result.available:
             transcript = result.transcript

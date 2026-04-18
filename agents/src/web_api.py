@@ -177,13 +177,16 @@ async def analyze_earnings(request: AnalyzeEarningsRequest) -> Any:
     if not request.transcript and request.ticker:
         from src.application.services.ticker_service import get_ticker_transcript
 
-        result = await get_ticker_transcript(request.ticker)
+        normalized_ticker = request.ticker.strip().upper()
+        result = await get_ticker_transcript(normalized_ticker)
         if not result.available:
             raise ValueError(
-                f"No transcript available for {request.ticker}. "
+                f"No transcript available for {normalized_ticker}. "
                 "Provide transcript text directly."
             )
-        request = request.model_copy(update={"transcript": result.transcript})
+        request = request.model_copy(
+            update={"transcript": result.transcript, "ticker": normalized_ticker},
+        )
     if not request.transcript:
         raise ValueError("Provide either a transcript or a ticker symbol.")
     service = AgentService()

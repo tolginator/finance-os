@@ -108,6 +108,25 @@ class TestEarningsEndpoint:
         resp = client.post("/agents/earnings_interpreter", json={})
         assert resp.status_code == 400
 
+    @patch("src.application.services.ticker_service.get_ticker_transcript", new_callable=AsyncMock)
+    @patch("src.web_api.AgentService")
+    def test_analyze_earnings_ticker_only_auto_fetches(self, mock_cls, mock_tx, client):
+        mock_tx.return_value = MagicMock(available=True, transcript="Auto-fetched transcript")
+        mock_svc = mock_cls.return_value
+        mock_svc.analyze_earnings = AsyncMock(return_value=_mock_response(
+            AnalyzeEarningsResponse,
+            tone="positive", net_sentiment=0.7, confidence="high",
+            guidance_direction="raised", guidance_count=2, key_phrase_count=5,
+        ))
+        resp = client.post("/agents/earnings_interpreter", json={"ticker": "AAPL"})
+        assert resp.status_code == 200
+
+    @patch("src.application.services.ticker_service.get_ticker_transcript", new_callable=AsyncMock)
+    def test_analyze_earnings_ticker_no_transcript_available_400(self, mock_tx, client):
+        mock_tx.return_value = MagicMock(available=False, transcript="")
+        resp = client.post("/agents/earnings_interpreter", json={"ticker": "AAPL"})
+        assert resp.status_code == 400
+
 
 class TestMacroEndpoint:
     @patch("src.web_api.AgentService")

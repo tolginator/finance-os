@@ -26,7 +26,7 @@ export const agentSpecs: AgentSpec[] = [
     description: 'Analyze earnings call transcripts for tone, sentiment, and guidance.',
     endpoint: '/agents/earnings_interpreter',
     fields: [
-      { name: 'transcript', label: 'Transcript', type: 'textarea', required: true, placeholder: 'Paste earnings call transcript...' },
+      { name: 'transcript', label: 'Transcript', type: 'textarea', placeholder: 'Paste earnings call transcript… or enter a ticker above to auto-fetch' },
       { name: 'ticker', label: 'Ticker', type: 'text', placeholder: 'AAPL' },
     ],
     responseFields: ['tone', 'net_sentiment', 'confidence', 'guidance_direction', 'guidance_count', 'key_phrase_count'],

@@ -37,7 +37,7 @@ describe('AgentRunner', () => {
     });
 
     // earnings_interpreter is the first agent in mock — its spec has transcript and ticker fields
-    expect(screen.getByText('Transcript *')).toBeInTheDocument();
+    expect(screen.getByText('Transcript')).toBeInTheDocument();
   });
 
   it('switches form when selecting different agent', async () => {
@@ -127,7 +127,7 @@ describe('AgentRunner', () => {
     await waitFor(() => {
       expect(screen.getByTestId('agent-select')).toBeInTheDocument();
     });
-    const transcriptInput = screen.getByPlaceholderText('Paste earnings call transcript...');
+    const transcriptInput = screen.getByPlaceholderText(/Paste earnings call transcript/);
     fireEvent.change(transcriptInput, { target: { value: 'Some transcript' } });
     fireEvent.click(screen.getByText('Run Agent'));
 
@@ -145,8 +145,8 @@ describe('AgentRunner', () => {
       expect(screen.getByTestId('agent-select')).toBeInTheDocument();
     });
 
-    // Fill required transcript field before running
-    const transcriptInput = screen.getByPlaceholderText('Paste earnings call transcript...');
+    // Fill transcript field before running
+    const transcriptInput = screen.getByPlaceholderText(/Paste earnings call transcript/);
     fireEvent.change(transcriptInput, { target: { value: 'Q1 results strong' } });
     fireEvent.click(screen.getByText('Run Agent'));
     await waitFor(() => {

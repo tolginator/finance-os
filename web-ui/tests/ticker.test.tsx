@@ -56,7 +56,7 @@ describe('TickerBar', () => {
 
     // The earnings_interpreter form should have ticker pre-filled
     // (earnings_interpreter is the default agent)
-    const transcriptField = screen.getByPlaceholderText('Paste earnings call transcript...');
+    const transcriptField = screen.getByPlaceholderText(/Paste earnings call transcript/);
     await waitFor(() => {
       expect((transcriptField as HTMLTextAreaElement).value).toContain('earnings call transcript for AAPL');
     });

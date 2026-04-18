@@ -9,7 +9,7 @@ export function StatsDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const refresh = useCallback(async () => {
+  const doRefresh = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
@@ -28,7 +28,22 @@ export function StatsDashboard() {
     }
   }, []);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const [h, a, kg] = await Promise.all([fetchHealth(), fetchAgents(), fetchKGStats()]);
+        if (!cancelled) { setHealth(h); setAgents(a); setKgStats(kg); }
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load stats');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   if (loading) return <p data-testid="stats-loading" style={{ color: '#6b7280' }}>Loading stats…</p>;
 
@@ -80,7 +95,7 @@ export function StatsDashboard() {
 
       <div style={{ gridColumn: '1 / -1', textAlign: 'right' }}>
         <button
-          onClick={refresh}
+          onClick={doRefresh}
           data-testid="stats-refresh"
           style={{ padding: '0.4rem 0.75rem', borderRadius: 6, border: '1px solid #d1d5db', background: 'white', cursor: 'pointer' }}
         >

@@ -10,19 +10,19 @@ describe('PipelineRunner', () => {
     render(<PipelineRunner />);
     expect(screen.getByText('Run Pipeline')).toBeInTheDocument();
     expect(screen.getByText('+ Add Task')).toBeInTheDocument();
-    expect(screen.getByText('task-1')).toBeInTheDocument();
+    expect(screen.getByText('task-0')).toBeInTheDocument();
   });
 
   it('adds and removes tasks', () => {
     render(<PipelineRunner />);
     fireEvent.click(screen.getByText('+ Add Task'));
-    // task-2 appears as its own label and as a depends_on option for task-1
-    expect(screen.getAllByText('task-2').length).toBeGreaterThanOrEqual(1);
+    // task-1 appears as its own label and as a depends_on option for task-0
+    expect(screen.getAllByText('task-1').length).toBeGreaterThanOrEqual(1);
 
     // Remove second task
-    fireEvent.click(screen.getByLabelText('Remove task-2'));
-    // Only the label should be gone; task-1's depends_on no longer lists it
-    expect(screen.queryAllByText('task-2')).toHaveLength(0);
+    fireEvent.click(screen.getByLabelText('Remove task-1'));
+    // Only the label should be gone; task-0's depends_on no longer lists it
+    expect(screen.queryAllByText('task-1')).toHaveLength(0);
   });
 
   it('runs pipeline and shows results', async () => {
@@ -57,16 +57,16 @@ describe('PipelineRunner', () => {
 
     // Get the multi-select elements (depends_on for each task)
     const allSelects = screen.getAllByRole('listbox') as HTMLSelectElement[];
-    // allSelects[0] = task-1's depends_on (has option for task-2)
-    // allSelects[1] = task-2's depends_on (has option for task-1)
+    // allSelects[0] = task-0's depends_on (has option for task-1)
+    // allSelects[1] = task-1's depends_on (has option for task-0)
 
-    // Select task-2 as dependency of task-1
-    const opt1 = allSelects[0].options[0]; // task-2
+    // Select task-1 as dependency of task-0
+    const opt1 = allSelects[0].options[0]; // task-1
     opt1.selected = true;
     fireEvent.change(allSelects[0]);
 
-    // Select task-1 as dependency of task-2
-    const opt2 = allSelects[1].options[0]; // task-1
+    // Select task-0 as dependency of task-1
+    const opt2 = allSelects[1].options[0]; // task-0
     opt2.selected = true;
     fireEvent.change(allSelects[1]);
 

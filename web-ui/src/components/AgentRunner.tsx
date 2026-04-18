@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { fetchAgents, postJson } from '../api';
 import { agentSpecs, type AgentSpec, type FieldSpec } from '../agentSpecs';
 import type { AgentInfo } from '../types';
@@ -12,6 +12,16 @@ export function AgentRunner() {
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const [error, setError] = useState('');
 
+  const initForm = useCallback((agentName: string) => {
+    const spec = agentSpecs.find((s) => s.name === agentName);
+    if (!spec) { setFormValues({}); return; }
+    const defaults: Record<string, string> = {};
+    for (const field of spec.fields) {
+      defaults[field.name] = field.defaultValue ?? '';
+    }
+    setFormValues(defaults);
+  }, []);
+
   useEffect(() => {
     fetchAgents()
       .then((list) => {
@@ -22,17 +32,7 @@ export function AgentRunner() {
       })
       .catch(() => setError('Failed to load agents'))
       .finally(() => setLoading(false));
-  }, []);
-
-  const initForm = (agentName: string) => {
-    const spec = agentSpecs.find((s) => s.name === agentName);
-    if (!spec) { setFormValues({}); return; }
-    const defaults: Record<string, string> = {};
-    for (const field of spec.fields) {
-      defaults[field.name] = field.defaultValue ?? '';
-    }
-    setFormValues(defaults);
-  };
+  }, [initForm]);
 
   const handleAgentChange = (name: string) => {
     setSelectedAgent(name);

@@ -32,7 +32,24 @@ export function WatchlistSelector({ onWatchlistChange, activeTickers }: Watchlis
     }
   }, [onWatchlistChange]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const resp = await fetchWatchlists();
+        if (cancelled) return;
+        setError('');
+        setData(resp);
+        onWatchlistChange(resp.active, resp.active_watchlist.tickers);
+      } catch {
+        if (cancelled) return;
+        setError('');
+        setData(DEFAULT_DATA);
+        onWatchlistChange(DEFAULT_DATA.active, DEFAULT_DATA.active_watchlist.tickers);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [onWatchlistChange]);
 
   const handleSwitch = async (name: string) => {
     try {

@@ -51,35 +51,45 @@ def _safe_decimal(val: object) -> str:
 
 def _fetch_summary_sync(symbol: str) -> TickerSummary:
     """Synchronous Yahoo Finance summary fetch (runs in thread)."""
-    ticker = yf.Ticker(symbol)
-    info = ticker.info or {}
+    normalized = symbol.upper()
+    try:
+        ticker = yf.Ticker(symbol)
+        info = ticker.info or {}
 
-    name = info.get("longName") or info.get("shortName") or symbol
-    earnings_date = ""
-    cal = getattr(ticker, "calendar", None)
-    if isinstance(cal, dict) and "Earnings Date" in cal:
-        dates = cal["Earnings Date"]
-        if isinstance(dates, list) and dates:
-            earnings_date = str(dates[0])
-        elif dates:
-            earnings_date = str(dates)
+        name = info.get("longName") or info.get("shortName") or normalized
+        earnings_date = ""
+        cal = getattr(ticker, "calendar", None)
+        if isinstance(cal, dict) and "Earnings Date" in cal:
+            dates = cal["Earnings Date"]
+            if isinstance(dates, list) and dates:
+                earnings_date = str(dates[0])
+            elif dates:
+                earnings_date = str(dates)
 
-    return TickerSummary(
-        symbol=symbol.upper(),
-        name=name,
-        sector=info.get("sector", ""),
-        industry=info.get("industry", ""),
-        market_cap=_safe_decimal(info.get("marketCap")),
-        currency=info.get("currency", "USD"),
-        current_price=_safe_decimal(
-            info.get("currentPrice") or info.get("regularMarketPrice")
-        ),
-        previous_close=_safe_decimal(info.get("previousClose")),
-        fifty_two_week_high=_safe_decimal(info.get("fiftyTwoWeekHigh")),
-        fifty_two_week_low=_safe_decimal(info.get("fiftyTwoWeekLow")),
-        earnings_date=earnings_date,
-        description=info.get("longBusinessSummary", ""),
-    )
+        return TickerSummary(
+            symbol=normalized,
+            name=name,
+            sector=info.get("sector", ""),
+            industry=info.get("industry", ""),
+            market_cap=_safe_decimal(info.get("marketCap")),
+            currency=info.get("currency", "USD"),
+            current_price=_safe_decimal(
+                info.get("currentPrice") or info.get("regularMarketPrice")
+            ),
+            previous_close=_safe_decimal(info.get("previousClose")),
+            fifty_two_week_high=_safe_decimal(info.get("fiftyTwoWeekHigh")),
+            fifty_two_week_low=_safe_decimal(info.get("fiftyTwoWeekLow")),
+            earnings_date=earnings_date,
+            description=info.get("longBusinessSummary", ""),
+        )
+    except Exception:
+        logger.warning("Summary fetch failed for %s", symbol, exc_info=True)
+        return TickerSummary(
+            symbol=normalized, name=normalized, sector="", industry="",
+            market_cap="", currency="USD", current_price="",
+            previous_close="", fifty_two_week_high="", fifty_two_week_low="",
+            earnings_date="", description="",
+        )
 
 
 def _fetch_transcript_sync(symbol: str) -> TickerTranscript:
@@ -115,11 +125,12 @@ async def _fetch_with_dedup(key: str, ttl: float, fetcher: object) -> object:
     """Fetch with cache and in-flight request deduplication."""
     cached = _cache_get(key, ttl)
     if cached is not None:
-        return cached
+        return cached.model_copy(deep=True)  # type: ignore[union-attr]
 
     # Deduplicate concurrent requests for the same key
     if key in _inflight:
-        return await _inflight[key]
+        result = await _inflight[key]
+        return result.model_copy(deep=True)  # type: ignore[union-attr]
 
     loop = asyncio.get_running_loop()
     fut: asyncio.Future[object] = loop.create_future()

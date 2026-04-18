@@ -32,13 +32,26 @@ export function TickerBar({ onTickerChange }: TickerBarProps) {
     onTickerChange({ symbol, summary: null, transcript: null, loading: true });
 
     try {
-      const [sum, tx] = await Promise.all([
+      const [summaryResult, transcriptResult] = await Promise.allSettled([
         fetchTickerSummary(symbol),
         fetchTickerTranscript(symbol),
       ]);
-      // Ignore stale responses from superseded requests
       if (thisRequest !== requestId.current) return;
+
+      if (summaryResult.status === 'rejected') {
+        const msg = summaryResult.reason instanceof Error ? summaryResult.reason.message : 'Lookup failed';
+        setError(msg);
+        onTickerChange({ symbol, summary: null, transcript: null, loading: false });
+        return;
+      }
+
+      const sum = summaryResult.value;
+      const tx = transcriptResult.status === 'fulfilled' ? transcriptResult.value : null;
+
       setSummary(sum);
+      if (transcriptResult.status === 'rejected') {
+        setError(transcriptResult.reason instanceof Error ? transcriptResult.reason.message : 'Transcript unavailable');
+      }
       onTickerChange({ symbol, summary: sum, transcript: tx, loading: false });
     } catch (err) {
       if (thisRequest !== requestId.current) return;
@@ -83,7 +96,7 @@ export function TickerBar({ onTickerChange }: TickerBarProps) {
           <div>Sector: {summary.sector || '—'}</div>
           <div>Industry: {summary.industry || '—'}</div>
           <div>Price: {summary.current_price ? `${summary.currency} ${summary.current_price}` : '—'}</div>
-          <div>Market Cap: {summary.market_cap ? formatMarketCap(summary.market_cap) : '—'}</div>
+          <div>Market Cap: {summary.market_cap ? formatMarketCap(summary.market_cap, summary.currency) : '—'}</div>
           <div>52W Range: {summary.fifty_two_week_low && summary.fifty_two_week_high ? `${summary.fifty_two_week_low} – ${summary.fifty_two_week_high}` : '—'}</div>
           {summary.earnings_date && <div>Next Earnings: {summary.earnings_date}</div>}
         </div>
@@ -98,11 +111,12 @@ export function TickerBar({ onTickerChange }: TickerBarProps) {
   );
 }
 
-function formatMarketCap(val: string): string {
+function formatMarketCap(val: string, currency?: string): string {
   const num = Number(val);
   if (!Number.isFinite(num)) return val;
-  if (num >= 1e12) return `$${(num / 1e12).toFixed(1)}T`;
-  if (num >= 1e9) return `$${(num / 1e9).toFixed(1)}B`;
-  if (num >= 1e6) return `$${(num / 1e6).toFixed(0)}M`;
-  return `$${num.toLocaleString()}`;
+  const prefix = currency || '$';
+  if (num >= 1e12) return `${prefix} ${(num / 1e12).toFixed(1)}T`;
+  if (num >= 1e9) return `${prefix} ${(num / 1e9).toFixed(1)}B`;
+  if (num >= 1e6) return `${prefix} ${(num / 1e6).toFixed(0)}M`;
+  return `${prefix} ${num.toLocaleString()}`;
 }

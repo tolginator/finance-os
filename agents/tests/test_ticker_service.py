@@ -77,7 +77,8 @@ class TestGetTickerSummary:
         result1 = await get_ticker_summary("AAPL")
         result2 = await get_ticker_summary("AAPL")
 
-        assert result1 is result2
+        assert result1 is not result2  # defensive copy
+        assert result1 == result2
         assert mock_yf_ticker.call_count == 1
 
     @patch("src.application.services.ticker_service.yf.Ticker")
@@ -145,5 +146,6 @@ class TestGetTickerTranscript:
         result1 = await get_ticker_transcript("AAPL")
         result2 = await get_ticker_transcript("AAPL")
 
-        assert result1 is result2
+        assert result1 is not result2  # defensive copy
+        assert result1 == result2
         assert mock_yf_ticker.call_count == 1

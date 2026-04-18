@@ -146,22 +146,22 @@ async def list_agents() -> list[dict[str, str]]:
 
 @app.get("/ticker/{symbol}/summary", response_model=TickerSummary)
 async def ticker_summary(
-    symbol: str = Path(..., pattern=r"^[A-Z0-9.\-]{1,10}$"),
+    symbol: str = Path(..., pattern=r"^[A-Za-z0-9.\-]{1,10}$"),
 ) -> Any:
     """Fetch company summary from Yahoo Finance."""
     from src.application.services.ticker_service import get_ticker_summary
 
-    return await get_ticker_summary(symbol)
+    return await get_ticker_summary(symbol.upper())
 
 
 @app.get("/ticker/{symbol}/transcript", response_model=TickerTranscript)
 async def ticker_transcript(
-    symbol: str = Path(..., pattern=r"^[A-Z0-9.\-]{1,10}$"),
+    symbol: str = Path(..., pattern=r"^[A-Za-z0-9.\-]{1,10}$"),
 ) -> Any:
     """Fetch latest earnings transcript (best-effort)."""
     from src.application.services.ticker_service import get_ticker_transcript
 
-    return await get_ticker_transcript(symbol)
+    return await get_ticker_transcript(symbol.upper())
 
 
 # --- Agent Endpoints ---

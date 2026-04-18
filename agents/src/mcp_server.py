@@ -59,6 +59,9 @@ async def analyze_earnings(transcript: str = "", ticker: str = "") -> dict[str, 
         result = await get_ticker_transcript(ticker)
         if result.available:
             transcript = result.transcript
+        else:
+            msg = f"No earnings transcript found for ticker '{ticker}'."
+            raise ValueError(msg)
     if not transcript:
         msg = "Provide either a transcript or a ticker symbol."
         raise ValueError(msg)

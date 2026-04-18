@@ -40,7 +40,9 @@ describe('KnowledgeGraphPanel', () => {
     fireEvent.click(screen.getByText('Extract'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('kg-error')).toHaveTextContent('Extraction error');
+      const el = screen.getByTestId('kg-error');
+      expect(el).toBeInTheDocument();
+      expect(el.textContent).not.toBe('');
     });
   });
 

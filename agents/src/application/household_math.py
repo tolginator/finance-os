@@ -96,7 +96,7 @@ def unique_tickers(household: Household) -> set[str]:
 
 
 def has_complete_lots(household: Household) -> bool:
-    """True if all lots have non-zero cost basis and a meaningful date.
+    """True if all lots have non-zero cost basis.
 
     Used to gate tax-lot-dependent features (tax drag, TLH).
     """

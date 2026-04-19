@@ -199,6 +199,19 @@ class HouseholdService:
                 accounts_map[acct_name] = Account(
                     name=acct_name, account_type=acct_type
                 )
+            else:
+                existing = accounts_map[acct_name]
+                if existing.account_type != acct_type:
+                    warnings.append(
+                        ImportWarning(
+                            line=line_num,
+                            message=(
+                                f"Account '{acct_name}' has conflicting types: "
+                                f"'{existing.account_type}' vs '{acct_type}' — skipping row"
+                            ),
+                        )
+                    )
+                    continue
 
             account = accounts_map[acct_name]
 
@@ -260,14 +273,22 @@ class HouseholdService:
                         )
                         continue
 
-                account.tax_lots.append(
-                    TaxLot(
-                        ticker=ticker,
-                        shares=shares,
-                        cost_basis_per_share=basis,
-                        purchase_date=pdate,
+                try:
+                    account.tax_lots.append(
+                        TaxLot(
+                            ticker=ticker,
+                            shares=shares,
+                            cost_basis_per_share=basis,
+                            purchase_date=pdate,
+                        )
                     )
-                )
+                except ValidationError as exc:
+                    warnings.append(
+                        ImportWarning(
+                            line=line_num,
+                            message=f"Invalid lot data: {exc.errors()[0]['msg']}",
+                        )
+                    )
 
             elif record_type == "cash":
                 amount_raw = row.get("amount", "").strip()
@@ -308,15 +329,23 @@ class HouseholdService:
 
                 mm_ticker = row.get("ticker", "").strip().upper() or None
 
-                account.cash_holdings.append(
-                    CashHolding(
-                        amount=amount,
-                        valuation_date=val_date,
-                        is_money_market=is_mm,
-                        ticker=mm_ticker if is_mm else None,
-                        counts_toward_liquidity_reserve=counts_liq,
+                try:
+                    account.cash_holdings.append(
+                        CashHolding(
+                            amount=amount,
+                            valuation_date=val_date,
+                            is_money_market=is_mm,
+                            ticker=mm_ticker if is_mm else None,
+                            counts_toward_liquidity_reserve=counts_liq,
+                        )
                     )
-                )
+                except ValidationError as exc:
+                    warnings.append(
+                        ImportWarning(
+                            line=line_num,
+                            message=f"Invalid cash data: {exc.errors()[0]['msg']}",
+                        )
+                    )
             else:
                 warnings.append(
                     ImportWarning(

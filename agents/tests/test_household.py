@@ -207,13 +207,23 @@ class TestCashFlowAssumption:
         )
         assert cf.inflation_adjusted is True  # default
 
-    def test_invalid_year_range(self) -> None:
+    def test_start_year_below_minimum(self) -> None:
         with pytest.raises(ValidationError):
             CashFlowAssumption(
                 description="Bad year",
                 amount_annual=Decimal("1000"),
                 flow_type=CashFlowType.WITHDRAWAL,
                 start_year=1990,
+            )
+
+    def test_end_year_before_start_year(self) -> None:
+        with pytest.raises(ValidationError):
+            CashFlowAssumption(
+                description="Bad range",
+                amount_annual=Decimal("1000"),
+                flow_type=CashFlowType.WITHDRAWAL,
+                start_year=2030,
+                end_year=2025,
             )
 
 
@@ -582,13 +592,6 @@ class TestCSVImport:
             account_name,account_type,record_type,ticker,shares,cost_basis_per_share,purchase_date,amount,valuation_date,is_money_market,counts_toward_liquidity_reserve
             Taxable,taxable,lot,VTI,100,200.50,2023-01-15,,,,
             Taxable,taxable,lot,VXUS,50,55.00,2023-03-01,,,,
-            Taxable,taxable,cash,,,,,,2024-01-01,,true
-        """).replace(",,,,,2024-01-01,,true", ",,,,25000,2024-01-01,false,true")
-        # Fix the cash row properly
-        csv = textwrap.dedent("""\
-            account_name,account_type,record_type,ticker,shares,cost_basis_per_share,purchase_date,amount,valuation_date,is_money_market,counts_toward_liquidity_reserve
-            Taxable,taxable,lot,VTI,100,200.50,2023-01-15,,,,
-            Taxable,taxable,lot,VXUS,50,55.00,2023-03-01,,,,
             Taxable,taxable,cash,,,,,,25000,2024-01-01,false,true
         """)
         result = service.preview_csv_import(ImportPreviewRequest(csv_content=csv))
@@ -655,3 +658,24 @@ class TestCSVImport:
         result = service.preview_csv_import(ImportPreviewRequest(csv_content=csv))
         assert len(result.accounts[0].tax_lots) == 0
         assert any("Invalid shares" in w.message for w in result.warnings)
+
+    def test_conflicting_account_type_warns(self, service: HouseholdService) -> None:
+        csv = textwrap.dedent("""\
+            account_name,account_type,record_type,ticker,shares,cost_basis_per_share,purchase_date
+            Mixed,taxable,lot,VTI,100,200,2023-01-01
+            Mixed,roth_ira,lot,VXUS,50,55,2023-06-01
+        """)
+        result = service.preview_csv_import(ImportPreviewRequest(csv_content=csv))
+        assert any("conflicting types" in w.message for w in result.warnings)
+        # Second row skipped, only 1 lot from first row
+        assert len(result.accounts) == 1
+        assert len(result.accounts[0].tax_lots) == 1
+
+    def test_negative_shares_warns(self, service: HouseholdService) -> None:
+        csv = textwrap.dedent("""\
+            account_name,account_type,record_type,ticker,shares,cost_basis_per_share,purchase_date
+            Taxable,taxable,lot,VTI,-10,200,2023-01-01
+        """)
+        result = service.preview_csv_import(ImportPreviewRequest(csv_content=csv))
+        assert any("Invalid lot data" in w.message for w in result.warnings)
+        assert len(result.accounts[0].tax_lots) == 0

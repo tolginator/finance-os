@@ -11,7 +11,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from enum import StrEnum
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 # ---------------------------------------------------------------------------
 # Enums
@@ -123,6 +123,17 @@ class CashFlowAssumption(BaseModel):
         default=True,
         description="Whether this amount grows with inflation in simulations",
     )
+
+    @model_validator(mode="after")
+    def _check_year_range(self) -> "CashFlowAssumption":
+        if (
+            self.start_year is not None
+            and self.end_year is not None
+            and self.end_year < self.start_year
+        ):
+            msg = f"end_year ({self.end_year}) must be >= start_year ({self.start_year})"
+            raise ValueError(msg)
+        return self
 
 
 # ---------------------------------------------------------------------------

@@ -72,6 +72,7 @@ class AppConfig(BaseSettings):
     llm_default_model: str = "gpt-4o"
     llm_temperature: float = 0.0
     fred_api_key: str = ""
+    bls_api_key: str = ""
     sec_edgar_email: str = ""
     azure: AzureOpenAIConfig = AzureOpenAIConfig()
 

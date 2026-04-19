@@ -7,6 +7,7 @@ Extracts the FRED fetching logic that was previously inline in
 import json
 import logging
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import UTC, date, datetime
 from decimal import Decimal, InvalidOperation
@@ -136,14 +137,14 @@ class FREDService:
         self, series_id: str, limit: int
     ) -> list[dict[str, str]]:
         """Raw HTTP fetch from FRED API."""
-        url = (
-            f"{FRED_BASE_URL}"
-            f"?series_id={series_id}"
-            f"&api_key={self._api_key}"
-            f"&file_type=json"
-            f"&sort_order=desc"
-            f"&limit={limit}"
-        )
+        params = urllib.parse.urlencode({
+            "series_id": series_id,
+            "api_key": self._api_key,
+            "file_type": "json",
+            "sort_order": "desc",
+            "limit": str(limit),
+        })
+        url = f"{FRED_BASE_URL}?{params}"
         req = urllib.request.Request(
             url, headers={"User-Agent": "finance-os/0.1.0"}
         )

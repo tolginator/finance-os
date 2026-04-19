@@ -1,8 +1,8 @@
 """Tests for data services — base types and TTL cache."""
 
-import time
 from datetime import UTC, date, datetime
 from decimal import Decimal
+from unittest.mock import patch
 
 from src.application.data_services.base import (
     DataReading,
@@ -94,18 +94,22 @@ class TestTTLCache:
         assert cache.get("missing") is None
 
     def test_expired_entry_returns_none(self) -> None:
-        cache = TTLCache(default_ttl=0.01)
-        cache.put("k", _sample_response())
-        time.sleep(0.02)
-        assert cache.get("k") is None
+        _mono = "src.application.data_services.base.time.monotonic"
+        with patch(_mono, return_value=1000.0):
+            cache = TTLCache(default_ttl=10.0)
+            cache.put("k", _sample_response())
+        with patch(_mono, return_value=1011.0):
+            assert cache.get("k") is None
 
     def test_custom_ttl_per_entry(self) -> None:
-        cache = TTLCache(default_ttl=0.01)
-        cache.put("short", _sample_response(), ttl=0.01)
-        cache.put("long", _sample_response("LONG"), ttl=60.0)
-        time.sleep(0.02)
-        assert cache.get("short") is None
-        assert cache.get("long") is not None
+        _mono = "src.application.data_services.base.time.monotonic"
+        with patch(_mono, return_value=1000.0):
+            cache = TTLCache(default_ttl=10.0)
+            cache.put("short", _sample_response(), ttl=5.0)
+            cache.put("long", _sample_response("LONG"), ttl=60.0)
+        with patch(_mono, return_value=1006.0):
+            assert cache.get("short") is None
+            assert cache.get("long") is not None
 
     def test_invalidate(self) -> None:
         cache = TTLCache()

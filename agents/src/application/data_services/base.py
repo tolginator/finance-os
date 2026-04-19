@@ -101,7 +101,7 @@ class TTLCache:
         if entry is None:
             return None
         if time.monotonic() > entry.expires_at:
-            del self._store[key]
+            self._store.pop(key, None)
             return None
         # Mark as served from cache
         resp = entry.response.model_copy(
@@ -117,7 +117,9 @@ class TTLCache:
         self, key: str, response: DataResponse, ttl: float | None = None
     ) -> None:
         """Store a response with TTL."""
-        self._store[key] = _CacheEntry(response, ttl or self._default_ttl)
+        self._store[key] = _CacheEntry(
+            response, self._default_ttl if ttl is None else ttl
+        )
 
     def invalidate(self, key: str) -> None:
         """Remove a specific key."""

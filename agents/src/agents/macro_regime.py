@@ -243,6 +243,7 @@ class MacroRegimeAgent(BaseAgent):
             ),
         )
         self._fred_api_key = fred_api_key
+        self._fred_service: FREDService | None = None
 
     @property
     def system_prompt(self) -> str:
@@ -301,7 +302,11 @@ class MacroRegimeAgent(BaseAgent):
                 metadata={"error": "missing_api_key"},
             )
 
-        service = FREDService(api_key=str(api_key))
+        # Reuse or create FREDService (preserves cache across calls)
+        if self._fred_service is None or str(api_key) != self._fred_api_key:
+            self._fred_api_key = str(api_key)
+            self._fred_service = FREDService(api_key=str(api_key))
+        service = self._fred_service
         responses = service.fetch_multiple(indicator_ids, limit=12)
 
         # Convert DataReading → IndicatorReading for classify/format

@@ -49,6 +49,13 @@ from src.application.contracts.agents import (
     SearchFilingsRequest,
     SearchFilingsResponse,
 )
+from src.application.contracts.household import (
+    GetHouseholdResponse,
+    ImportPreviewRequest,
+    ImportPreviewResponse,
+    UpdateHouseholdRequest,
+    UpdateHouseholdResponse,
+)
 from src.application.contracts.knowledge_graph import (
     ExtractEntitiesRequest,
     ExtractEntitiesResponse,
@@ -64,6 +71,11 @@ from src.application.contracts.ticker import TickerSummary, TickerTranscript
 from src.application.registry import AGENT_CATALOG, create_pipeline_service
 from src.application.services.agent_service import AgentService
 from src.application.services.digest_service import DigestService
+from src.application.services.household_service import (
+    HouseholdCorruptError,
+    HouseholdService,
+    StaleRevisionError,
+)
 from src.application.services.kg_service import KnowledgeGraphService
 from src.application.watchlists import WatchlistNotFoundError, WatchlistStore
 from src.core.knowledge_graph import KnowledgeGraph
@@ -91,6 +103,9 @@ _kg_lock = asyncio.Lock()
 
 # Process-level watchlist store (persists to ~/.config/finance-os/watchlists.json)
 _watchlist_store = WatchlistStore()
+
+# Process-level household service (persists to ~/.config/finance-os/household.json)
+_household_service = HouseholdService()
 
 app = FastAPI(
     title="finance-os",
@@ -127,6 +142,22 @@ async def watchlist_not_found_handler(
 ) -> JSONResponse:
     """Map WatchlistNotFoundError to 404."""
     return JSONResponse(status_code=404, content={"detail": str(exc)})
+
+
+@app.exception_handler(StaleRevisionError)
+async def stale_revision_handler(
+    _request: Request, exc: StaleRevisionError,
+) -> JSONResponse:
+    """Map StaleRevisionError to 409 Conflict."""
+    return JSONResponse(status_code=409, content={"detail": str(exc)})
+
+
+@app.exception_handler(HouseholdCorruptError)
+async def household_corrupt_handler(
+    _request: Request, exc: HouseholdCorruptError,
+) -> JSONResponse:
+    """Map HouseholdCorruptError to 500 — corrupt file preserved for recovery."""
+    return JSONResponse(status_code=500, content={"detail": str(exc)})
 
 
 # --- Health & Info ---
@@ -340,6 +371,32 @@ async def kg_stats() -> Any:
             None, _kg_service().get_stats,
         )
     return response.model_dump(mode="json")
+
+
+# --- Household Portfolio ---
+
+
+@app.get("/household", response_model=GetHouseholdResponse)
+async def get_household() -> Any:
+    """Load the household portfolio (returns defaults if no file exists)."""
+    household, exists = await asyncio.to_thread(_household_service.load)
+    return GetHouseholdResponse(household=household, exists=exists).model_dump(mode="json")
+
+
+@app.put("/household", response_model=UpdateHouseholdResponse)
+async def update_household(request: UpdateHouseholdRequest) -> Any:
+    """Update the household portfolio (optimistic concurrency via expected_revision)."""
+    household, summary = await asyncio.to_thread(_household_service.save, request)
+    return UpdateHouseholdResponse(
+        household=household, journal_entry=summary,
+    ).model_dump(mode="json")
+
+
+@app.post("/household/import/csv/preview", response_model=ImportPreviewResponse)
+async def preview_csv_import(request: ImportPreviewRequest) -> Any:
+    """Parse CSV content and return proposed accounts without persisting."""
+    result = await asyncio.to_thread(_household_service.preview_csv_import, request)
+    return result.model_dump(mode="json")
 
 
 # --- Watchlists ---

@@ -474,7 +474,10 @@ class _FileLockContext:
         try:
             fcntl.flock(self._fd, fcntl.LOCK_EX)
         except BaseException:
-            os.close(self._fd)
+            try:
+                os.close(self._fd)
+            except OSError:
+                pass
             self._fd = None
             raise
         return self

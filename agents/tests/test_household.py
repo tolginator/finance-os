@@ -1,6 +1,7 @@
 """Tests for household portfolio model — contracts, service, and math helpers."""
 
 import json
+import os
 import textwrap
 from datetime import date
 from decimal import Decimal
@@ -579,6 +580,33 @@ class TestHouseholdService:
         assert len(loaded.accounts) == 3
         assert loaded.accounts[1].account_type == AccountType.ROTH_IRA
         assert loaded.accounts[2].cash_holdings[0].ticker == "VMFXX"
+
+    def test_flock_failure_closes_fd(self, tmp_path: Path) -> None:
+        """File descriptor must be closed if fcntl.flock() raises."""
+        from unittest.mock import patch
+
+        svc = HouseholdService(path=tmp_path / "household.json")
+        closed_fds: list[int] = []
+        original_close = os.close
+
+        def tracking_close(fd: int) -> None:
+            closed_fds.append(fd)
+            original_close(fd)
+
+        with (
+            patch("src.application.services.household_service.fcntl") as mock_fcntl,
+            patch(
+                "src.application.services.household_service.os.close",
+                side_effect=tracking_close,
+            ),
+        ):
+            mock_fcntl.LOCK_EX = 2
+            mock_fcntl.flock.side_effect = OSError("mock flock failure")
+
+            with pytest.raises(OSError, match="mock flock failure"):
+                svc.load()
+
+        assert len(closed_fds) == 1
 
 
 # ---------------------------------------------------------------------------

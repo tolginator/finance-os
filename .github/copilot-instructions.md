@@ -250,6 +250,7 @@ All branches other than `main` **must** follow: `<username>/<MeaningfulDescripti
 
 - Use `gh pr create --title "..." --body "Closes #N"`.
 - **Assign every PR to the "finance-os" GitHub Project** (if one exists).
+- **After every push**, wait a few minutes for CI and Copilot code review feedback on the remote. Read all review comments, assess validity, address valid findings with a new commit, push, and resolve the conversations. Repeat this loop until there is no more unresolved feedback.
 
 ## @azure Rule
 

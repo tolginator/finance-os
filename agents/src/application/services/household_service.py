@@ -471,7 +471,12 @@ class _FileLockContext:
     def __enter__(self) -> "_FileLockContext":
         self._lock_path.parent.mkdir(parents=True, exist_ok=True)
         self._fd = os.open(str(self._lock_path), os.O_CREAT | os.O_RDWR)
-        fcntl.flock(self._fd, fcntl.LOCK_EX)
+        try:
+            fcntl.flock(self._fd, fcntl.LOCK_EX)
+        except BaseException:
+            os.close(self._fd)
+            self._fd = None
+            raise
         return self
 
     def __exit__(self, *_: object) -> None:

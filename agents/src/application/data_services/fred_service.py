@@ -102,6 +102,11 @@ class FREDService:
         data_as_of: date | None = None
         if readings:
             data_as_of = readings[0].date
+            state = FreshnessState.FRESH
+            reason = None
+        else:
+            state = FreshnessState.STALE
+            reason = "fred returned no readable observations"
 
         response = DataResponse(
             readings=readings,
@@ -109,10 +114,13 @@ class FREDService:
                 source="fred",
                 fetched_at=datetime.now(UTC),
                 data_as_of=data_as_of,
-                state=FreshnessState.FRESH,
+                state=state,
+                reason=reason,
             ),
         )
-        self._cache.put(cache_key, response)
+        # Only cache successful responses with data
+        if readings:
+            self._cache.put(cache_key, response)
         return response
 
     def fetch_multiple(

@@ -40,6 +40,7 @@ class FreshnessMetadata(BaseModel):
         default=None,
         description="Why state is not FRESH (e.g. 'cached', 'interpolated gap')",
     )
+    served_from_cache: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -96,21 +97,16 @@ class TTLCache:
         self._default_ttl = default_ttl
 
     def get(self, key: str) -> DataResponse | None:
-        """Return cached response if not expired, else None."""
+        """Return deep-copied cached response if not expired, else None."""
         entry = self._store.get(key)
         if entry is None:
             return None
         if time.monotonic() > entry.expires_at:
             self._store.pop(key, None)
             return None
-        # Mark as served from cache
-        resp = entry.response.model_copy(
-            update={
-                "freshness": entry.response.freshness.model_copy(
-                    update={"state": FreshnessState.STALE, "reason": "cached"}
-                )
-            }
-        )
+        # Deep copy to isolate callers from cached data
+        resp = entry.response.model_copy(deep=True)
+        resp.freshness.served_from_cache = True
         return resp
 
     def put(

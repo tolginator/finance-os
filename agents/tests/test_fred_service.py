@@ -121,14 +121,16 @@ class TestFREDServiceFetch:
             svc.fetch_series("INDPRO", bypass_cache=True)
             assert mock.call_count == 2
 
-    def test_cached_response_marked_stale(self) -> None:
+    def test_cached_response_marked_from_cache(self) -> None:
         svc = FREDService(api_key="test-key")
         with patch.object(svc, "_http_fetch", return_value=self._mock_observations()):
-            svc.fetch_series("INDPRO")
+            fresh = svc.fetch_series("INDPRO")
             cached = svc.fetch_series("INDPRO")
 
-        assert cached.freshness.state == FreshnessState.STALE
-        assert cached.freshness.reason == "cached"
+        assert fresh.freshness.served_from_cache is False
+        assert cached.freshness.served_from_cache is True
+        # Original state preserved
+        assert cached.freshness.state == FreshnessState.FRESH
 
     def test_fetch_series_requires_api_key(self) -> None:
         svc = FREDService(api_key="")
@@ -162,6 +164,25 @@ class TestFREDServiceFetch:
             resp = svc.fetch_series("GDP")
         assert resp.readings == []
         assert resp.freshness.data_as_of is None
+        assert resp.freshness.state == FreshnessState.STALE
+        assert resp.freshness.reason == "fred returned no readable observations"
+
+    def test_empty_response_not_cached(self) -> None:
+        """Failed/empty fetches should not be cached."""
+        svc = FREDService(api_key="test-key")
+        with patch.object(svc, "_http_fetch", return_value=[]):
+            svc.fetch_series("GDP")
+        # Cache should be empty — next call should try HTTP again
+        call_count = 0
+
+        def counting_fetch(*args: object, **kwargs: object) -> list[dict[str, str]]:
+            nonlocal call_count
+            call_count += 1
+            return []
+
+        with patch.object(svc, "_http_fetch", side_effect=counting_fetch):
+            svc.fetch_series("GDP")
+        assert call_count == 1  # not served from cache
 
 
 @pytest.mark.integration

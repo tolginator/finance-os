@@ -86,8 +86,9 @@ class TestTTLCache:
         result = cache.get("k1")
         assert result is not None
         assert len(result.readings) == 1
-        assert result.freshness.state == FreshnessState.STALE
-        assert result.freshness.reason == "cached"
+        # Original state preserved, served_from_cache flag set
+        assert result.freshness.state == FreshnessState.FRESH
+        assert result.freshness.served_from_cache is True
 
     def test_miss_returns_none(self) -> None:
         cache = TTLCache()
@@ -128,3 +129,27 @@ class TestTTLCache:
     def test_invalidate_nonexistent_is_noop(self) -> None:
         cache = TTLCache()
         cache.invalidate("nope")  # should not raise
+
+    def test_get_returns_deep_copy(self) -> None:
+        """Mutating a returned response must not corrupt the cache."""
+        cache = TTLCache(default_ttl=60.0)
+        cache.put("k", _sample_response())
+        result = cache.get("k")
+        assert result is not None
+        result.readings.clear()  # mutate returned copy
+        second = cache.get("k")
+        assert second is not None
+        assert len(second.readings) == 1  # cache untouched
+
+    def test_get_preserves_original_state(self) -> None:
+        """Cache should not overwrite provider-set freshness state."""
+        resp = _sample_response()
+        resp.freshness.state = FreshnessState.PROVISIONAL
+        resp.freshness.reason = "interpolated gap"
+        cache = TTLCache(default_ttl=60.0)
+        cache.put("k", resp)
+        result = cache.get("k")
+        assert result is not None
+        assert result.freshness.state == FreshnessState.PROVISIONAL
+        assert result.freshness.reason == "interpolated gap"
+        assert result.freshness.served_from_cache is True

@@ -112,9 +112,10 @@ class TTLCache:
     def put(
         self, key: str, response: DataResponse, ttl: float | None = None
     ) -> None:
-        """Store a response with TTL."""
+        """Store a deep copy of response with TTL."""
         self._store[key] = _CacheEntry(
-            response, self._default_ttl if ttl is None else ttl
+            response.model_copy(deep=True),
+            self._default_ttl if ttl is None else ttl,
         )
 
     def invalidate(self, key: str) -> None:

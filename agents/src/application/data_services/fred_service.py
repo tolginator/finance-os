@@ -173,8 +173,9 @@ class FREDService:
         meta = FRED_INDICATORS.get(series_id, (series_id, "", ""))
         description, unit, frequency = meta
 
-        readings: list[DataReading] = []
-        for i, obs in enumerate(observations):
+        # First pass: parse valid observations
+        parsed: list[tuple[date, Decimal]] = []
+        for obs in observations:
             raw_val = obs.get("value", ".")
             if raw_val == ".":
                 continue
@@ -182,28 +183,26 @@ class FREDService:
                 value = Decimal(raw_val)
             except InvalidOperation:
                 continue
-
             raw_date = obs.get("date", "")
             try:
                 obs_date = date.fromisoformat(raw_date)
             except ValueError:
                 continue
+            parsed.append((obs_date, value))
 
+        # Second pass: build readings with pct_change from adjacent
+        readings: list[DataReading] = []
+        for i, (obs_date, value) in enumerate(parsed):
             previous_value: Decimal | None = None
             pct_change: Decimal | None = None
-            if i + 1 < len(observations):
-                prev_raw = observations[i + 1].get("value", ".")
-                if prev_raw != ".":
-                    try:
-                        previous_value = Decimal(prev_raw)
-                        if previous_value != 0:
-                            pct_change = (
-                                (value - previous_value)
-                                / previous_value
-                                * 100
-                            )
-                    except InvalidOperation:
-                        pass
+            if i + 1 < len(parsed):
+                previous_value = parsed[i + 1][1]
+                if previous_value != 0:
+                    pct_change = (
+                        (value - previous_value)
+                        / previous_value
+                        * 100
+                    )
 
             readings.append(
                 DataReading(

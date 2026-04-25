@@ -304,9 +304,11 @@ class MacroRegimeAgent(BaseAgent):
 
         # Reuse or create FREDService (preserves cache across calls)
         if self._fred_service is None or str(api_key) != self._fred_api_key:
+            service = FREDService(api_key=str(api_key))
             self._fred_api_key = str(api_key)
-            self._fred_service = FREDService(api_key=str(api_key))
-        service = self._fred_service
+            self._fred_service = service
+        else:
+            service = self._fred_service
         responses = service.fetch_multiple(indicator_ids, limit=12)
 
         # Convert DataReading → IndicatorReading for classify/format

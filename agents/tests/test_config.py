@@ -15,6 +15,7 @@ class TestAppConfig:
         assert config.llm_default_model == "gpt-4o"
         assert config.llm_temperature == 0.0
         assert config.fred_api_key == ""
+        assert config.bls_api_key == ""
 
     def test_env_override(self, monkeypatch):
         monkeypatch.setenv("FINANCE_OS_LLM_PROVIDER", "azure_openai")
@@ -22,6 +23,11 @@ class TestAppConfig:
         config = AppConfig()
         assert config.llm_provider == "azure_openai"
         assert config.azure.deployment == "gpt-4o"
+
+    def test_bls_api_key_from_env(self, monkeypatch):
+        monkeypatch.setenv("FINANCE_OS_BLS_API_KEY", "bls-test-789")
+        config = AppConfig()
+        assert config.bls_api_key == "bls-test-789"
 
     def test_fred_api_key_from_env(self, monkeypatch):
         monkeypatch.setenv("FINANCE_OS_FRED_API_KEY", "test-key-123")

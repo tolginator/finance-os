@@ -278,6 +278,7 @@ def show_config(args: argparse.Namespace) -> None:
         "llm_default_model": config.llm_default_model,
         "llm_temperature": config.llm_temperature,
         "fred_api_key": _mask(config.fred_api_key),
+        "bls_api_key": _mask(config.bls_api_key),
         "sec_edgar_email": config.sec_edgar_email or "(not set)",
         "azure_endpoint": config.azure.endpoint or "(not set)",
         "azure_deployment": config.azure.deployment or "(not set)",

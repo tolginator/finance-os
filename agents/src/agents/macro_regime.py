@@ -12,20 +12,21 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
 
+from src.application.data_services.fred_service import (
+    FRED_INDICATORS,
+    FREDService,
+)
 from src.core.agent import AgentResponse, BaseAgent
 
 FRED_BASE_URL = "https://api.stlouisfed.org/fred/series/observations"
 
-# Key macro indicators and their regime signals
+# Legacy alias — kept for backward compatibility with digest_service
 MACRO_INDICATORS: dict[str, str] = {
-    "GDP": "Real GDP growth",
-    "UNRATE": "Unemployment rate",
-    "CPIAUCSL": "Consumer Price Index",
-    "FEDFUNDS": "Federal Funds Rate",
-    "T10Y2Y": "10Y-2Y Treasury Spread",
-    "UMCSENT": "Consumer Sentiment",
-    "INDPRO": "Industrial Production",
-    "PAYEMS": "Nonfarm Payrolls",
+    sid: desc for sid, (desc, _, _) in FRED_INDICATORS.items()
+    if sid in {
+        "GDP", "UNRATE", "CPIAUCSL", "FEDFUNDS",
+        "T10Y2Y", "UMCSENT", "INDPRO", "PAYEMS",
+    }
 }
 
 
@@ -242,6 +243,7 @@ class MacroRegimeAgent(BaseAgent):
             ),
         )
         self._fred_api_key = fred_api_key
+        self._fred_service: FREDService | None = None
 
     @property
     def system_prompt(self) -> str:
@@ -300,16 +302,29 @@ class MacroRegimeAgent(BaseAgent):
                 metadata={"error": "missing_api_key"},
             )
 
-        all_readings: dict[str, list[IndicatorReading]] = {}
+        # Reuse or create FREDService (preserves cache across calls)
+        if self._fred_service is None or str(api_key) != self._fred_api_key:
+            service = FREDService(api_key=str(api_key))
+            self._fred_api_key = str(api_key)
+            self._fred_service = service
+        else:
+            service = self._fred_service
+        responses = service.fetch_multiple(indicator_ids, limit=12)
 
-        for series_id in indicator_ids:
-            desc = MACRO_INDICATORS.get(series_id, series_id)
-            observations = fetch_fred_series(
-                series_id, str(api_key), limit=12
-            )
-            all_readings[series_id] = parse_observations(
-                series_id, desc, observations
-            )
+        # Convert DataReading → IndicatorReading for classify/format
+        all_readings: dict[str, list[IndicatorReading]] = {}
+        for series_id, data_resp in responses.items():
+            all_readings[series_id] = [
+                IndicatorReading(
+                    series_id=r.series_id,
+                    description=r.description,
+                    date=r.date.isoformat(),
+                    value=r.value,
+                    previous_value=r.previous_value,
+                    change_pct=r.pct_change,
+                )
+                for r in data_resp.readings
+            ]
 
         regime = classify_regime(all_readings)
         dashboard = format_dashboard(all_readings, regime)

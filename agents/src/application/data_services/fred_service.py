@@ -27,7 +27,7 @@ FRED_BASE_URL = "https://api.stlouisfed.org/fred/series/observations"
 # Curated indicator catalog: series_id → (description, unit, frequency)
 FRED_INDICATORS: dict[str, tuple[str, str, str]] = {
     # Existing (from v1)
-    "GDP": ("Real GDP growth", "billions $", "quarterly"),
+    "GDP": ("Gross Domestic Product", "billions $", "quarterly"),
     "UNRATE": ("Unemployment rate", "%", "monthly"),
     "CPIAUCSL": ("Consumer Price Index (All Urban)", "index", "monthly"),
     "FEDFUNDS": ("Federal Funds Rate", "%", "monthly"),

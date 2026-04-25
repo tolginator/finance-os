@@ -148,6 +148,7 @@ class TestConfigCommand:
         from pathlib import Path
 
         monkeypatch.setenv("FINANCE_OS_FRED_API_KEY", "supersecretkey123")
+        monkeypatch.setenv("FINANCE_OS_BLS_API_KEY", "blssecretkey456")
         monkeypatch.setattr("src.application.config.CONFIG_FILE", Path("/nonexistent"))
 
         parser = build_parser()
@@ -156,10 +157,12 @@ class TestConfigCommand:
         show_config(args)
         captured = capsys.readouterr()
         assert "supersecretkey123" not in captured.out
+        assert "blssecretkey456" not in captured.out
         assert "****" in captured.out
 
     def test_config_json(self, capsys, monkeypatch):
         monkeypatch.setenv("FINANCE_OS_FRED_API_KEY", "mykey12345")
+        monkeypatch.setenv("FINANCE_OS_BLS_API_KEY", "blskey67890")
         from pathlib import Path
         monkeypatch.setattr("src.application.config.CONFIG_FILE", Path("/nonexistent"))
 
@@ -170,7 +173,9 @@ class TestConfigCommand:
         captured = capsys.readouterr()
         data = json.loads(captured.out)
         assert data["fred_api_key"] == "****2345"
+        assert data["bls_api_key"] == "****7890"
         assert "mykey12345" not in json.dumps(data)
+        assert "blskey67890" not in json.dumps(data)
 
 
 class TestRunAgent:

@@ -87,9 +87,9 @@ class _CacheEntry:
 class TTLCache:
     """Simple in-memory TTL cache keyed by string.
 
-    Thread-safe for single-writer (GIL protects dict mutations).
-    Not shared across processes — each Web API / MCP / CLI process
-    has its own cache instance.
+    Not thread-safe — callers must synchronise externally if shared
+    across threads.  Not shared across processes — each Web API / MCP /
+    CLI process has its own cache instance.
     """
 
     def __init__(self, default_ttl: float = 3600.0) -> None:

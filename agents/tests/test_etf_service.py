@@ -15,7 +15,6 @@ from src.application.data_services.etf_service import (
     ETFOverride,
     ETFProfile,
     ETFService,
-    HoldingOverride,
     OverrideStore,
     apply_override,
     classify_from_yahoo,
@@ -196,30 +195,6 @@ class TestClassifyFromYahoo:
 class TestOverrideModels:
     """Tests for override Pydantic models."""
 
-    def test_holdings_must_sum_to_one(self) -> None:
-        with pytest.raises(ValueError, match="sum to 1.0"):
-            ETFOverride(
-                as_of=date.today(),
-                holdings=[
-                    HoldingOverride(symbol="A", weight=Decimal("0.5")),
-                    HoldingOverride(symbol="B", weight=Decimal("0.3")),
-                ],
-            )
-
-    def test_holdings_valid_sum(self) -> None:
-        override = ETFOverride(
-            as_of=date.today(),
-            holdings=[
-                HoldingOverride(symbol="A", weight=Decimal("0.6")),
-                HoldingOverride(symbol="B", weight=Decimal("0.4")),
-            ],
-        )
-        assert len(override.holdings) == 2
-
-    def test_negative_weight_rejected(self) -> None:
-        with pytest.raises(ValueError):
-            HoldingOverride(symbol="A", weight=Decimal("-0.1"))
-
     def test_invalid_mode_rejected(self) -> None:
         with pytest.raises(ValueError, match="mode"):
             ETFOverride(as_of=date.today(), mode="invalid")
@@ -283,7 +258,7 @@ class TestApplyOverride:
 
     def test_patch_mode_fills_gaps(self) -> None:
         profile = self._base_profile()
-        profile.sector_focus = ""  # gap
+        profile.sector_focus = ""
         override = ETFOverride(
             as_of=date.today(),
             mode="patch",
@@ -291,6 +266,21 @@ class TestApplyOverride:
         )
         result = apply_override(profile, override)
         assert result.sector_focus == "technology"
+
+    def test_patch_mode_preserves_existing(self) -> None:
+        profile = self._base_profile()
+        profile.sector_focus = "healthcare"
+        profile.duration_bucket = "intermediate"
+        override = ETFOverride(
+            as_of=date.today(),
+            mode="patch",
+            sector="technology",
+            duration="long",
+        )
+        result = apply_override(profile, override)
+        # Patch should NOT overwrite existing values
+        assert result.sector_focus == "healthcare"
+        assert result.duration_bucket == "intermediate"
 
 
 class TestOverrideStore:
@@ -429,6 +419,26 @@ class TestETFService:
         assert result.profile.ticker == "EMPTY"
         assert len(result.profile.warnings) > 0
 
+    def test_rejects_non_etf_quote_type(
+        self, tmp_path: Path
+    ) -> None:
+        store = OverrideStore(path=tmp_path / "overrides.json")
+        service = ETFService(override_store=store)
+
+        mock_ticker = MagicMock()
+        mock_ticker.info = {
+            "symbol": "AAPL",
+            "quoteType": "EQUITY",
+            "longName": "Apple Inc.",
+        }
+
+        _yf = "src.application.data_services.etf_service.yf.Ticker"
+        with patch(_yf, return_value=mock_ticker):
+            result = service.classify_sync("AAPL")
+
+        assert result.profile.asset_class is None
+        assert any("not ETF" in w for w in result.profile.warnings)
+
     @pytest.mark.asyncio
     async def test_classify_async(self, tmp_path: Path) -> None:
         store = OverrideStore(path=tmp_path / "overrides.json")
@@ -499,10 +509,3 @@ class TestCategoryMapCoverage:
             assert ac in mapped_classes, (
                 f"{ac} not represented in CATEGORY_MAP"
             )
-
-    def test_no_duplicate_categories(self) -> None:
-        """Categories should be unique keys."""
-        # dict handles this, but verify the map is not accidentally
-        # overwriting entries (e.g., Ultrashort Bond appears twice)
-        # This is a known issue — we document it as intentional
-        pass

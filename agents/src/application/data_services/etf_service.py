@@ -8,6 +8,7 @@ calls are dispatched to threads to avoid blocking async event loops.
 import asyncio
 import json
 import logging
+import threading
 import time
 from datetime import UTC, date, datetime
 from decimal import Decimal, InvalidOperation
@@ -15,7 +16,7 @@ from enum import StrEnum
 from pathlib import Path
 
 import yfinance as yf
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator
 
 from src.application.config import CONFIG_DIR
 from src.application.contracts.household import AssetClass
@@ -223,7 +224,6 @@ class ETFOverride(BaseModel):
     """Manual override for a single ETF's classification."""
 
     asset_class: AssetClass | None = None
-    holdings: list[HoldingOverride] | None = None
     sector: str | None = None
     geography: str | None = None
     duration: str | None = None
@@ -237,16 +237,6 @@ class ETFOverride(BaseModel):
         if v not in ("replace", "patch"):
             raise ValueError("mode must be 'replace' or 'patch'")
         return v
-
-    @model_validator(mode="after")
-    def holdings_sum_to_one(self) -> "ETFOverride":
-        if self.holdings:
-            total = sum(h.weight for h in self.holdings)
-            if abs(total - Decimal("1")) > Decimal("0.001"):
-                raise ValueError(
-                    f"holdings weights must sum to 1.0, got {total}"
-                )
-        return self
 
 
 class OverridesFile(BaseModel):
@@ -476,7 +466,7 @@ def apply_override(
             profile.credit_quality = override.credit_quality
             profile.provenance["credit_quality"] = prov
     else:
-        # Patch: override wins per-field, provider fills gaps
+        # Patch: override fills gaps only (except asset_class always wins)
         if override.asset_class is not None:
             profile.asset_class = override.asset_class
             profile.classification_confidence = prov.confidence
@@ -485,16 +475,16 @@ def apply_override(
         if override.sector is not None and not profile.sector_focus:
             profile.sector_focus = override.sector
             profile.provenance["sector_focus"] = prov
-        elif override.sector is not None:
-            profile.sector_focus = override.sector
-            profile.provenance["sector_focus"] = prov
-        if override.geography is not None:
+        if override.geography is not None and profile.geography == "US":
             profile.geography = override.geography
             profile.provenance["geography"] = prov
-        if override.duration is not None:
+        if override.duration is not None and not profile.duration_bucket:
             profile.duration_bucket = override.duration
             profile.provenance["duration_bucket"] = prov
-        if override.credit_quality is not None:
+        if (
+            override.credit_quality is not None
+            and not profile.credit_quality
+        ):
             profile.credit_quality = override.credit_quality
             profile.provenance["credit_quality"] = prov
 
@@ -519,6 +509,7 @@ class ETFService:
     ) -> None:
         self._cache: dict[str, tuple[float, ETFProfileResponse]] = {}
         self._cache_ttl = cache_ttl
+        self._cache_lock = threading.Lock()
         self._override_store = override_store or OverrideStore()
 
     def classify_sync(self, ticker: str) -> ETFProfileResponse:
@@ -550,19 +541,25 @@ class ETFService:
         self, tickers: list[str]
     ) -> dict[str, ETFProfileResponse]:
         """Classify multiple ETFs concurrently."""
-        tasks = {t.upper(): self.classify(t) for t in tickers}
+        upper_tickers = [t.upper() for t in tickers]
+        tasks = [
+            asyncio.create_task(self.classify(t)) for t in upper_tickers
+        ]
+        gathered = await asyncio.gather(*tasks, return_exceptions=True)
         results: dict[str, ETFProfileResponse] = {}
-        for ticker, task in tasks.items():
-            try:
-                results[ticker] = await task
-            except Exception as exc:
-                logger.warning("Failed to classify %s: %s", ticker, exc)
+        for ticker, result in zip(upper_tickers, gathered, strict=False):
+            if isinstance(result, Exception):
+                logger.warning(
+                    "Failed to classify %s: %s", ticker, result
+                )
                 results[ticker] = ETFProfileResponse(
                     profile=ETFProfile(
                         ticker=ticker,
-                        warnings=[f"Classification failed: {exc}"],
+                        warnings=[f"Classification failed: {result}"],
                     )
                 )
+            else:
+                results[ticker] = result
         return results
 
     def _fetch_and_classify(self, ticker: str) -> ETFProfile:
@@ -577,27 +574,46 @@ class ETFService:
                 warnings=[f"Yahoo Finance fetch failed: {exc}"],
             )
 
-        if not info or info.get("quoteType") is None:
+        if not info:
             return ETFProfile(
                 ticker=ticker,
                 warnings=["No data returned from Yahoo Finance"],
             )
 
+        quote_type = info.get("quoteType")
+        qt_upper = (
+            quote_type.strip().upper()
+            if isinstance(quote_type, str)
+            else None
+        )
+        if qt_upper != "ETF":
+            warning = (
+                f"quoteType is '{quote_type}', not ETF"
+                if quote_type is not None
+                else "quoteType missing; cannot confirm ETF"
+            )
+            return ETFProfile(ticker=ticker, warnings=[warning])
+
         return classify_from_yahoo(info)
 
-    # -- Cache helpers --
+    # -- Cache helpers (thread-safe) --
 
     def _cache_get(self, key: str) -> ETFProfileResponse | None:
-        entry = self._cache.get(key)
-        if entry is None:
-            return None
-        ts, resp = entry
-        if time.monotonic() - ts > self._cache_ttl:
-            self._cache.pop(key, None)
-            return None
-        copy = resp.model_copy(deep=True)
-        copy.served_from_cache = True
-        return copy
+        with self._cache_lock:
+            entry = self._cache.get(key)
+            if entry is None:
+                return None
+            ts, resp = entry
+            if time.monotonic() - ts > self._cache_ttl:
+                self._cache.pop(key, None)
+                return None
+            copy = resp.model_copy(deep=True)
+            copy.served_from_cache = True
+            return copy
 
     def _cache_put(self, key: str, resp: ETFProfileResponse) -> None:
-        self._cache[key] = (time.monotonic(), resp.model_copy(deep=True))
+        with self._cache_lock:
+            self._cache[key] = (
+                time.monotonic(),
+                resp.model_copy(deep=True),
+            )

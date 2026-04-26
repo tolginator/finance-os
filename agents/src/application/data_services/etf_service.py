@@ -9,6 +9,7 @@ import asyncio
 import json
 import logging
 import os
+import tempfile
 import threading
 import time
 from datetime import UTC, date, datetime
@@ -257,33 +258,46 @@ class OverrideStore:
         try:
             raw = json.loads(self._path.read_text(encoding="utf-8"))
             return OverridesFile.model_validate(raw)
-        except (json.JSONDecodeError, ValueError) as exc:
+        except (json.JSONDecodeError, OSError, ValueError) as exc:
             logger.warning("Corrupt overrides file %s: %s", self._path, exc)
             return OverridesFile()
 
     def _save(self, data: OverridesFile) -> None:
         """Atomic write to disk with fsync for durability."""
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = self._path.with_suffix(".tmp")
-        content = data.model_dump_json(indent=2)
-        fd = os.open(str(tmp), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o644)
+        content = data.model_dump_json(indent=2).encode("utf-8")
+        fd = tempfile.mkstemp(
+            dir=str(self._path.parent), suffix=".tmp"
+        )
+        tmp_fd, tmp_path = fd[0], Path(fd[1])
         try:
-            os.write(fd, content.encode("utf-8"))
-            os.fsync(fd)
+            os.write(tmp_fd, content)
+            os.fsync(tmp_fd)
         finally:
-            os.close(fd)
-        tmp.replace(self._path)
-        # fsync parent directory to persist the rename
-        dir_fd = os.open(str(self._path.parent), os.O_RDONLY)
+            os.close(tmp_fd)
+        os.chmod(str(tmp_path), 0o600)
+        tmp_path.replace(self._path)
+        # Best-effort fsync of parent directory to persist the rename.
+        # Some platforms/filesystems do not support this.
+        dir_fd: int | None = None
         try:
+            dir_fd = os.open(str(self._path.parent), os.O_RDONLY)
             os.fsync(dir_fd)
+        except OSError as exc:
+            logger.warning(
+                "Could not fsync parent directory %s: %s",
+                self._path.parent,
+                exc,
+            )
         finally:
-            os.close(dir_fd)
+            if dir_fd is not None:
+                os.close(dir_fd)
 
     def get(self, ticker: str) -> ETFOverride | None:
         """Get override for a single ticker."""
-        data = self.load()
-        return data.overrides.get(ticker.upper())
+        with self._lock:
+            data = self.load()
+            return data.overrides.get(ticker.upper())
 
     def set(self, ticker: str, override: ETFOverride) -> None:
         """Set override for a single ticker."""

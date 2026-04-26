@@ -241,7 +241,9 @@ class OverrideStore:
     """Loads/saves ETF overrides from persistent storage.
 
     Uses a threading lock for concurrent write safety and fsync
-    for durability before replacing the target file.
+    for durability before replacing the target file. Thread-safe
+    public methods are `get`, `set`, and `remove`. The `_save`
+    helper is private and always called under the lock.
     """
 
     def __init__(self, path: Path = OVERRIDES_FILE) -> None:
@@ -259,7 +261,7 @@ class OverrideStore:
             logger.warning("Corrupt overrides file %s: %s", self._path, exc)
             return OverridesFile()
 
-    def save(self, data: OverridesFile) -> None:
+    def _save(self, data: OverridesFile) -> None:
         """Atomic write to disk with fsync for durability."""
         self._path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self._path.with_suffix(".tmp")
@@ -288,7 +290,7 @@ class OverrideStore:
         with self._lock:
             data = self.load()
             data.overrides[ticker.upper()] = override
-            self.save(data)
+            self._save(data)
 
     def remove(self, ticker: str) -> bool:
         """Remove override. Returns True if existed."""
@@ -296,7 +298,7 @@ class OverrideStore:
             data = self.load()
             removed = data.overrides.pop(ticker.upper(), None) is not None
             if removed:
-                self.save(data)
+                self._save(data)
             return removed
 
 
@@ -522,6 +524,8 @@ class ETFService:
     All yfinance calls dispatched to threads. Results cached per-ticker.
     """
 
+    _MAX_CONCURRENT_CLASSIFY = 10
+
     def __init__(
         self,
         cache_ttl: float = 3600.0,
@@ -545,8 +549,9 @@ class ETFService:
             override = self._override_store.get(ticker)
             if override:
                 profile = apply_override(profile, override)
-            return ETFProfileResponse(
-                profile=profile, served_from_cache=True
+            return cached.model_copy(
+                deep=True,
+                update={"profile": profile, "served_from_cache": True},
             )
 
         # Fetch from Yahoo and cache the provider-derived profile only.
@@ -570,11 +575,15 @@ class ETFService:
     async def classify_multiple(
         self, tickers: list[str]
     ) -> dict[str, ETFProfileResponse]:
-        """Classify multiple ETFs concurrently."""
+        """Classify multiple ETFs concurrently (bounded concurrency)."""
+        sem = asyncio.Semaphore(self._MAX_CONCURRENT_CLASSIFY)
         upper_tickers = [t.upper() for t in tickers]
-        tasks = [
-            asyncio.create_task(self.classify(t)) for t in upper_tickers
-        ]
+
+        async def _limited(t: str) -> ETFProfileResponse:
+            async with sem:
+                return await self.classify(t)
+
+        tasks = [asyncio.create_task(_limited(t)) for t in upper_tickers]
         gathered = await asyncio.gather(*tasks, return_exceptions=True)
         results: dict[str, ETFProfileResponse] = {}
         for ticker, result in zip(upper_tickers, gathered, strict=False):

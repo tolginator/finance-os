@@ -283,12 +283,23 @@ class OverrideStore:
         )
         tmp_fd, tmp_path = fd[0], Path(fd[1])
         try:
-            os.write(tmp_fd, content)
-            os.fsync(tmp_fd)
-        finally:
-            os.close(tmp_fd)
-        os.chmod(str(tmp_path), 0o600)
-        tmp_path.replace(self._path)
+            try:
+                os.write(tmp_fd, content)
+                os.fsync(tmp_fd)
+            finally:
+                os.close(tmp_fd)
+            os.chmod(str(tmp_path), 0o600)
+            tmp_path.replace(self._path)
+        except Exception:
+            try:
+                tmp_path.unlink(missing_ok=True)
+            except OSError as cleanup_exc:
+                logger.warning(
+                    "Could not remove temp file %s: %s",
+                    tmp_path,
+                    cleanup_exc,
+                )
+            raise
         # Best-effort fsync of parent directory to persist the rename.
         # Some platforms/filesystems do not support this.
         dir_fd: int | None = None
@@ -430,6 +441,15 @@ def _extract_diagnostics(profile: ETFProfile, category: str) -> None:
     """
     cat_lower = category.lower()
 
+    # Detect "ex-<region>" exclusion patterns so we don't tag a
+    # geography that the category explicitly excludes.
+    def _excluded(region: str) -> bool:
+        """Return True if category says 'ex-<region>' (excluding it)."""
+        return (
+            f"ex-{region}" in cat_lower
+            or f"ex {region}" in cat_lower
+        )
+
     # Bond categories should not get equity-style diagnostics.
     _bond_hints = (
         "bond", "government", "treasury", "corporate", "high yield",
@@ -452,19 +472,20 @@ def _extract_diagnostics(profile: ETFProfile, category: str) -> None:
         elif "blend" in cat_lower:
             profile.style = "blend"
 
-    ex_japan = "ex-japan" in cat_lower or "ex japan" in cat_lower
-
     if "foreign" in cat_lower or "international" in cat_lower:
         profile.geography = "international"
-    elif "emerging" in cat_lower:
+    elif "emerging" in cat_lower and not _excluded("emerging"):
         profile.geography = "emerging"
-    elif "europe" in cat_lower:
+    elif "europe" in cat_lower and not _excluded("europe"):
         profile.geography = "europe"
-    elif "japan" in cat_lower and not ex_japan:
+    elif "japan" in cat_lower and not _excluded("japan"):
         profile.geography = "japan"
-    elif "china" in cat_lower or "india" in cat_lower:
+    elif (
+        ("china" in cat_lower and not _excluded("china"))
+        or ("india" in cat_lower and not _excluded("india"))
+    ):
         profile.geography = "emerging"
-    elif "latin" in cat_lower:
+    elif "latin" in cat_lower and not _excluded("latin"):
         profile.geography = "emerging"
 
     if "short" in cat_lower:

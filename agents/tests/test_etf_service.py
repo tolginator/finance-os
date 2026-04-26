@@ -235,6 +235,27 @@ class TestExtractDiagnostics:
         _extract_diagnostics(profile, "Pacific/Asia ex-Japan Stk")
         assert profile.geography != "japan"
 
+    def test_ex_china_not_tagged_emerging(self) -> None:
+        profile = self._base_profile()
+        _extract_diagnostics(profile, "EM ex-China")
+        assert profile.geography != "emerging"
+
+    def test_ex_europe_not_tagged_europe(self) -> None:
+        profile = self._base_profile()
+        _extract_diagnostics(profile, "World ex-Europe")
+        assert profile.geography != "europe"
+
+    def test_japan_stock_tagged_japan(self) -> None:
+        """Positive case: 'Japan Stock' should set geography to japan."""
+        profile = self._base_profile()
+        _extract_diagnostics(profile, "Japan Stock")
+        assert profile.geography == "japan"
+
+    def test_europe_stock_tagged_europe(self) -> None:
+        profile = self._base_profile()
+        _extract_diagnostics(profile, "Europe Stock")
+        assert profile.geography == "europe"
+
 
 class TestOverrideModels:
     """Tests for override Pydantic models."""

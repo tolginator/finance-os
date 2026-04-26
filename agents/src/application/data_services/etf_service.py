@@ -250,16 +250,28 @@ class OverrideStore:
     def __init__(self, path: Path = OVERRIDES_FILE) -> None:
         self._path = path
         self._lock = threading.Lock()
+        self._cached_data: OverridesFile | None = None
+        self._cached_mtime: float = 0.0
 
     def load(self) -> OverridesFile:
-        """Load overrides from disk. Returns empty on missing/corrupt file."""
+        """Load overrides from disk with mtime-based caching."""
         if not self._path.exists():
+            self._cached_data = None
+            self._cached_mtime = 0.0
             return OverridesFile()
         try:
+            mtime = self._path.stat().st_mtime
+            if self._cached_data is not None and mtime == self._cached_mtime:
+                return self._cached_data
             raw = json.loads(self._path.read_text(encoding="utf-8"))
-            return OverridesFile.model_validate(raw)
+            data = OverridesFile.model_validate(raw)
+            self._cached_data = data
+            self._cached_mtime = mtime
+            return data
         except (json.JSONDecodeError, OSError, ValueError) as exc:
             logger.warning("Corrupt overrides file %s: %s", self._path, exc)
+            self._cached_data = None
+            self._cached_mtime = 0.0
             return OverridesFile()
 
     def _save(self, data: OverridesFile) -> None:
@@ -292,6 +304,9 @@ class OverrideStore:
         finally:
             if dir_fd is not None:
                 os.close(dir_fd)
+        # Invalidate mtime cache so next load() re-reads
+        self._cached_data = None
+        self._cached_mtime = 0.0
 
     def get(self, ticker: str) -> ETFOverride | None:
         """Get override for a single ticker."""
@@ -437,13 +452,15 @@ def _extract_diagnostics(profile: ETFProfile, category: str) -> None:
         elif "blend" in cat_lower:
             profile.style = "blend"
 
+    ex_japan = "ex-japan" in cat_lower or "ex japan" in cat_lower
+
     if "foreign" in cat_lower or "international" in cat_lower:
         profile.geography = "international"
     elif "emerging" in cat_lower:
         profile.geography = "emerging"
     elif "europe" in cat_lower:
         profile.geography = "europe"
-    elif "japan" in cat_lower:
+    elif "japan" in cat_lower and not ex_japan:
         profile.geography = "japan"
     elif "china" in cat_lower or "india" in cat_lower:
         profile.geography = "emerging"
@@ -568,10 +585,11 @@ class ETFService:
                 update={"profile": profile, "served_from_cache": True},
             )
 
-        # Fetch from Yahoo and cache the provider-derived profile only.
+        # Fetch from Yahoo and cache only successful classifications.
         profile = self._fetch_and_classify(ticker)
         base_response = ETFProfileResponse(profile=profile)
-        self._cache_put(ticker, base_response)
+        if profile.asset_class is not None and not profile.warnings:
+            self._cache_put(ticker, base_response)
 
         # Apply override if present to a copy so the cache remains the
         # unmodified provider-derived result.

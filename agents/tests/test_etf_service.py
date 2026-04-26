@@ -229,6 +229,12 @@ class TestExtractDiagnostics:
         _extract_diagnostics(profile, "China Region")
         assert profile.geography == "emerging"
 
+    def test_ex_japan_not_tagged_japan(self) -> None:
+        """'Pacific/Asia ex-Japan Stk' should not set geography to japan."""
+        profile = self._base_profile()
+        _extract_diagnostics(profile, "Pacific/Asia ex-Japan Stk")
+        assert profile.geography != "japan"
+
 
 class TestOverrideModels:
     """Tests for override Pydantic models."""

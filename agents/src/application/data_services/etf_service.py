@@ -125,7 +125,7 @@ _KEYWORD_RULES: list[tuple[list[str], AssetClass, Confidence]] = [
         AssetClass.IG_CORPORATE,
         Confidence.MEDIUM,
     ),
-    (["emerging", "em "], AssetClass.EMERGING_MARKETS, Confidence.MEDIUM),
+    (["emerging", "emerging markets"], AssetClass.EMERGING_MARKETS, Confidence.MEDIUM),
     (
         ["international", "foreign", "ex-us", "world ex", "eafe"],
         AssetClass.INTL_DEVELOPED,
@@ -271,6 +271,12 @@ class OverrideStore:
         finally:
             os.close(fd)
         tmp.replace(self._path)
+        # fsync parent directory to persist the rename
+        dir_fd = os.open(str(self._path.parent), os.O_RDONLY)
+        try:
+            os.fsync(dir_fd)
+        finally:
+            os.close(dir_fd)
 
     def get(self, ticker: str) -> ETFOverride | None:
         """Get override for a single ticker."""
@@ -385,7 +391,12 @@ def classify_from_yahoo(info: dict[str, object]) -> ETFProfile:
 
 
 def _extract_diagnostics(profile: ETFProfile, category: str) -> None:
-    """Extract cap_size, style, geography from category string."""
+    """Extract diagnostic attributes from a category string.
+
+    May populate `cap_size`, `style`, `geography`, and
+    `duration_bucket` on the provided profile when those hints are
+    present in the category text.
+    """
     cat_lower = category.lower()
 
     # Bond categories should not get equity-style diagnostics.
@@ -437,9 +448,10 @@ def apply_override(
     """Apply a manual override to an ETF profile.
 
     In 'replace' mode, provided override fields replace provider values.
-    In 'patch' mode, override fields are only used to fill provider gaps;
-    existing provider values are preserved. Geography also treats a default
-    "US" value as a gap that a patch override may replace.
+    In 'patch' mode, override fields are used to fill provider gaps, except
+    `asset_class`, which is treated as authoritative and replaces any
+    existing provider classification when supplied. Geography also treats a
+    default "US" value as a gap that a patch override may replace.
     """
     today = date.today()
     stale = (today - override.as_of).days > _STALE_OVERRIDE_DAYS
@@ -524,22 +536,32 @@ class ETFService:
         """Classify an ETF synchronously (blocking yfinance call)."""
         ticker = ticker.upper()
 
-        # Check cache
+        # Check cache for the provider-derived profile, then apply the
+        # latest override on a copy so override changes are visible
+        # immediately without mutating the cached base result.
         cached = self._cache_get(ticker)
         if cached is not None:
-            return cached
+            profile = cached.profile.model_copy(deep=True)
+            override = self._override_store.get(ticker)
+            if override:
+                profile = apply_override(profile, override)
+            return ETFProfileResponse(
+                profile=profile, served_from_cache=True
+            )
 
-        # Fetch from Yahoo
+        # Fetch from Yahoo and cache the provider-derived profile only.
         profile = self._fetch_and_classify(ticker)
+        base_response = ETFProfileResponse(profile=profile)
+        self._cache_put(ticker, base_response)
 
-        # Apply override if present
+        # Apply override if present to a copy so the cache remains the
+        # unmodified provider-derived result.
+        effective_profile = profile.model_copy(deep=True)
         override = self._override_store.get(ticker)
         if override:
-            profile = apply_override(profile, override)
+            effective_profile = apply_override(effective_profile, override)
 
-        resp = ETFProfileResponse(profile=profile)
-        self._cache_put(ticker, resp)
-        return resp
+        return ETFProfileResponse(profile=effective_profile)
 
     async def classify(self, ticker: str) -> ETFProfileResponse:
         """Classify an ETF asynchronously (thread-dispatched)."""

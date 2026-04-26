@@ -373,7 +373,7 @@ class TestOverrideStore:
         store = OverrideStore(path=path)
         with patch("src.application.data_services.etf_service.os.fsync") as mock_fsync:
             store.set("SPY", ETFOverride(as_of=date.today()))
-        assert mock_fsync.call_count == 1
+        assert mock_fsync.call_count >= 1
 
 
 class TestETFService:
@@ -434,6 +434,37 @@ class TestETFService:
             result = service.classify_sync("XYZ")
 
         assert result.profile.asset_class == AssetClass.TIPS
+
+    def test_override_change_reflects_on_cached_profile(
+        self, tmp_path: Path
+    ) -> None:
+        """Overrides applied after caching should be visible immediately."""
+        store = OverrideStore(path=tmp_path / "overrides.json")
+        service = ETFService(override_store=store)
+
+        mock_ticker = MagicMock()
+        mock_ticker.info = self._mock_info(ticker="SPY")
+        yf_path = "src.application.data_services.etf_service.yf.Ticker"
+
+        with patch(yf_path, return_value=mock_ticker):
+            r1 = service.classify_sync("SPY")
+
+        assert r1.profile.asset_class == AssetClass.US_EQUITY
+
+        # Add override after profile is cached
+        store.set(
+            "SPY",
+            ETFOverride(
+                as_of=date.today(),
+                asset_class=AssetClass.TIPS,
+            ),
+        )
+
+        with patch(yf_path, return_value=mock_ticker):
+            r2 = service.classify_sync("SPY")
+
+        # Override should be visible even on cached result
+        assert r2.profile.asset_class == AssetClass.TIPS
 
     def test_classify_sync_handles_yfinance_failure(
         self, tmp_path: Path

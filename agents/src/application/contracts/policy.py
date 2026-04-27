@@ -282,6 +282,21 @@ class CreateGoalRequest(BaseModel):
     inflation_assumption: Decimal = Decimal("0.025")
     notes: str = ""
 
+    @model_validator(mode="after")
+    def _goal_type_invariants(self) -> Self:
+        if self.goal_type == GoalType.RETIREMENT and self.withdrawal_rate is None:
+            raise ValueError("Retirement goals require withdrawal_rate")
+        if (
+            self.goal_type != GoalType.RETIREMENT
+            and self.withdrawal_rate is not None
+        ):
+            raise ValueError(
+                f"{self.goal_type.value} goals should not have withdrawal_rate"
+            )
+        if self.horizon_years is not None and self.horizon_years < 1:
+            raise ValueError("horizon_years must be positive")
+        return self
+
 
 class UpdateGoalRequest(BaseModel):
     """Request to update an existing goal."""

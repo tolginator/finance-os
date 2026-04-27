@@ -243,7 +243,7 @@ class PolicyService:
             path.parent / "goals.lock" if path else LOCK_FILE
         )
         self._cached_data: GoalsFile | None = None
-        self._cached_mtime: float = 0.0
+        self._cached_mtime_ns: int = 0
 
     def _flock(self) -> _FileLockContext:
         return _FileLockContext(self._lock_path)
@@ -256,13 +256,13 @@ class PolicyService:
         if not self._path.exists():
             return GoalsFile()
         try:
-            mtime = self._path.stat().st_mtime
-            if self._cached_data is not None and mtime == self._cached_mtime:
+            mtime_ns = self._path.stat().st_mtime_ns
+            if self._cached_data is not None and mtime_ns == self._cached_mtime_ns:
                 return self._cached_data
             raw = json.loads(self._path.read_text(encoding="utf-8"))
             data = GoalsFile.model_validate(raw)
             self._cached_data = data
-            self._cached_mtime = mtime
+            self._cached_mtime_ns = mtime_ns
             return data
         except (json.JSONDecodeError, ValidationError, OSError) as exc:
             logger.error("Corrupt goals file %s: %s", self._path, exc)
@@ -305,9 +305,9 @@ class PolicyService:
         # Update mtime cache after successful write
         self._cached_data = data
         try:
-            self._cached_mtime = self._path.stat().st_mtime
+            self._cached_mtime_ns = self._path.stat().st_mtime_ns
         except OSError:
-            self._cached_mtime = 0.0
+            self._cached_mtime_ns = 0
 
     # -- public API --------------------------------------------------------
 
@@ -375,20 +375,12 @@ class PolicyService:
                 raise GoalNotFoundError(f"Goal '{goal_id}' not found")
 
             updates: dict[str, object] = {}
-            if request.name is not None:
-                updates["name"] = request.name
-            if request.policy is not None:
-                updates["policy"] = request.policy
-            if request.horizon_years is not None:
-                updates["horizon_years"] = request.horizon_years
-            if request.target_amount is not None:
-                updates["target_amount"] = request.target_amount
-            if request.withdrawal_rate is not None:
-                updates["withdrawal_rate"] = request.withdrawal_rate
-            if request.inflation_assumption is not None:
-                updates["inflation_assumption"] = request.inflation_assumption
-            if request.notes is not None:
-                updates["notes"] = request.notes
+            for field in (
+                "name", "policy", "horizon_years", "target_amount",
+                "withdrawal_rate", "inflation_assumption", "notes",
+            ):
+                if field in request.model_fields_set:
+                    updates[field] = getattr(request, field)
             updates["updated_at"] = datetime.now(UTC)
 
             updated = goal.model_copy(update=updates)

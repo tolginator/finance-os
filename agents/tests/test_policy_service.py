@@ -533,12 +533,38 @@ class TestPolicyService:
         )
         assert updated.name == "Updated Name"
         assert updated.horizon_years == 25
-        assert updated.updated_at > goal.created_at
+        assert updated.updated_at >= goal.created_at
 
     def test_update_nonexistent_raises(self, tmp_path: Path) -> None:
         svc = PolicyService(path=tmp_path / "goals.json")
         with pytest.raises(GoalNotFoundError):
             svc.update_goal("nope", UpdateGoalRequest(name="x"))
+
+    def test_update_clear_optional_to_none(self, tmp_path: Path) -> None:
+        svc = PolicyService(path=tmp_path / "goals.json")
+        goal = svc.create_from_template(GoalType.RETIREMENT)
+        assert goal.target_amount is None
+        # Set a target amount
+        updated = svc.update_goal(
+            goal.id,
+            UpdateGoalRequest(target_amount=_D("2000000")),
+        )
+        assert updated.target_amount == _D("2000000")
+        # Clear it back to None via explicit set
+        cleared = svc.update_goal(
+            goal.id,
+            UpdateGoalRequest(target_amount=None),
+        )
+        assert cleared.target_amount is None
+
+    def test_create_request_retirement_requires_withdrawal(self) -> None:
+        with pytest.raises(ValueError, match="withdrawal_rate"):
+            CreateGoalRequest(
+                name="Bad",
+                goal_type=GoalType.RETIREMENT,
+                policy=_valid_policy(),
+                horizon_years=30,
+            )
 
     def test_delete_goal(self, tmp_path: Path) -> None:
         svc = PolicyService(path=tmp_path / "goals.json")

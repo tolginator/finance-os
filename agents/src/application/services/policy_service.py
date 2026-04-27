@@ -212,7 +212,7 @@ def compute_drift(
         target = policy.allocations[ac].target_weight
         current = current_allocations.get(ac, Decimal("0"))
         drift = current - target
-        band = policy.rebalancing_bands.get(ac)
+        band = (policy.rebalancing_bands or {}).get(ac)
         breaches = abs(drift) > band.threshold if band else False
         drifts.append(DriftResult(
             asset_class=ac,
@@ -258,7 +258,7 @@ class PolicyService:
         try:
             mtime_ns = self._path.stat().st_mtime_ns
             if self._cached_data is not None and mtime_ns == self._cached_mtime_ns:
-                return self._cached_data
+                return self._cached_data.model_copy(deep=True)
             raw = json.loads(self._path.read_text(encoding="utf-8"))
             data = GoalsFile.model_validate(raw)
             self._cached_data = data

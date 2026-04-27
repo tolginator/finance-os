@@ -116,6 +116,7 @@ class InvestmentPolicy(BaseModel):
         provided = self.rebalancing_bands or {}
         self.rebalancing_bands = {**default_bands, **provided}
         return self
+
     benchmark_blend: list[BenchmarkComponent] = Field(default_factory=list)
     risk_budget: Decimal | None = None
     liquidity_floor: Decimal = Decimal("0.05")
@@ -223,7 +224,7 @@ class Goal(BaseModel):
         else:
             if self.withdrawal_rate is not None:
                 raise ValueError(
-                    f"{self.goal_type} goals should not have withdrawal_rate"
+                    f"{self.goal_type.value} goals should not have withdrawal_rate"
                 )
         if self.target_amount is not None and self.target_amount < 0:
             raise ValueError("target_amount must be non-negative")

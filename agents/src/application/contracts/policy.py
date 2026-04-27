@@ -295,6 +295,15 @@ class CreateGoalRequest(BaseModel):
     inflation_assumption: Decimal = Decimal("0.025")
     notes: str = ""
 
+    @field_validator("name")
+    @classmethod
+    def _strip_name(cls, value: str) -> str:
+        """Strip whitespace and reject blank names."""
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("name must not be blank")
+        return stripped
+
     @model_validator(mode="after")
     def _goal_type_invariants(self) -> Self:
         if self.goal_type == GoalType.RETIREMENT and self.withdrawal_rate is None:
@@ -321,6 +330,49 @@ class UpdateGoalRequest(BaseModel):
     withdrawal_rate: Decimal | None = None
     inflation_assumption: Decimal | None = None
     notes: str | None = None
+
+    @field_validator("name")
+    @classmethod
+    def _validate_name(cls, value: str | None) -> str | None:
+        """Strip whitespace and reject blank names when provided."""
+        if value is None:
+            return None
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("name must not be blank")
+        return stripped
+
+    @field_validator("horizon_years")
+    @classmethod
+    def _validate_horizon_years(cls, value: int | None) -> int | None:
+        """Reject non-positive horizon when provided."""
+        if value is None:
+            return None
+        if value < 1:
+            raise ValueError("horizon_years must be positive")
+        return value
+
+    @field_validator("target_amount")
+    @classmethod
+    def _validate_target_amount(cls, value: Decimal | None) -> Decimal | None:
+        """Reject negative target amounts when provided."""
+        if value is None:
+            return None
+        if value < 0:
+            raise ValueError("target_amount must be non-negative")
+        return value
+
+    @field_validator("inflation_assumption")
+    @classmethod
+    def _validate_inflation_assumption(
+        cls, value: Decimal | None,
+    ) -> Decimal | None:
+        """Reject negative inflation assumption when provided."""
+        if value is None:
+            return None
+        if value < 0:
+            raise ValueError("inflation_assumption must be non-negative")
+        return value
 
 
 class DriftRequest(BaseModel):

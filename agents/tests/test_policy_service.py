@@ -407,6 +407,72 @@ class TestCannedGoals:
 
 
 # ---------------------------------------------------------------------------
+# CreateGoalRequest validation
+# ---------------------------------------------------------------------------
+
+
+class TestCreateGoalRequest:
+    def test_whitespace_name_rejected(self) -> None:
+        with pytest.raises(ValueError, match="blank"):
+            CreateGoalRequest(
+                name="   ",
+                goal_type=GoalType.WEALTH_BUILDING,
+                policy=_valid_policy(),
+                horizon_years=20,
+            )
+
+    def test_name_stripped(self) -> None:
+        req = CreateGoalRequest(
+            name="  Growth  ",
+            goal_type=GoalType.WEALTH_BUILDING,
+            policy=_valid_policy(),
+            horizon_years=20,
+        )
+        assert req.name == "Growth"
+
+
+# ---------------------------------------------------------------------------
+# UpdateGoalRequest validation
+# ---------------------------------------------------------------------------
+
+
+class TestUpdateGoalRequest:
+    def test_blank_name_rejected(self) -> None:
+        with pytest.raises(ValueError, match="blank"):
+            UpdateGoalRequest(name="   ")
+
+    def test_name_stripped(self) -> None:
+        req = UpdateGoalRequest(name="  Edited  ")
+        assert req.name == "Edited"
+
+    def test_none_name_allowed(self) -> None:
+        req = UpdateGoalRequest(name=None)
+        assert req.name is None
+
+    def test_negative_horizon_rejected(self) -> None:
+        with pytest.raises(ValueError, match="positive"):
+            UpdateGoalRequest(horizon_years=0)
+
+    def test_negative_target_amount_rejected(self) -> None:
+        with pytest.raises(ValueError, match="non-negative"):
+            UpdateGoalRequest(target_amount=_D("-1"))
+
+    def test_negative_inflation_rejected(self) -> None:
+        with pytest.raises(ValueError, match="non-negative"):
+            UpdateGoalRequest(inflation_assumption=_D("-0.01"))
+
+    def test_valid_partial_update(self) -> None:
+        req = UpdateGoalRequest(
+            horizon_years=25,
+            target_amount=_D("1000000"),
+            inflation_assumption=_D("0.03"),
+        )
+        assert req.horizon_years == 25
+        assert req.target_amount == _D("1000000")
+        assert req.inflation_assumption == _D("0.03")
+
+
+# ---------------------------------------------------------------------------
 # Drift computation
 # ---------------------------------------------------------------------------
 

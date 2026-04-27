@@ -283,7 +283,7 @@ class PolicyService:
                 os.fsync(tmp_file.fileno())
             os.chmod(str(tmp_path), 0o600)
             tmp_path.replace(self._path)
-        except Exception:
+        except BaseException:
             try:
                 tmp_path.unlink(missing_ok=True)
             except OSError as cleanup_exc:

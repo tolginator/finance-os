@@ -304,10 +304,31 @@ class CreateGoalRequest(BaseModel):
             raise ValueError("name must not be blank")
         return stripped
 
+    @field_validator("target_amount")
+    @classmethod
+    def _validate_target_amount(cls, value: Decimal | None) -> Decimal | None:
+        """Reject negative target amounts when provided."""
+        if value is None:
+            return None
+        if value < 0:
+            raise ValueError("target_amount must be non-negative")
+        return value
+
+    @field_validator("inflation_assumption")
+    @classmethod
+    def _validate_inflation_assumption(cls, value: Decimal) -> Decimal:
+        """Reject negative inflation assumption."""
+        if value < 0:
+            raise ValueError("inflation_assumption must be non-negative")
+        return value
+
     @model_validator(mode="after")
     def _goal_type_invariants(self) -> Self:
-        if self.goal_type == GoalType.RETIREMENT and self.withdrawal_rate is None:
-            raise ValueError("Retirement goals require withdrawal_rate")
+        if self.goal_type == GoalType.RETIREMENT:
+            if self.withdrawal_rate is None:
+                raise ValueError("Retirement goals require withdrawal_rate")
+            if self.withdrawal_rate <= 0:
+                raise ValueError("withdrawal_rate must be positive")
         if (
             self.goal_type != GoalType.RETIREMENT
             and self.withdrawal_rate is not None

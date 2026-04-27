@@ -430,6 +430,46 @@ class TestCreateGoalRequest:
         )
         assert req.name == "Growth"
 
+    def test_negative_target_amount_rejected(self) -> None:
+        with pytest.raises(ValueError, match="non-negative"):
+            CreateGoalRequest(
+                name="Test",
+                goal_type=GoalType.WEALTH_BUILDING,
+                policy=_valid_policy(),
+                horizon_years=20,
+                target_amount=_D("-100"),
+            )
+
+    def test_negative_inflation_rejected(self) -> None:
+        with pytest.raises(ValueError, match="non-negative"):
+            CreateGoalRequest(
+                name="Test",
+                goal_type=GoalType.WEALTH_BUILDING,
+                policy=_valid_policy(),
+                horizon_years=20,
+                inflation_assumption=_D("-0.01"),
+            )
+
+    def test_zero_withdrawal_rate_rejected_for_retirement(self) -> None:
+        with pytest.raises(ValueError, match="positive"):
+            CreateGoalRequest(
+                name="Retire",
+                goal_type=GoalType.RETIREMENT,
+                policy=_valid_policy(),
+                horizon_years=30,
+                withdrawal_rate=_D("0"),
+            )
+
+    def test_negative_withdrawal_rate_rejected_for_retirement(self) -> None:
+        with pytest.raises(ValueError, match="positive"):
+            CreateGoalRequest(
+                name="Retire",
+                goal_type=GoalType.RETIREMENT,
+                policy=_valid_policy(),
+                horizon_years=30,
+                withdrawal_rate=_D("-0.01"),
+            )
+
 
 # ---------------------------------------------------------------------------
 # UpdateGoalRequest validation

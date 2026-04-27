@@ -207,15 +207,47 @@ class TestInvestmentPolicy:
             )
 
     def test_infeasible_min_unreachable_with_valid_targets(self) -> None:
-        # Note: sum(min) > 1 is impossible when each min <= target
-        # and targets sum to 1.  The validator is defense-in-depth.
-        # We verify the guard exists by testing directly with raw data.
-        pass
+        # sum(min) > 1 is impossible with valid AllocationTargets where
+        # min<=target and targets sum to 1. Use model_construct on both
+        # AllocationTarget and InvestmentPolicy, then call the validator.
+        alloc = {
+            ac: AllocationTarget.model_construct(
+                target_weight=_D("1") / 9,
+                min_weight=_D("0.12"),  # 9*0.12=1.08 > 1
+                max_weight=_D("0.30"),
+            )
+            for ac in AssetClass
+        }
+        policy = InvestmentPolicy.model_construct(
+            allocations=alloc,
+            rebalancing_bands={},
+            benchmark_blend=[],
+            risk_budget=None,
+            liquidity_floor=_D("0"),
+        )
+        with pytest.raises(ValueError, match="infeasible"):
+            policy._policy_invariants()
 
     def test_infeasible_max_unreachable_with_valid_targets(self) -> None:
-        # Similarly, sum(max) < 1 is impossible when each target <= max
-        # and targets sum to 1.
-        pass
+        # sum(max) < 1 is impossible with valid AllocationTargets where
+        # target<=max and targets sum to 1. Bypass via model_construct.
+        alloc = {
+            ac: AllocationTarget.model_construct(
+                target_weight=_D("1") / 9,
+                min_weight=_D("0"),
+                max_weight=_D("0.10"),  # 9*0.10=0.90 < 1
+            )
+            for ac in AssetClass
+        }
+        policy = InvestmentPolicy.model_construct(
+            allocations=alloc,
+            rebalancing_bands={},
+            benchmark_blend=[],
+            risk_budget=None,
+            liquidity_floor=_D("0"),
+        )
+        with pytest.raises(ValueError, match="infeasible"):
+            policy._policy_invariants()
 
     def test_cash_below_liquidity_floor_rejected(self) -> None:
         alloc = _full_allocations({
@@ -255,6 +287,12 @@ class TestInvestmentPolicy:
             ],
         )
         assert len(p.benchmark_blend) == 2
+
+    def test_default_rebalancing_bands_populated(self) -> None:
+        p = _valid_policy()
+        assert len(p.rebalancing_bands) == 9
+        for ac in AssetClass:
+            assert ac in p.rebalancing_bands
 
 
 # ---------------------------------------------------------------------------
@@ -418,6 +456,18 @@ class TestDriftComputation:
         current[AssetClass.US_TREASURIES] -= _D("0.03")
         report = compute_drift(policy, current)
         assert report.total_drift >= _D("0.06")
+
+    def test_drift_request_negative_weight_rejected(self) -> None:
+        with pytest.raises(ValueError, match=r"\[0, 1\]"):
+            DriftRequest(
+                current_allocations={AssetClass.US_EQUITY: _D("-0.10")},
+            )
+
+    def test_drift_request_weight_above_one_rejected(self) -> None:
+        with pytest.raises(ValueError, match=r"\[0, 1\]"):
+            DriftRequest(
+                current_allocations={AssetClass.US_EQUITY: _D("1.50")},
+            )
 
 
 # ---------------------------------------------------------------------------

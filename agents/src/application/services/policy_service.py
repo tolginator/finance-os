@@ -239,17 +239,28 @@ class PolicyService:
         self._lock_path = (
             path.parent / "goals.lock" if path else LOCK_FILE
         )
+        self._cached_data: GoalsFile | None = None
+        self._cached_mtime: float = 0.0
 
     def _flock(self) -> _FileLockContext:
         return _FileLockContext(self._lock_path)
 
     def _load_unlocked(self) -> GoalsFile:
-        """Load goals without acquiring lock (caller must hold lock)."""
+        """Load goals without acquiring lock (caller must hold lock).
+
+        Uses mtime-based caching to avoid redundant disk reads.
+        """
         if not self._path.exists():
             return GoalsFile()
         try:
+            mtime = self._path.stat().st_mtime
+            if self._cached_data is not None and mtime == self._cached_mtime:
+                return self._cached_data
             raw = json.loads(self._path.read_text(encoding="utf-8"))
-            return GoalsFile.model_validate(raw)
+            data = GoalsFile.model_validate(raw)
+            self._cached_data = data
+            self._cached_mtime = mtime
+            return data
         except (json.JSONDecodeError, ValidationError, OSError) as exc:
             logger.error("Corrupt goals file %s: %s", self._path, exc)
             raise GoalsCorruptError(str(exc)) from exc
@@ -289,6 +300,12 @@ class PolicyService:
         finally:
             if dir_fd is not None:
                 os.close(dir_fd)
+        # Update mtime cache after successful write
+        self._cached_data = data
+        try:
+            self._cached_mtime = self._path.stat().st_mtime
+        except OSError:
+            self._cached_mtime = 0.0
 
     # -- public API --------------------------------------------------------
 
@@ -380,7 +397,7 @@ class PolicyService:
         return updated
 
     def delete_goal(self, goal_id: str) -> bool:
-        """Delete a goal. Returns True if it existed."""
+        """Delete a goal. Raises GoalNotFoundError if missing."""
         with self._flock():
             data = self._load_unlocked()
             if goal_id not in data.goals:

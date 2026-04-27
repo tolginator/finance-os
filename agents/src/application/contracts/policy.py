@@ -106,8 +106,17 @@ class InvestmentPolicy(BaseModel):
 
     allocations: dict[AssetClass, AllocationTarget]
     rebalancing_bands: dict[AssetClass, RebalancingBand] = Field(
-        default_factory=dict,
+        default=None,
     )
+
+    @model_validator(mode="after")
+    def _default_bands(self) -> Self:
+        """Populate rebalancing bands for all asset classes if not provided."""
+        if self.rebalancing_bands is None:
+            self.rebalancing_bands = {
+                ac: RebalancingBand() for ac in AssetClass
+            }
+        return self
     benchmark_blend: list[BenchmarkComponent] = Field(default_factory=list)
     risk_budget: Decimal | None = None
     liquidity_floor: Decimal = Decimal("0.05")
@@ -294,6 +303,11 @@ class DriftRequest(BaseModel):
 
     @model_validator(mode="after")
     def _allocations_valid(self) -> Self:
+        for ac, w in self.current_allocations.items():
+            if w < 0 or w > 1:
+                raise ValueError(
+                    f"Allocation for {ac.value} must be in [0, 1], got {w}"
+                )
         total = sum(self.current_allocations.values())
         if abs(total - 1) > Decimal("0.01"):
             raise ValueError(

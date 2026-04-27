@@ -294,6 +294,16 @@ class TestInvestmentPolicy:
         for ac in AssetClass:
             assert ac in p.rebalancing_bands
 
+    def test_partial_rebalancing_bands_filled(self) -> None:
+        custom = RebalancingBand(threshold=_D("0.10"))
+        p = _valid_policy(
+            rebalancing_bands={AssetClass.US_EQUITY: custom},
+        )
+        assert len(p.rebalancing_bands) == 9
+        assert p.rebalancing_bands[AssetClass.US_EQUITY].threshold == _D("0.10")
+        # Other classes get the default threshold
+        assert p.rebalancing_bands[AssetClass.TIPS].threshold == _D("0.05")
+
 
 # ---------------------------------------------------------------------------
 # Goal validation
@@ -455,7 +465,7 @@ class TestDriftComputation:
         current[AssetClass.US_EQUITY] += _D("0.03")
         current[AssetClass.US_TREASURIES] -= _D("0.03")
         report = compute_drift(policy, current)
-        assert report.total_drift >= _D("0.06")
+        assert report.total_drift == _D("0.06")
 
     def test_drift_request_negative_weight_rejected(self) -> None:
         with pytest.raises(ValueError, match=r"\[0, 1\]"):

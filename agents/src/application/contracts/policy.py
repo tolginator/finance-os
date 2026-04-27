@@ -105,17 +105,16 @@ class InvestmentPolicy(BaseModel):
     """
 
     allocations: dict[AssetClass, AllocationTarget]
-    rebalancing_bands: dict[AssetClass, RebalancingBand] = Field(
+    rebalancing_bands: dict[AssetClass, RebalancingBand] | None = Field(
         default=None,
     )
 
     @model_validator(mode="after")
     def _default_bands(self) -> Self:
-        """Populate rebalancing bands for all asset classes if not provided."""
-        if self.rebalancing_bands is None:
-            self.rebalancing_bands = {
-                ac: RebalancingBand() for ac in AssetClass
-            }
+        """Fill missing rebalancing bands with defaults for all asset classes."""
+        default_bands = {ac: RebalancingBand() for ac in AssetClass}
+        provided = self.rebalancing_bands or {}
+        self.rebalancing_bands = {**default_bands, **provided}
         return self
     benchmark_blend: list[BenchmarkComponent] = Field(default_factory=list)
     risk_budget: Decimal | None = None

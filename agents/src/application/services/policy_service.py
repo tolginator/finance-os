@@ -70,8 +70,11 @@ class _FileLockContext:
         self._fd = os.open(str(self._lock_path), os.O_CREAT | os.O_RDWR)
         try:
             fcntl.flock(self._fd, fcntl.LOCK_EX)
-        except Exception:
-            os.close(self._fd)
+        except BaseException:
+            try:
+                os.close(self._fd)
+            except OSError:
+                pass
             self._fd = None
             raise
         return self
@@ -274,11 +277,10 @@ class PolicyService:
         )
         tmp_path = Path(tmp_name)
         try:
-            try:
-                os.write(fd_num, content)
-                os.fsync(fd_num)
-            finally:
-                os.close(fd_num)
+            with os.fdopen(fd_num, "wb") as tmp_file:
+                tmp_file.write(content)
+                tmp_file.flush()
+                os.fsync(tmp_file.fileno())
             os.chmod(str(tmp_path), 0o600)
             tmp_path.replace(self._path)
         except Exception:

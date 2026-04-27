@@ -8,6 +8,8 @@ from decimal import Decimal
 
 from pydantic import BaseModel, Field
 
+from src.application.contracts.regime import MacroRegimeReport
+
 # --- Earnings Interpreter ---
 
 
@@ -54,9 +56,13 @@ class ClassifyMacroResponse(BaseModel):
     """Macro regime classification results."""
 
     content: str = Field(description="Human-readable macro dashboard")
-    regime: str = Field(description="Classified regime (expansion/contraction/transition)")
+    regime: str = Field(description="Legacy regime (expansion/contraction/transition)")
     indicators_fetched: int = Field(description="Number of indicators requested")
     indicators_with_data: int = Field(description="Number that returned data")
+    regime_report: MacroRegimeReport | None = Field(
+        default=None,
+        description="Multi-dimensional regime report (enhanced classifier)",
+    )
 
 
 # --- Filing Analyst ---

@@ -187,7 +187,16 @@ class Goal(BaseModel):
     """A financial goal with an embedded investment policy."""
 
     id: str = Field(default_factory=lambda: uuid4().hex[:12])
-    name: str
+    name: str = Field(min_length=1)
+
+    @field_validator("name")
+    @classmethod
+    def _strip_name(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Goal name must not be blank")
+        return v
+
     goal_type: GoalType
     policy: InvestmentPolicy
     horizon_years: int
@@ -274,7 +283,7 @@ class GoalsFile(BaseModel):
 class CreateGoalRequest(BaseModel):
     """Request to create a new goal."""
 
-    name: str
+    name: str = Field(min_length=1)
     goal_type: GoalType
     policy: InvestmentPolicy
     horizon_years: int

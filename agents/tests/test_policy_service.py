@@ -315,6 +315,18 @@ class TestGoal:
         g = _valid_goal()
         assert g.goal_type == GoalType.WEALTH_BUILDING
 
+    def test_blank_name_rejected(self) -> None:
+        with pytest.raises(ValueError, match="blank"):
+            _valid_goal(name="   ")
+
+    def test_empty_name_rejected(self) -> None:
+        with pytest.raises(ValueError):
+            _valid_goal(name="")
+
+    def test_name_stripped(self) -> None:
+        g = _valid_goal(name="  My Goal  ")
+        assert g.name == "My Goal"
+
     def test_retirement_requires_withdrawal_rate(self) -> None:
         with pytest.raises(ValueError, match="withdrawal_rate"):
             _valid_goal(goal_type=GoalType.RETIREMENT)

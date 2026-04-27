@@ -175,6 +175,10 @@ class TestBenchmarkComponent:
         with pytest.raises(ValueError, match="non-negative"):
             BenchmarkComponent(ticker="SPY", weight=_D("-0.01"))
 
+    def test_blank_ticker_rejected(self) -> None:
+        with pytest.raises(ValueError):
+            BenchmarkComponent(ticker="   ", weight=_D("0.50"))
+
 
 # ---------------------------------------------------------------------------
 # InvestmentPolicy validation
@@ -568,6 +572,18 @@ class TestPolicyService:
             UpdateGoalRequest(target_amount=None),
         )
         assert cleared.target_amount is None
+
+    def test_update_normalizes_name(self, tmp_path: Path) -> None:
+        svc = PolicyService(path=tmp_path / "goals.json")
+        goal = svc.create_from_template(GoalType.WEALTH_BUILDING)
+        updated = svc.update_goal(
+            goal.id,
+            UpdateGoalRequest(name="  Padded Name  "),
+        )
+        assert updated.name == "Padded Name"
+        # Verify persisted
+        reloaded = svc.get_goal(goal.id)
+        assert reloaded.name == "Padded Name"
 
     def test_create_request_retirement_requires_withdrawal(self) -> None:
         with pytest.raises(ValueError, match="withdrawal_rate"):

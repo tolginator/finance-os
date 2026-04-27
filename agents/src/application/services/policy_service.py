@@ -384,8 +384,8 @@ class PolicyService:
             updates["updated_at"] = datetime.now(UTC)
 
             updated = goal.model_copy(update=updates)
-            # Re-validate goal-type invariants on the updated goal
-            Goal.model_validate(updated.model_dump())
+            # Re-validate all Goal invariants (including field validators)
+            updated = Goal.model_validate(updated.model_dump())
             data.goals[goal_id] = updated
             self._write_atomic(data)
         return updated

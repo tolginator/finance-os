@@ -74,13 +74,16 @@ class RebalancingBand(BaseModel):
 class BenchmarkComponent(BaseModel):
     """One constituent of a synthetic benchmark blend."""
 
-    ticker: str
+    ticker: str = Field(min_length=1)
     weight: Decimal
 
     @field_validator("ticker")
     @classmethod
     def uppercase_ticker(cls, v: str) -> str:
-        return v.strip().upper()
+        v = v.strip().upper()
+        if not v:
+            raise ValueError("ticker must not be blank")
+        return v
 
     @field_validator("weight")
     @classmethod

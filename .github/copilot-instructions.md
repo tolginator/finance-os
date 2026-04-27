@@ -1,10 +1,26 @@
 # Copilot Instructions
 
+## Response Rules
+
+- Be concise. Minimize chat output.
+- Do not generate summaries.
+
+## Critical Invariants
+
+These override all other rules. Verify compliance before every commit.
+
+1. **Never commit secrets** — no passwords, API keys, tokens, or credentials anywhere in the codebase.
+2. **Use `decimal.Decimal` for all monetary arithmetic** — never `float` for money.
+3. **Every code change must include tests.**
+4. **Never commit to `main`** — use worktrees and branches.
+5. **Run `npm run preflight` before every push.**
+6. **Use `datetime.now(UTC)` from `datetime`** — never `datetime.utcnow()` (deprecated).
+
 ## Project Context
 
-**finance-os** is a macro ETF portfolio intelligence system — macroeconomic outlook-driven investment evaluation and goal-driven portfolio rebalancing for a wealthy family ($2M–$10M investable). Monorepo with a TypeScript MCP server, Python agent framework, FastAPI web API, and React frontend.
+**finance-os** — macro ETF portfolio intelligence system. Macroeconomic outlook-driven investment evaluation and goal-driven portfolio rebalancing for a wealthy family ($2M–$10M investable). Monorepo: TypeScript MCP server, Python agent framework, FastAPI web API, React frontend.
 
-**Target persona**: Wealthy family that can retire anytime keeping their lifestyle comfortably. Capital preservation + moderate growth. Tax-efficient ETF portfolios. Not average, not ultra-rich.
+**Persona**: Wealthy family, capital preservation + moderate growth, 3–4% SWR, tax-efficient ETF portfolios, multi-generational.
 
 ## Architecture
 
@@ -17,9 +33,7 @@
 
 ### Agents (`agents/`) — Python
 - **Framework**: Custom agent base classes in `src/core/`
-- **LLM Gateway**: Pluggable inference client — supports Azure OpenAI, or skip when host LLM reasons (MCP path)
-- **Active Agents**: Macro regime, risk analyst, quant signal (kept from v1). Macro outlook, portfolio evaluator, rebalancer (new, in development).
-- **Retiring Agents**: Filing analyst, earnings interpreter, thesis guardian, adversarial (stock-picking focused — being removed after new UI is ready)
+- **LLM Gateway**: Pluggable inference client — Azure OpenAI, or skipped when host LLM reasons (MCP path)
 - **Application Layer**: `src/application/` — shared contracts (Pydantic), LLM gateway, services. CLI, MCP server, and Web API are thin wrappers.
 - **Quant Tools**: `src/tools/` — regression, factor analysis, Monte Carlo, Bayesian updates
 - **Data Pipelines**: `src/pipelines/` — FRED, market data, research digest
@@ -40,27 +54,12 @@
 
 ## LLM Inference Model
 
-Agents perform deterministic data processing and construct prompts but **do not call LLMs directly**. The LLM gateway in the application layer provides inference when needed:
+Agents do deterministic data processing and prompt construction — they do not call LLMs directly.
 
 | Path | LLM reasoning | Gateway |
 |---|---|---|
 | MCP (Copilot, Claude Desktop) | Host LLM reasons | Skipped |
-| CLI | LLM gateway calls provider | Used |
-| Web API | LLM gateway calls provider | Used |
-
-## Data Flow
-
-```
-External APIs (FRED, BLS, Treasury, IMF, World Bank, Yahoo Finance)
-        ↓
-Data Services (Python) → Provider Abstraction (freshness tracking)
-        ↓
-Application Layer (contracts + LLM gateway)
-        ↓
-Agents (Python) — macro outlook, portfolio evaluation, rebalancing
-        ↓
-Portfolio Intelligence (evaluation, recommendations, stress tests)
-```
+| CLI / Web API | LLM gateway calls provider | Used |
 
 ## Tech Stack
 
@@ -71,12 +70,9 @@ Portfolio Intelligence (evaluation, recommendations, stress tests)
 | Application Layer | Python, Pydantic 2.11+, pydantic-settings, azure-identity |
 | Agents | Python 3.12+ |
 | LLM Gateway | Pluggable — Azure OpenAI, or host LLM via MCP |
-| Data Sources | FRED, BLS, Treasury.gov, IMF, World Bank, Yahoo Finance |
 | CLI | Python (`finance-os` console script) |
-| Web API | Python (`finance-os-api` console script, FastAPI + uvicorn) |
+| Web API | FastAPI + uvicorn (`finance-os-api` console script) |
 | Web UI | React 19, TypeScript, Vite |
-| MCP Server entry | Python (`finance-os-mcp` console script, stdio transport) |
-| Copilot Skills | Markdown workflow definitions (`.github/skills/`) |
 | Testing | Vitest (TS), pytest (Python) |
 | CI/CD | GitHub Actions |
 
@@ -90,129 +86,138 @@ Two-layer taxonomy for ETF classification:
 
 ## Key Design Decisions
 
-1. **Policy-first**: Macro outlook applies bounded tilts around strategic allocation (IPS), never overrides it
-2. **Dimensioned evaluation**: No single "health score" — policy drift, concentration, macro alignment, liquidity, tax drag, scenario exposure
-3. **Phased rebalancing**: Directional → account-aware → tax-lot (increasing complexity)
-4. **Provider abstraction**: All data behind interfaces for future source upgrades; track freshness/confidence
-5. **Wealthy family persona**: 3–4% SWR, capital preservation priority, tax-efficiency, multi-generational
-6. **No social network data**: Only government, institutional, and market data sources
-7. **ETF-level, not stock-level**: All analysis at macro/asset-class/ETF granularity
-8. **Decimal precision**: All monetary/financial arithmetic uses `decimal.Decimal`, never `float`
+1. **Policy-first**: Macro outlook applies bounded tilts around strategic allocation (IPS), never overrides it.
+2. **Dimensioned evaluation**: No single "health score" — separate dimensions for drift, concentration, macro alignment, liquidity, tax drag, scenario exposure.
+3. **Phased rebalancing**: Directional → account-aware → tax-lot (increasing complexity).
+4. **Provider abstraction**: All data behind interfaces; track freshness/confidence.
+5. **No social network data**: Only government, institutional, and market data sources.
+6. **ETF-level, not stock-level**: All analysis at macro/asset-class/ETF granularity.
 
 ## Code Guidelines
 
 ### General
-- **ES Modules**: All TypeScript and JavaScript uses ESM (`"type": "module"`)
-- **Dependencies**: Minimize. Justify every new dependency.
-- **Dependency versions**: Always use the latest stable version. No legacy compatibility — legacy systems must fail. When a dependency ships a breaking change, update all consuming code to work with the new version. Never pin to old versions to avoid migration work. **Legacy compatibility is an anti-pattern.**
-- **No secrets**: See [Security](#security) section below.
-- **Error handling**: Graceful degradation. Never crash on malformed input — log warnings and continue.
-- **Privacy**: All portfolio/personal data stays local. No PII sent to external APIs unless explicitly configured.
+- Use ES Modules everywhere (`"type": "module"`).
+- Minimize dependencies. Justify every new one.
+- Always use the latest stable version of dependencies. Never pin old versions to avoid migration. Update consuming code on breaking changes.
+- Graceful degradation on malformed input — log warnings and continue, never crash.
 
 ### TypeScript (MCP Server)
-- Strict TypeScript (`"strict": true`)
-- Use `interface` over `type` for object shapes
-- Async/await everywhere, no raw promises
-- Each MCP tool is a self-contained module in `src/tools/`
-- Tool implementations must validate all inputs and return structured error responses
+- Strict mode (`"strict": true`). Use `interface` over `type` for object shapes.
+- Async/await everywhere. No raw promises.
+- Each MCP tool is a self-contained module in `src/tools/`. Validate all inputs; return structured error responses.
 
 ### Python (Agents)
-- Python 3.12+ with type hints everywhere (use native `X | Y`, `list[str]`, etc. — no `from __future__ import annotations`)
-- PEP 8, `snake_case` for functions/variables, `PascalCase` for classes
-- Docstrings on all public functions and classes (Google style)
-- Use `pathlib.Path` over `os.path`
-- All monetary/financial arithmetic uses `decimal.Decimal`, never `float`
-- `#!/usr/bin/env python3` shebang on executable scripts
+- Python 3.12+ with type hints everywhere. Use native `X | Y`, `list[str]` — no `from __future__ import annotations`.
+- PEP 8: `snake_case` for functions/variables, `PascalCase` for classes.
+- Google-style docstrings on all public functions and classes.
+- Use `pathlib.Path` over `os.path`.
 
 ### Financial Accuracy Rules
 
-These rules exist because this is financial software. Violations produce incorrect dollar amounts.
+1. **Net flow, not gross**: Income shows `income - expense` per category; expense shows `expense - income`.
+2. **Data source attribution**: Every data point must trace to its source (API, filing, calculation).
+3. **Timestamp everything**: All market data, signals, and analysis must carry timestamps.
+4. **No stale data**: Always check data freshness before analysis.
+5. **Tax-lot integrity**: Never merge or average cost basis across lots. Each lot retains its purchase date and per-share cost.
 
-1. **All monetary arithmetic** uses `decimal.Decimal` (Python) or a decimal library (TypeScript). Never use floating point for money.
-2. **Net flow, not gross**: Income shows `income - expense` per category; expense shows `expense - income`.
-3. **Data source attribution**: Every data point must trace to its source (API, filing, calculation).
-4. **Timestamp everything**: All market data, signals, and analysis must carry timestamps.
-5. **No stale data assumptions**: Always check data freshness before analysis.
-6. **Tax-lot integrity**: When multiple lots exist per position, never merge or average cost basis. Each lot retains its purchase date and per-share cost.
+## Defensive Coding Checklist
+
+### Quick Decision Table
+
+| Situation | Do this |
+|---|---|
+| Money/weights/amounts | `decimal.Decimal`, never `float` |
+| PATCH update | `model_fields_set` to detect explicit `None` vs absent |
+| Optional dict/list missing entries | Merge with defaults in `@model_validator` |
+| After `model_copy(update=...)` | Re-validate: `Model.model_validate(obj.model_dump())`, use the returned object |
+| Enum in error message | `enum_value.value`, not the enum member |
+| Writing persistent files | Atomic write pattern (see Safe File I/O) |
+| Mtime-based cache read | Return `model_copy(deep=True)` to prevent mutation leaking |
+
+### Pydantic Model Discipline
+
+1. **String fields**: Add `Field(min_length=1)` + `@field_validator` that strips whitespace and rejects blank.
+2. **Numeric bounds**: Validate domain range on every constrained numeric field (e.g., weights in `[0, 1]`).
+3. **Request models mirror entity invariants**: If `Goal` validates goal-type invariants, `CreateGoalRequest` must too. Reject invalid input at the API boundary.
+4. **Optional collections**: Populate missing entries with defaults in `@model_validator`. A partial dict must be merged with defaults, not left incomplete.
+5. **Nullability**: If a field can be `None` at runtime (including via `model_construct`), annotate as `| None`.
+6. **`model_copy` bypasses validators** — always re-validate afterward and use the returned object.
+7. **PATCH semantics**: Use `model_fields_set` to distinguish "explicitly set to None" from "not provided". Never use `if value is not None`.
+8. **Enum in error messages**: Use `.value` so clients see `"wealth_building"` not `"GoalType.WEALTH_BUILDING"`.
+
+### Safe File I/O Pattern
+
+Atomic write pattern for services with persistent state:
+
+1. Use `os.fdopen` (not raw `os.write`) — `os.write` can short-write, silently truncating data.
+2. Catch `BaseException` (not `Exception`) in fd/lock cleanup — `KeyboardInterrupt` leaks fds otherwise.
+3. Use `st_mtime_ns` (int) for mtime caching — `st_mtime` (float) equality is unreliable across filesystems.
+4. Return deep copies from mtime caches — prevents mutation/disk divergence if `_write_atomic` fails after cache update.
+5. Use `0o600` permissions for sensitive files. Best-effort `fsync` on parent directory.
+
+Reference: `PolicyService._write_atomic()`, `OverrideStore._save()`.
+
+### Docstrings and PR Descriptions
+
+- Docstrings must match behavior exactly. If a method raises on not-found, do not document "returns False".
+- PR descriptions must match the code being shipped. Do not claim unimplemented features.
 
 ## Security
 
-Security is not optional. This is financial software handling sensitive portfolio data.
-
 ### No Portable Credentials
 
-- **No passwords, secrets, API keys, tokens, or credentials anywhere in the codebase** — not in source files, config files, environment files, comments, tests, documentation, or commit messages.
-- **No `.env` files committed to the repository.** Use `.env.example` with placeholder keys only. Actual `.env` files must be in `.gitignore`.
-- **No GitHub Secrets for PATs or service credentials.** Use only the built-in `GITHUB_TOKEN` and native GitHub features.
-- **No plaintext credential storage.**
+- No passwords, secrets, API keys, tokens, or credentials anywhere in the codebase — not in source, config, env files, comments, tests, docs, or commits.
+- No `.env` files committed. Use `.env.example` with placeholders only.
+- No GitHub Secrets for PATs or service credentials. Use only `GITHUB_TOKEN`.
 
-### Authentication Standards
+### Authentication
 
-- **Prefer credential-free authentication**: OIDC federation, managed identities, workload identity, certificate-based auth.
-- **When credentials are unavoidable** (e.g., FRED, BLS API keys): load from environment variables at runtime via `pydantic-settings` (`AppConfig`). Never hardcode, never log, never serialize.
+- Prefer credential-free: OIDC federation, managed identities, workload identity, certificate-based auth.
+- When credentials are unavoidable (FRED, BLS API keys): load from environment variables at runtime via `pydantic-settings` (`AppConfig`). Never hardcode, log, or serialize.
 
 ### Defense in Depth
 
-- **All portfolio and personal data stays local.** No PII sent to external APIs unless the user explicitly configures it.
-- **Validate all external input** — API responses, file contents, user input. Never trust external data.
-- **Log security-relevant events** but **never log credentials or sensitive data**.
-- **Fail closed**: if a security check cannot be performed, deny access.
+- All portfolio and personal data stays local. No PII sent to external APIs unless explicitly configured.
+- Validate all external input (API responses, file contents, user input).
+- Log security-relevant events but never log credentials or sensitive data.
+- Fail closed: if a security check cannot be performed, deny access.
 
 ## Testing
 
-### Running Tests
+### Commands
 
-- **MCP Server (unit)**: `cd mcp-server && npm test`
-- **Agents (unit)**: `cd agents && source .venv/bin/activate && pytest -m "not integration"`
-- **Agents (integration)**: `cd agents && source .venv/bin/activate && pytest -m integration`
-- **Full suite (unit)**: `npm test` (from root)
-- **Linting**: `npm run lint` (root), `cd agents && ruff check src/ tests/`
-
-### Pre-Push Preflight
-
-**Always run `npm run preflight` from the repo root before pushing.**
-
-```bash
-npm run preflight   # must pass before every push
-```
-
-### Testing Philosophy
-
-Every code change **must** include tests. No exceptions.
-
-#### Positive Tests
-- Cover the happy path for each unit of new or changed functionality
-- Use concrete, representative test fixtures
-
-#### Negative Tests
-- Every boundary condition and error path must have a negative test
-- **Never assert on error codes or error message strings**
-- **Assert on observable behavior**: return values, thrown vs not thrown, state changes, output shape
-
-#### Financial Logic Tests
-- All monetary calculations must be tested with `Decimal` precision
-- Tax-lot selection logic must have edge-case coverage (wash sales, zero-basis lots, same-day trades)
-- Rebalancing math must verify current→target drift calculations
-- Scenario stress tests must verify arithmetic against known expected losses
-
-#### Test Anti-Patterns
-
-| Anti-pattern | Why it's bad |
+| Scope | Command |
 |---|---|
-| Tautology (`assert True`) | Tests nothing |
-| Language validation (constructor/property tests) | Tests that the language works, not your code |
-| Mirror (reimplements production logic) | Breaks when logic changes |
-| Duplicate (same behavior twice) | Noise; keep the more expressive one |
-| Error-code/message matching | Couples to internals |
+| MCP Server (unit) | `cd mcp-server && npm test` |
+| Agents (unit) | `cd agents && source .venv/bin/activate && pytest -m "not integration"` |
+| Agents (integration) | `cd agents && source .venv/bin/activate && pytest -m integration` |
+| Full suite | `npm test` (from root) |
+| Lint | `npm run lint` (root) |
+| **Preflight (pre-push)** | **`npm run preflight`** (from root) |
 
-## Communication Style
+### Test Requirements
 
-- Be concise and succinct, use as few words as possible. Words are at a premium.
-- Do not generate summaries in chat output.
+- Every code change must include tests.
+- Cover the happy path with concrete, representative fixtures.
+- Every boundary condition and error path must have a negative test.
+- Assert on observable behavior (return values, exceptions, state changes), not error message strings.
+- All monetary calculations tested with `Decimal` precision.
 
-## Git Workflow: Worktrees and Branches
+### Anti-Patterns
 
-Multiple Copilot CLI sessions may work simultaneously. Always use git worktrees.
+| Avoid | Do instead |
+|---|---|
+| `assert True`, `pass` (placeholder) | Use `model_construct` to bypass outer validation and test the guard directly |
+| Testing language features (constructor/property) | Test your logic, not that Python works |
+| Mirror test (reimplements production logic) | Use independent expected values |
+| Duplicate test (same behavior twice) | Keep the more expressive one |
+| `>= expected` when exact value is known | `== expected` — ranges hide regressions |
+| `>` for time comparisons | `>=` — strict comparison is flaky on fast machines |
+| Testing only returned objects | Write-read cycle: reload from a fresh instance to verify persistence |
+
+## Git Workflow
+
+Use git worktrees. Multiple sessions may work simultaneously.
 
 ### Branch Naming
 
@@ -220,14 +225,14 @@ All branches other than `main` **must** follow: `<username>/<MeaningfulDescripti
 
 ### Making Changes
 
-0. **Never commit to main.**
+0. Never commit to `main`.
 1. `git worktree add <path> -b <username>/<task> origin/main`
 2. Work exclusively in the worktree.
-3. Make **separate, descriptive commits** for each logical change within a PR.
-4. Do **not** amend or force-push.
-5. Run `npm run preflight` before pushing.
+3. Separate, descriptive commits for each logical change.
+4. Do not amend or force-push.
+5. `npm run preflight` before pushing.
 6. Commit, push, create PR targeting `main`.
-7. **Squash merge** when merging PRs into main.
+7. Squash merge when merging PRs.
 
 ### After PR Merge
 
@@ -240,17 +245,17 @@ All branches other than `main` **must** follow: `<username>/<MeaningfulDescripti
 
 ### Issue-First Workflow
 
-**Every PR must have a corresponding issue created before the PR.** No exceptions.
+Every PR must have a corresponding issue created before the PR.
 
-1. Before starting work, create an issue describing what will be built.
-2. For multi-step features, use **parent issue + sub-issues**.
+1. Create an issue describing what will be built before starting work.
+2. For multi-step features, use parent issue + sub-issues.
 3. Every PR body must reference its issue(s) via closing keywords (`Closes #N`).
 
 ### Pull Requests
 
 - Use `gh pr create --title "..." --body "Closes #N"`.
-- **Assign every PR to the "finance-os" GitHub Project** (if one exists).
-- **After every push**, wait a few minutes for CI and Copilot code review feedback on the remote. Read all review comments, assess validity, address valid findings with a new commit, push, and resolve the conversations. Repeat this loop until there is no more unresolved feedback.
+- Assign every PR to the "finance-os" GitHub Project (if one exists).
+- After every push, wait for CI and Copilot code review feedback. Read all review comments, assess validity, address valid findings with a new commit, push, and resolve conversations. Repeat until no unresolved feedback remains.
 
 ## @azure Rule
 

@@ -135,6 +135,45 @@ These rules exist because this is financial software. Violations produce incorre
 5. **No stale data assumptions**: Always check data freshness before analysis.
 6. **Tax-lot integrity**: When multiple lots exist per position, never merge or average cost basis. Each lot retains its purchase date and per-share cost.
 
+## Defensive Coding Checklist
+
+These rules are distilled from recurring code review findings. Apply them **before** pushing to reduce review cycles.
+
+### Pydantic Model Discipline
+
+1. **String fields**: Every user-facing string field (`name`, `ticker`, etc.) must have `Field(min_length=1)` and a `@field_validator` that strips whitespace and rejects blank values.
+2. **Numeric bounds**: Every numeric field with domain constraints must validate its range (e.g., weights in `[0, 1]`, positive-only amounts). Don't rely on downstream consumers to catch out-of-range values.
+3. **Request models mirror entity invariants**: If an entity model (e.g., `Goal`) has validators (goal-type invariants, name stripping), the corresponding request model (`CreateGoalRequest`) must enforce the same rules. Invalid requests must fail at the API boundary, not deep in service code.
+4. **Optional collections need safe defaults**: When a dict/list field is optional, populate missing entries with sensible defaults in a `@model_validator`. A partial dict (e.g., 3 of 9 asset classes provided) must be merged with defaults, not left incomplete.
+5. **Type annotations match nullability**: If a field can be `None` at runtime (including via `model_construct`), the type annotation must include `| None`. Defensive guards (`x or {}`) are good but don't substitute for correct types.
+6. **`model_copy` bypasses validators**: After `model_copy(update=...)`, always re-validate through `Model.model_validate(obj.model_dump())` and use the returned object — the copy itself is unvalidated.
+7. **PATCH update semantics**: Use `model_fields_set` to distinguish "field was explicitly set to None" from "field was not provided". Never use `if value is not None` for PATCH-style partial updates — it makes clearing optional fields impossible.
+8. **Enum error messages**: Use `enum_value.value` (not the enum member itself) in user-facing error messages so API clients get clean strings like `"wealth_building"` instead of `"GoalType.WEALTH_BUILDING"`.
+
+### Safe File I/O Pattern
+
+When writing files atomically (the standard pattern for services with persistent state):
+
+1. **Use `os.fdopen`** (not raw `os.write`) to prevent short writes that silently truncate data.
+2. **Catch `BaseException`** (not `Exception`) in fd/lock cleanup so `KeyboardInterrupt` doesn't leak file descriptors.
+3. **Use `st_mtime_ns`** (int) for mtime-based caching, never `st_mtime` (float) — float equality is unreliable across filesystems.
+4. **Return deep copies** from mtime caches (`model_copy(deep=True)`). If callers mutate the cached object and `_write_atomic` fails, the in-memory cache diverges from disk.
+5. **File permissions**: `0o600` for sensitive data files. Best-effort `fsync` on parent directory with `try/except OSError`.
+
+Reference implementation: `PolicyService._write_atomic()`, `OverrideStore._save()`.
+
+### Docstrings and Descriptions
+
+1. **Docstrings must match behavior exactly.** If a method raises on not-found, don't say "returns False". If a method caches, don't say "loads from disk on every call".
+2. **PR descriptions must match the code being shipped.** Don't claim features (caching, validation) that aren't implemented yet.
+
+### Test Quality
+
+1. **No placeholder tests.** Every `def test_*` must contain at least one assertion. If a code path is unreachable under normal construction (e.g., defense-in-depth validators), use `model_construct` to bypass outer validation and test the guard directly.
+2. **Exact assertions over range assertions.** When the expected value is deterministic, assert `== expected`, not `>= expected`.
+3. **Time comparisons use `>=`**, not `>`, to avoid flakiness on fast machines or coarse-resolution clocks.
+4. **Test the full write-read cycle.** After creating/updating, reload from a fresh service instance to verify persistence, not just the returned object.
+
 ## Security
 
 Security is not optional. This is financial software handling sensitive portfolio data.

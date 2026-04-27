@@ -107,7 +107,6 @@ Two-layer taxonomy for ETF classification:
 - **Dependency versions**: Always use the latest stable version. No legacy compatibility — legacy systems must fail. When a dependency ships a breaking change, update all consuming code to work with the new version. Never pin to old versions to avoid migration work. **Legacy compatibility is an anti-pattern.**
 - **No secrets**: See [Security](#security) section below.
 - **Error handling**: Graceful degradation. Never crash on malformed input — log warnings and continue.
-- **Privacy**: All portfolio/personal data stays local. No PII sent to external APIs unless explicitly configured.
 
 ### TypeScript (MCP Server)
 - Strict TypeScript (`"strict": true`)
@@ -121,7 +120,6 @@ Two-layer taxonomy for ETF classification:
 - PEP 8, `snake_case` for functions/variables, `PascalCase` for classes
 - Docstrings on all public functions and classes (Google style)
 - Use `pathlib.Path` over `os.path`
-- All monetary/financial arithmetic uses `decimal.Decimal`, never `float`
 - `#!/usr/bin/env python3` shebang on executable scripts
 
 ### Financial Accuracy Rules
@@ -166,13 +164,6 @@ Reference implementation: `PolicyService._write_atomic()`, `OverrideStore._save(
 
 1. **Docstrings must match behavior exactly.** If a method raises on not-found, don't say "returns False". If a method caches, don't say "loads from disk on every call".
 2. **PR descriptions must match the code being shipped.** Don't claim features (caching, validation) that aren't implemented yet.
-
-### Test Quality
-
-1. **No placeholder tests.** Every `def test_*` must contain at least one assertion. If a code path is unreachable under normal construction (e.g., defense-in-depth validators), use `model_construct` to bypass outer validation and test the guard directly.
-2. **Exact assertions over range assertions.** When the expected value is deterministic, assert `== expected`, not `>= expected`.
-3. **Time comparisons use `>=`**, not `>`, to avoid flakiness on fast machines or coarse-resolution clocks.
-4. **Test the full write-read cycle.** After creating/updating, reload from a fresh service instance to verify persistence, not just the returned object.
 
 ## Security
 
@@ -234,15 +225,17 @@ Every code change **must** include tests. No exceptions.
 - Rebalancing math must verify current→target drift calculations
 - Scenario stress tests must verify arithmetic against known expected losses
 
-#### Test Anti-Patterns
+#### Test Anti-Patterns and Quality Rules
 
 | Anti-pattern | Why it's bad |
 |---|---|
-| Tautology (`assert True`) | Tests nothing |
+| Tautology / placeholder (`assert True`, `pass`) | Tests nothing — overstates coverage. If a code path is unreachable under normal construction, use `model_construct` to bypass outer validation and test the guard directly. |
 | Language validation (constructor/property tests) | Tests that the language works, not your code |
 | Mirror (reimplements production logic) | Breaks when logic changes |
 | Duplicate (same behavior twice) | Noise; keep the more expressive one |
-| Error-code/message matching | Couples to internals |
+| Range assertion when exact value is known | `>= expected` can hide regressions; use `== expected` when deterministic |
+| Strict time comparison (`>`) | Flaky on fast machines or coarse clocks; use `>=` |
+| Testing only returned objects | Always test the full write-read cycle — reload from a fresh instance to verify persistence |
 
 ## Communication Style
 
@@ -264,7 +257,7 @@ All branches other than `main` **must** follow: `<username>/<MeaningfulDescripti
 2. Work exclusively in the worktree.
 3. Make **separate, descriptive commits** for each logical change within a PR.
 4. Do **not** amend or force-push.
-5. Run `npm run preflight` before pushing.
+5. Run `npm run preflight` before pushing (see [Testing](#testing)).
 6. Commit, push, create PR targeting `main`.
 7. **Squash merge** when merging PRs into main.
 

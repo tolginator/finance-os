@@ -322,6 +322,21 @@ class TestClassifyGrowth:
         assert "GDP" in result.contributing_indicators
         assert "INDPRO" in result.contributing_indicators
 
+    def test_zero_pct_change_is_neutral(self) -> None:
+        """pct_change == 0 should not count as either signal."""
+        result = classify_growth(
+            _growth_data(
+                gdp_pct=_D("0"),
+                unrate_pct=_D("0"),
+                indpro_pct=_D("0"),
+                payems_pct=_D("0"),
+                lei_pct=_D("0"),
+            )
+        )
+        assert result is not None
+        # With no positive or negative signals, trend should be stable
+        assert result.trend == TrendDirection.STABLE
+
 
 # ---------------------------------------------------------------------------
 # Rate classifier tests
@@ -357,6 +372,19 @@ class TestClassifyRates:
 
     def test_no_data_returns_none(self) -> None:
         result = classify_rates({})
+        assert result is None
+
+    def test_no_fedfunds_returns_none(self) -> None:
+        """Rate classification requires FEDFUNDS — curve alone is insufficient."""
+        data = {
+            "T10Y2Y": _response(
+                _reading("T10Y2Y", _D("0.5"), frequency="daily")
+            ),
+            "DGS10": _response(
+                _reading("DGS10", _D("4.2"), frequency="daily")
+            ),
+        }
+        result = classify_rates(data)
         assert result is None
 
 

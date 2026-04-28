@@ -12,6 +12,7 @@ from src.agents.macro_regime import MacroRegimeAgent
 from src.agents.quant_signal import QuantSignalAgent
 from src.agents.risk_agent import RiskAgent
 from src.agents.thesis_guardian import ThesisGuardianAgent
+from src.application.config import AppConfig
 from src.application.contracts.agents import (
     AnalyzeEarningsRequest,
     AnalyzeEarningsResponse,
@@ -28,12 +29,22 @@ from src.application.contracts.agents import (
     SearchFilingsRequest,
     SearchFilingsResponse,
 )
+from src.application.data_services.fred_service import FREDService
+from src.application.services.regime_service import RegimeService
 from src.core.agent import AgentResponse, BaseAgent
 
 
 def _metadata_get(metadata: dict[str, Any], key: str, default: Any = "") -> Any:
     """Safely get a metadata value with a default."""
     return metadata.get(key, default)
+
+
+def _get_fred_api_key() -> str:
+    """Best-effort FRED API key from AppConfig."""
+    try:
+        return AppConfig().fred_api_key
+    except Exception:
+        return ""
 
 
 class AgentService:
@@ -86,6 +97,15 @@ class AgentService:
         if request.indicators:
             kwargs["indicators"] = request.indicators
         response = await agent.run("Classify current macro regime", **kwargs)
+
+        # Enhanced multi-dimensional regime report
+        regime_report = None
+        api_key = request.api_key or _get_fred_api_key()
+        if api_key:
+            fred = FREDService(api_key=api_key)
+            regime_svc = RegimeService(fred_service=fred)
+            regime_report = regime_svc.classify()
+
         return ClassifyMacroResponse(
             content=response.content,
             regime=_metadata_get(response.metadata, "regime"),
@@ -95,6 +115,7 @@ class AgentService:
             indicators_with_data=int(
                 _metadata_get(response.metadata, "indicators_with_data", 0)
             ),
+            regime_report=regime_report,
         )
 
     async def search_filings(

@@ -115,29 +115,30 @@ def classify_growth(
             if reading.pct_change is not None:
                 if reading.pct_change > 0:
                     signals["expansion"] += 2
-                else:
+                elif reading.pct_change < 0:
                     signals["contraction"] += 2
         elif series_id == "UNRATE":
             if reading.pct_change is not None:
                 if reading.pct_change > 0:
                     signals["contraction"] += 1
-                else:
+                elif reading.pct_change < 0:
                     signals["expansion"] += 1
         elif series_id in ("INDPRO", "PAYEMS"):
             if reading.pct_change is not None:
                 if reading.pct_change > 0:
                     signals["expansion"] += 1
-                else:
+                elif reading.pct_change < 0:
                     signals["contraction"] += 1
         elif series_id == "USALOLITONOSTSAM":
             # LEI: rising = forward expansion signal
             if reading.pct_change is not None:
                 if reading.pct_change > 0:
                     signals["expansion"] += 1
-                else:
+                elif reading.pct_change < 0:
                     signals["contraction"] += 1
 
     if not contributing:
+        logger.info("Growth classification skipped: no indicator data available")
         return None
 
     exp = signals["expansion"]
@@ -211,7 +212,7 @@ def classify_growth(
 # Rate environment classifier
 # ---------------------------------------------------------------------------
 
-RATE_INDICATORS = ["FEDFUNDS", "DGS5", "DGS10", "DGS30", "T10Y2Y"]
+RATE_INDICATORS = ["FEDFUNDS", "DGS10", "T10Y2Y"]
 
 
 def classify_rates(
@@ -247,22 +248,26 @@ def classify_rates(
         contributing.append(series_id)
 
     if not contributing:
+        logger.info("Rate classification skipped: no indicator data available")
+        return None
+
+    # Fed funds is required — without it, rate classification is underdetermined
+    ff_resp = data.get("FEDFUNDS")
+    ff_reading = _latest_reading(ff_resp) if ff_resp else None
+    if ff_reading is None:
+        logger.info("Rate classification skipped: FEDFUNDS data unavailable")
         return None
 
     # Fed funds direction
-    ff_resp = data.get("FEDFUNDS")
-    ff_reading = _latest_reading(ff_resp) if ff_resp else None
     ff_rising = (
-        ff_reading is not None
-        and ff_reading.pct_change is not None
+        ff_reading.pct_change is not None
         and ff_reading.pct_change > 0
     )
     ff_falling = (
-        ff_reading is not None
-        and ff_reading.pct_change is not None
+        ff_reading.pct_change is not None
         and ff_reading.pct_change < 0
     )
-    ff_stable = ff_reading is not None and not ff_rising and not ff_falling
+    ff_stable = not ff_rising and not ff_falling
 
     # Yield curve shape
     spread_resp = data.get("T10Y2Y")
@@ -334,7 +339,7 @@ def classify_rates(
 # Inflation regime classifier
 # ---------------------------------------------------------------------------
 
-INFLATION_INDICATORS = ["CPIAUCSL", "FEDFUNDS", "T10Y2Y"]
+INFLATION_INDICATORS = ["CPIAUCSL", "UNRATE"]
 
 
 def classify_inflation(
@@ -369,12 +374,14 @@ def classify_inflation(
         contributing.append(series_id)
 
     if "CPIAUCSL" not in contributing:
+        logger.info("Inflation classification skipped: CPI data unavailable")
         return None
 
     cpi_resp = data.get("CPIAUCSL")
     cpi_reading = _latest_reading(cpi_resp) if cpi_resp else None
 
     if cpi_reading is None or cpi_reading.pct_change is None:
+        logger.info("Inflation classification skipped: CPI pct_change unavailable")
         return None
 
     cpi_mom = cpi_reading.pct_change
@@ -456,14 +463,17 @@ class RegimeService:
     def __init__(self, fred_service: FREDService) -> None:
         self._fred = fred_service
 
-    async def classify(self) -> MacroRegimeReport:
+    def classify(self) -> MacroRegimeReport:
         """Classify all regime dimensions from current FRED data.
 
         Returns a MacroRegimeReport with populated dimensions.
         Dimensions return None if insufficient data is available.
+
+        This method is synchronous because FREDService uses blocking I/O.
+        Callers in async contexts should use ``asyncio.to_thread``.
         """
         # Fetch all indicators
-        data = await self._fetch_indicators()
+        data = self._fetch_indicators()
 
         # Classify each dimension independently
         growth = classify_growth(data)
@@ -486,6 +496,6 @@ class RegimeService:
             as_of=as_of,
         )
 
-    async def _fetch_indicators(self) -> dict[str, DataResponse]:
+    def _fetch_indicators(self) -> dict[str, DataResponse]:
         """Fetch all regime indicators from FRED."""
         return self._fred.fetch_multiple(ALL_REGIME_INDICATORS, limit=3)

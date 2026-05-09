@@ -4,6 +4,7 @@ Handles contract validation, kwargs mapping, and response normalization.
 """
 
 import asyncio
+import threading
 from typing import Any
 
 from src.agents.adversarial import AdversarialAgent
@@ -30,6 +31,7 @@ from src.application.contracts.agents import (
     SearchFilingsRequest,
     SearchFilingsResponse,
 )
+from src.application.contracts.regime import MacroRegimeReport
 from src.application.data_services.fred_service import FREDService
 from src.application.services.regime_service import RegimeService
 from src.core.agent import AgentResponse, BaseAgent
@@ -61,6 +63,7 @@ class AgentService:
     def __init__(self) -> None:
         self._agents: dict[str, BaseAgent] = {}
         self._regime_service: RegimeService | None = None
+        self._regime_lock = threading.Lock()
 
     def _get_or_create(self, agent_cls: type[BaseAgent], *args: Any) -> BaseAgent:
         """Cache agent instances by class name."""
@@ -105,16 +108,22 @@ class AgentService:
         api_key = request.api_key or _get_fred_api_key()
         if api_key:
             if request.api_key:
-                # Per-request key — create dedicated instances
+                # Per-request key — dedicated instances, no lock needed
                 fred = FREDService(api_key=request.api_key)
                 regime_svc = RegimeService(fred_service=fred)
+                regime_report = await asyncio.to_thread(regime_svc.classify)
             else:
                 # App-config key — reuse long-lived instances for cache benefit
+                # Lock serializes access (TTLCache is not thread-safe)
                 if self._regime_service is None:
                     fred = FREDService(api_key=api_key)
                     self._regime_service = RegimeService(fred_service=fred)
-                regime_svc = self._regime_service
-            regime_report = await asyncio.to_thread(regime_svc.classify)
+
+                def _classify_locked() -> MacroRegimeReport:
+                    with self._regime_lock:
+                        return self._regime_service.classify()  # type: ignore[union-attr]
+
+                regime_report = await asyncio.to_thread(_classify_locked)
 
         return ClassifyMacroResponse(
             content=response.content,

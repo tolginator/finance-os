@@ -305,7 +305,7 @@ def classify_rates(
     base_confidence = Decimal("0.8")
     if stale_count > 0:
         base_confidence -= Decimal("0.1") * stale_count
-    if len(contributing) < 3:
+    if len(contributing) < len(RATE_INDICATORS):
         base_confidence -= Decimal("0.2")
     confidence = max(Decimal("0.1"), min(Decimal("1.0"), base_confidence))
 

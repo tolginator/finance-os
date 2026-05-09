@@ -41,8 +41,6 @@ FRESHNESS_THRESHOLDS: dict[str, int] = {
 
 def _data_freshness(reading: DataReading) -> FreshnessState:
     """Determine freshness state based on observation date and frequency."""
-    if not reading.date:
-        return FreshnessState.STALE
     age_days = (date.today() - reading.date).days
     threshold = FRESHNESS_THRESHOLDS.get(reading.frequency, 45)
     if age_days <= threshold:
@@ -212,7 +210,7 @@ def classify_growth(
 # Rate environment classifier
 # ---------------------------------------------------------------------------
 
-RATE_INDICATORS = ["FEDFUNDS", "DGS10", "T10Y2Y"]
+RATE_INDICATORS = ["FEDFUNDS", "T10Y2Y"]
 
 
 def classify_rates(
@@ -352,9 +350,9 @@ def classify_inflation(
     - Combination with growth signals for stagflation detection
 
     Classification:
-    - DISINFLATION: CPI growth decelerating
-    - STABLE: CPI growth in normal range (0-0.3% mom)
-    - REFLATION: CPI growth accelerating
+    - DISINFLATION: CPI month-over-month growth below 0.1%
+    - STABLE: CPI month-over-month growth 0.1% to 0.3%
+    - REFLATION: CPI month-over-month growth 0.3% to 0.4%
     - STAGFLATION: CPI rising while growth deteriorating
     """
     contributing: list[str] = []

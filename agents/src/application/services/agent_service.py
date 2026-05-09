@@ -3,6 +3,7 @@
 Handles contract validation, kwargs mapping, and response normalization.
 """
 
+import asyncio
 from typing import Any
 
 from src.agents.adversarial import AdversarialAgent
@@ -59,6 +60,7 @@ class AgentService:
 
     def __init__(self) -> None:
         self._agents: dict[str, BaseAgent] = {}
+        self._regime_service: RegimeService | None = None
 
     def _get_or_create(self, agent_cls: type[BaseAgent], *args: Any) -> BaseAgent:
         """Cache agent instances by class name."""
@@ -102,9 +104,17 @@ class AgentService:
         regime_report = None
         api_key = request.api_key or _get_fred_api_key()
         if api_key:
-            fred = FREDService(api_key=api_key)
-            regime_svc = RegimeService(fred_service=fred)
-            regime_report = regime_svc.classify()
+            if request.api_key:
+                # Per-request key — create dedicated instances
+                fred = FREDService(api_key=request.api_key)
+                regime_svc = RegimeService(fred_service=fred)
+            else:
+                # App-config key — reuse long-lived instances for cache benefit
+                if self._regime_service is None:
+                    fred = FREDService(api_key=api_key)
+                    self._regime_service = RegimeService(fred_service=fred)
+                regime_svc = self._regime_service
+            regime_report = await asyncio.to_thread(regime_svc.classify)
 
         return ClassifyMacroResponse(
             content=response.content,

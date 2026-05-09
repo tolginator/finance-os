@@ -91,7 +91,6 @@ def _rate_data(
     ff_value: Decimal = _D("5.25"),
     ff_pct: Decimal | None = _D("0"),
     spread_value: Decimal = _D("0.5"),
-    dgs10_pct: Decimal | None = _D("0"),
 ) -> dict[str, DataResponse]:
     """Build mock data for rate classification."""
     data: dict[str, DataResponse] = {}
@@ -100,9 +99,6 @@ def _rate_data(
     )
     data["T10Y2Y"] = _response(
         _reading("T10Y2Y", spread_value, frequency="daily")
-    )
-    data["DGS10"] = _response(
-        _reading("DGS10", _D("4.2"), dgs10_pct, frequency="daily")
     )
     return data
 
@@ -313,7 +309,8 @@ class TestClassifyGrowth:
         }
         result = classify_growth(data)
         assert result is not None
-        assert result.confidence < _D("0.8")
+        # 3 stale indicators: 0.8 - 0.1*3 = 0.5
+        assert result.confidence == _D("0.5")
         assert result.freshness == FreshnessState.STALE
 
     def test_contributing_indicators_tracked(self) -> None:
@@ -336,6 +333,32 @@ class TestClassifyGrowth:
         assert result is not None
         # With no positive or negative signals, trend should be stable
         assert result.trend == TrendDirection.STABLE
+
+    def test_confidence_penalty_for_few_indicators(self) -> None:
+        """Only 2 indicators (< 3 threshold) → 0.8 - 0.2 = 0.6."""
+        data = {
+            "GDP": _response(
+                _reading("GDP", _D("25000"), _D("2.0"), frequency="quarterly")
+            ),
+            "INDPRO": _response(
+                _reading("INDPRO", _D("103"), _D("0.3"))
+            ),
+        }
+        result = classify_growth(data)
+        assert result is not None
+        assert result.confidence == _D("0.6")
+
+    def test_single_indicator_gdp_only(self) -> None:
+        """Only GDP present → still classifiable with reduced confidence."""
+        data = {
+            "GDP": _response(
+                _reading("GDP", _D("25000"), _D("3.0"), frequency="quarterly")
+            ),
+        }
+        result = classify_growth(data)
+        assert result is not None
+        assert result.regime == GrowthRegime.EXPANSION
+        assert result.confidence == _D("0.6")
 
 
 # ---------------------------------------------------------------------------
@@ -380,12 +403,24 @@ class TestClassifyRates:
             "T10Y2Y": _response(
                 _reading("T10Y2Y", _D("0.5"), frequency="daily")
             ),
-            "DGS10": _response(
-                _reading("DGS10", _D("4.2"), frequency="daily")
-            ),
         }
         result = classify_rates(data)
         assert result is None
+
+    def test_confidence_full_when_all_indicators_fresh(self) -> None:
+        """All RATE_INDICATORS present and fresh → confidence == 0.8."""
+        result = classify_rates(_rate_data())
+        assert result is not None
+        assert result.confidence == _D("0.8")
+
+    def test_confidence_reduced_when_indicator_missing(self) -> None:
+        """Only FEDFUNDS present (T10Y2Y missing) → 0.8 - 0.2 = 0.6."""
+        data = {
+            "FEDFUNDS": _response(_reading("FEDFUNDS", _D("5.25"), _D("0.1"))),
+        }
+        result = classify_rates(data)
+        assert result is not None
+        assert result.confidence == _D("0.6")
 
 
 # ---------------------------------------------------------------------------
@@ -422,6 +457,38 @@ class TestClassifyInflation:
     def test_no_cpi_returns_none(self) -> None:
         # Only has UNRATE, not CPIAUCSL
         data = {"UNRATE": _response(_reading("UNRATE", _D("4.0"), _D("0.1")))}
+        result = classify_inflation(data)
+        assert result is None
+
+    def test_boundary_disinflation_stable(self) -> None:
+        """CPI mom exactly 0.1% → STABLE (lower bound inclusive)."""
+        result = classify_inflation(_inflation_data(cpi_pct=_D("0.1")))
+        assert result is not None
+        assert result.regime == InflationRegime.STABLE
+
+    def test_boundary_stable_reflation(self) -> None:
+        """CPI mom exactly 0.3% → STABLE (upper bound inclusive)."""
+        result = classify_inflation(_inflation_data(cpi_pct=_D("0.3")))
+        assert result is not None
+        assert result.regime == InflationRegime.STABLE
+
+    def test_boundary_just_above_reflation(self) -> None:
+        """CPI mom 0.31% → REFLATION."""
+        result = classify_inflation(_inflation_data(cpi_pct=_D("0.31")))
+        assert result is not None
+        assert result.regime == InflationRegime.REFLATION
+
+    def test_boundary_high_inflation_no_unemployment(self) -> None:
+        """CPI mom > 0.4% but no UNRATE → REFLATION (not stagflation)."""
+        result = classify_inflation(_inflation_data(cpi_pct=_D("0.5")))
+        assert result is not None
+        assert result.regime == InflationRegime.REFLATION
+
+    def test_cpi_with_no_pct_change_returns_none(self) -> None:
+        """CPI present but pct_change is None → cannot classify."""
+        data = {
+            "CPIAUCSL": _response(_reading("CPIAUCSL", _D("310"), pct_change=None)),
+        }
         result = classify_inflation(data)
         assert result is None
 

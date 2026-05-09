@@ -221,7 +221,6 @@ def classify_rates(
     Scoring logic:
     - Fed funds rate direction (rising/stable/falling)
     - Yield curve shape (normal/flat/inverted)
-    - Long rates direction
 
     Classification:
     - RISING: Fed funds increasing, curve steepening or flat
@@ -351,9 +350,9 @@ def classify_inflation(
 
     Classification:
     - DISINFLATION: CPI month-over-month growth below 0.1%
-    - STABLE: CPI month-over-month growth 0.1% to 0.3%
-    - REFLATION: CPI month-over-month growth 0.3% to 0.4%
-    - STAGFLATION: CPI rising while growth deteriorating
+    - STABLE: CPI month-over-month growth from 0.1% to 0.3% (inclusive)
+    - REFLATION: CPI month-over-month growth above 0.3% up to 0.4%
+    - STAGFLATION: CPI above 0.4% while unemployment rising
     """
     contributing: list[str] = []
     latest_readings: list[DataReading] = []

@@ -11,6 +11,11 @@ export const agentSpecs: AgentSpec[] = [
     description: 'Classify current macro environment from FRED indicators.',
   },
   {
+    name: 'macro_outlook',
+    label: 'Macro Outlook',
+    description: 'Compute asset-class tilts from macro regime, bounded by policy.',
+  },
+  {
     name: 'quant_signal',
     label: 'Quant Signal',
     description: 'Generate composite quantitative signals.',

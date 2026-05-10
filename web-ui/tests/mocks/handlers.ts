@@ -7,6 +7,7 @@ export const handlers = [
     HttpResponse.json([
       { name: 'earnings_interpreter', description: 'Analyzes earnings call transcripts for sentiment and guidance' },
       { name: 'macro_regime', description: 'Classifies macro regime from FRED indicators' },
+      { name: 'macro_outlook', description: 'Computes asset-class tilts from macro regime' },
       { name: 'filing_analyst', description: 'Searches and analyzes SEC filings' },
       { name: 'quant_signal', description: 'Generates composite quant signals from multiple inputs' },
       { name: 'thesis_guardian', description: 'Evaluates investment theses against observed data' },

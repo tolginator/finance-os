@@ -162,6 +162,8 @@ Once running, open http://127.0.0.1:8000/docs for interactive Swagger UI.
 |--------|------|-------------|
 | GET | `/health` | Health check |
 | GET | `/agents` | List available agents |
+| GET | `/ticker/{symbol}/summary` | ETF/company summary from Yahoo Finance (cached 5 min) |
+| GET | `/ticker/{symbol}/transcript` | Latest earnings transcript (cached 1 hour) |
 | POST | `/agents/macro_regime` | Classify macro regime from FRED data |
 | POST | `/agents/macro_outlook` | Macro outlook with asset-class tilts |
 | POST | `/agents/quant_signal` | Generate quant signals |

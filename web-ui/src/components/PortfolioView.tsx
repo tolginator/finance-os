@@ -79,7 +79,9 @@ function formatCurrency(value: string): string {
 }
 
 function formatShares(value: string): string {
-  return new Intl.NumberFormat('en-US', { maximumFractionDigits: 4 }).format(Number.parseFloat(value));
+  const n = Number.parseFloat(value);
+  if (!Number.isFinite(n)) return '0';
+  return new Intl.NumberFormat('en-US', { maximumFractionDigits: 4 }).format(n);
 }
 
 function formatDate(value: string): string {
@@ -226,8 +228,7 @@ export function PortfolioView() {
                     </div>
                   </button>
 
-                  {isExpanded && (
-                    <div id={`holdings-${slug}`} style={{ padding: '0 1rem 1rem' }}>
+                  <div id={`holdings-${slug}`} style={{ padding: '0 1rem 1rem', display: isExpanded ? 'block' : 'none' }}>
                       <table
                         data-testid={`holdings-table-${account.name}`}
                         style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}
@@ -274,8 +275,7 @@ export function PortfolioView() {
                           ))
                         )}
                       </div>
-                    </div>
-                  )}
+                  </div>
                 </div>
               );
             })}

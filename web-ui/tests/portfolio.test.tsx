@@ -113,10 +113,10 @@ describe('PortfolioView', () => {
 
     fireEvent.click(button!);
     expect(button).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByTestId('holdings-table-Joint Taxable')).not.toBeInTheDocument();
+    expect(screen.getByTestId('holdings-table-Joint Taxable')).not.toBeVisible();
 
     fireEvent.click(button!);
     expect(button).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByTestId('holdings-table-Joint Taxable')).toBeInTheDocument();
+    expect(screen.getByTestId('holdings-table-Joint Taxable')).toBeVisible();
   });
 });

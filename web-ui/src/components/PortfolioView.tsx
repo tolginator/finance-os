@@ -252,7 +252,9 @@ export function PortfolioView() {
           ) : null}
 
           <div data-testid="portfolio-accounts" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            {state.data.household.accounts.map((account) => {
+            {state.data.household.accounts
+              .filter((a) => a.tax_lots.length > 0 || a.cash_holdings.length > 0)
+              .map((account) => {
               const isExpanded = expandedAccounts[account.name] ?? false;
               const slug = toSlug(account.name);
               const totalCostBasis = getAccountCostBasis(account);

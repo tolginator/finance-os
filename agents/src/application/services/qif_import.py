@@ -204,8 +204,13 @@ def preview_qif_import(
                 Account(name=banking.account, account_type=AccountType.TAXABLE),
             )
 
+    non_empty = [
+        a for a in accounts_map.values()
+        if a.tax_lots or a.cash_holdings
+    ]
+
     return ImportPreviewResponse(
-        accounts=list(accounts_map.values()),
+        accounts=non_empty,
         warnings=_dedupe_warnings(warnings),
         position_only=position_only,
     )

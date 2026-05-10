@@ -15,6 +15,20 @@ CONFIG_DIR = Path.home() / ".config" / "finance-os"
 CONFIG_FILE = CONFIG_DIR / "config.json"
 
 
+def update_config_value(key: str, value: str | None) -> None:
+    """Set or remove a key in config.json, preserving other values."""
+    data = _load_config_file()
+    if value is None or value == "":
+        data.pop(key, None)
+    else:
+        data[key] = value
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    CONFIG_FILE.write_text(
+        json.dumps(data, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+
+
 def _load_config_file() -> dict[str, Any]:
     """Load config from ~/.config/finance-os/config.json if it exists."""
     if CONFIG_FILE.is_file():
@@ -74,6 +88,7 @@ class AppConfig(BaseSettings):
     fred_api_key: str = ""
     bls_api_key: str = ""
     sec_edgar_email: str = ""
+    qif_source_path: str = ""
     azure: AzureOpenAIConfig = AzureOpenAIConfig()
 
     @classmethod

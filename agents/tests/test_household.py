@@ -707,3 +707,58 @@ class TestCSVImport:
         result = service.preview_csv_import(ImportPreviewRequest(csv_content=csv))
         assert any("Invalid lot data" in w.message for w in result.warnings)
         assert len(result.accounts[0].tax_lots) == 0
+
+
+# ---------------------------------------------------------------------------
+# QIF auto-import tests
+# ---------------------------------------------------------------------------
+
+
+class TestQifAutoImport:
+    def test_auto_imports_when_qif_source_configured(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """When qif_source_path points to a valid QIF file and no
+        household.json exists, load() should auto-import."""
+        qif_file = tmp_path / "portfolio.qif"
+        qif_file.write_text(
+            "!Account\nNBrokerage\nTInvst\n^\n"
+            "!Type:Invst\nD01/15/2024\nNBuy\nYVTI\nQ100\nT20050\nI200.50\n^\n",
+            encoding="utf-8",
+        )
+
+        monkeypatch.setattr(
+            "src.application.services.household_service.AppConfig",
+            lambda: type("C", (), {"qif_source_path": str(qif_file)})(),
+        )
+
+        svc = HouseholdService(path=tmp_path / "household.json")
+        household, exists = svc.load()
+
+        assert exists is True
+        assert len(household.accounts) == 1
+        assert household.accounts[0].name == "Brokerage"
+        assert household.revision == 1
+        assert (tmp_path / "household.json").is_file()
+
+    def test_no_auto_import_when_path_empty(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(
+            "src.application.services.household_service.AppConfig",
+            lambda: type("C", (), {"qif_source_path": ""})(),
+        )
+        svc = HouseholdService(path=tmp_path / "household.json")
+        household, exists = svc.load()
+        assert exists is False
+
+    def test_no_auto_import_when_file_missing(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(
+            "src.application.services.household_service.AppConfig",
+            lambda: type("C", (), {"qif_source_path": "/nonexistent/file.qif"})(),
+        )
+        svc = HouseholdService(path=tmp_path / "household.json")
+        household, exists = svc.load()
+        assert exists is False

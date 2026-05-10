@@ -51,6 +51,42 @@ export const handlers = [
     }),
   ),
 
+  http.post('/api/household/import/qif/preview', async ({ request }) => {
+    const body = (await request.json()) as { qif_content: string; household_name: string };
+    return HttpResponse.json({
+      accounts: [
+        {
+          name: 'Investment Account',
+          account_type: 'taxable',
+          tax_lots: [
+            {
+              ticker: 'VTI',
+              shares: '100',
+              cost_basis_per_share: '200.00',
+              purchase_date: '2024-01-15',
+            },
+          ],
+          cash_holdings: [],
+        },
+      ],
+      warnings: body.qif_content.includes('warning') ? [{ line: 7, message: 'Parser warning' }] : [],
+      position_only: false,
+    });
+  }),
+
+  http.put('/api/household', () =>
+    HttpResponse.json({
+      household: {
+        name: 'My Household',
+        accounts: [],
+        liquidity_reserve_floor: '0',
+        revision: 1,
+        updated_at: new Date().toISOString(),
+      },
+      journal_entry: 'Imported 1 account from QIF file.',
+    }),
+  ),
+
   http.post('/api/agents/macro_regime', () =>
     HttpResponse.json({
       regime: 'Balanced slowdown',

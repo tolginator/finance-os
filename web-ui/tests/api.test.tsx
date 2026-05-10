@@ -9,8 +9,10 @@ import {
   fetchHealth,
   fetchWatchlists,
   normalizeDetail,
+  previewQifImport,
   runDigest,
   runPipeline,
+  saveHousehold,
   updateWatchlist,
 } from '../src/api';
 
@@ -52,6 +54,23 @@ describe('api helpers', () => {
     await expect(createWatchlist('growth', ['VTI'])).resolves.toEqual({ tickers: [] });
     await expect(activateWatchlist('default')).resolves.toMatchObject({ active: 'default' });
     await expect(deleteWatchlist('growth')).resolves.toBeUndefined();
+  });
+
+  it('previews qif imports and saves households', async () => {
+    await expect(previewQifImport('!Type:Invst\n^', 'My Household')).resolves.toMatchObject({
+      accounts: [{ name: 'Investment Account' }],
+      warnings: [],
+      position_only: false,
+    });
+
+    await expect(
+      saveHousehold({
+        name: 'My Household',
+        accounts: [],
+        liquidity_reserve_floor: '0',
+        expected_revision: 0,
+      }),
+    ).resolves.toMatchObject({ journal_entry: 'Imported 1 account from QIF file.' });
   });
 
   it('runs pipeline', async () => {

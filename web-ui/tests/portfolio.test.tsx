@@ -58,7 +58,7 @@ describe('PortfolioView', () => {
     });
   });
 
-  it('shows an empty state when no household is configured', async () => {
+  it('shows an importer in the empty state when no household is configured', async () => {
     server.use(
       http.get('/api/household', () =>
         HttpResponse.json({
@@ -79,6 +79,7 @@ describe('PortfolioView', () => {
     await waitFor(() => {
       expect(screen.getByTestId('portfolio-empty')).toBeInTheDocument();
     });
+    expect(screen.getByTestId('qif-importer')).toBeInTheDocument();
   });
 
   it('renders household accounts from the API response', async () => {
@@ -118,5 +119,18 @@ describe('PortfolioView', () => {
     fireEvent.click(button!);
     expect(button).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByTestId('holdings-table-Joint Taxable')).toBeVisible();
+  });
+
+  it('shows an import button for existing households', async () => {
+    server.use(http.get('/api/household', () => HttpResponse.json(householdFixture)));
+
+    render(<PortfolioView />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Import QIF' })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Import QIF' }));
+    expect(screen.getByTestId('qif-importer')).toBeInTheDocument();
   });
 });

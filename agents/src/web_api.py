@@ -23,7 +23,7 @@ from functools import lru_cache
 from typing import Any
 
 import uvicorn
-from fastapi import FastAPI, Path, Request
+from fastapi import FastAPI, HTTPException, Path, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -416,6 +416,50 @@ async def import_qif_preview(req: QifImportPreviewRequest) -> Any:
     from src.application.services.qif_import import preview_qif_import
 
     return preview_qif_import(req.qif_content, req.household_name).model_dump(mode="json")
+
+
+class QifSourceRequest(BaseModel):
+    """Request for POST /household/qif_source."""
+
+    path: str = Field(min_length=1, description="Filesystem path to QIF file")
+
+
+class QifSourceResponse(BaseModel):
+    """Response for GET/POST/DELETE /household/qif_source."""
+
+    qif_source_path: str = Field(default="", description="Current linked QIF file path")
+
+
+@app.get("/household/qif_source", response_model=QifSourceResponse)
+async def get_qif_source() -> Any:
+    """Return the currently linked QIF source file path."""
+    from src.application.config import AppConfig
+
+    cfg = AppConfig()
+    return QifSourceResponse(qif_source_path=cfg.qif_source_path).model_dump(mode="json")
+
+
+@app.post("/household/qif_source", response_model=QifSourceResponse)
+async def set_qif_source(req: QifSourceRequest) -> Any:
+    """Link a QIF file so it auto-loads on startup."""
+    from pathlib import Path as PathLib
+
+    from src.application.config import update_config_value
+
+    resolved = PathLib(req.path).expanduser()
+    if not resolved.is_file():
+        raise HTTPException(status_code=400, detail=f"File not found: {resolved}")
+    update_config_value("qif_source_path", str(resolved))
+    return QifSourceResponse(qif_source_path=str(resolved)).model_dump(mode="json")
+
+
+@app.delete("/household/qif_source", response_model=QifSourceResponse)
+async def clear_qif_source() -> Any:
+    """Unlink the QIF source file."""
+    from src.application.config import update_config_value
+
+    update_config_value("qif_source_path", None)
+    return QifSourceResponse(qif_source_path="").model_dump(mode="json")
 
 
 # --- Watchlists ---

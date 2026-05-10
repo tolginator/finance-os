@@ -14,7 +14,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from src.application.config import CONFIG_DIR
+from src.application.config import CONFIG_DIR, AppConfig
 from src.application.contracts.household import (
     Account,
     Household,
@@ -375,8 +375,15 @@ class HouseholdService:
         return FileLockContext(self._lock_path)
 
     def _load_unlocked(self) -> tuple[Household, bool]:
-        """Load without acquiring the lock (caller must hold it)."""
+        """Load without acquiring the lock (caller must hold it).
+
+        If no household.json exists but ``qif_source_path`` is configured,
+        auto-imports from the QIF file and persists the result.
+        """
         if not self._path.is_file():
+            household = self._try_auto_import_qif()
+            if household is not None:
+                return household, True
             return self._default_household(), False
 
         raw_text = self._path.read_text(encoding="utf-8")
@@ -437,6 +444,46 @@ class HouseholdService:
                 f.write(json.dumps(entry, default=str) + "\n")
         except OSError:
             logger.warning("Failed to write household journal entry", exc_info=True)
+
+    def _try_auto_import_qif(self) -> Household | None:
+        """If qif_source_path is set in config, import from that file."""
+        try:
+            cfg = AppConfig()
+        except Exception:
+            return None
+
+        qif_path_str = cfg.qif_source_path
+        if not qif_path_str:
+            return None
+
+        qif_path = Path(qif_path_str).expanduser()
+        if not qif_path.is_file():
+            logger.warning("QIF source path configured but file not found: %s", qif_path)
+            return None
+
+        try:
+            from src.application.services.qif_import import preview_qif_import
+
+            qif_content = qif_path.read_text(encoding="utf-8", errors="replace")
+            preview = preview_qif_import(qif_content)
+            household = Household(
+                name="My Household",
+                accounts=preview.accounts,
+                revision=1,
+                updated_at=datetime.now(),
+            )
+            self._write_atomic(household)
+            self._append_journal(
+                action="auto_import_qif",
+                base_revision=0,
+                new_revision=1,
+                summary=f"Auto-imported {len(household.accounts)} accounts from {qif_path}",
+            )
+            logger.info("Auto-imported household from QIF: %s", qif_path)
+            return household
+        except Exception:
+            logger.warning("Failed to auto-import from QIF: %s", qif_path, exc_info=True)
+            return None
 
     @staticmethod
     def _default_household() -> Household:

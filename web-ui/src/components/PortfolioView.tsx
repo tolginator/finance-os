@@ -1,11 +1,23 @@
 import { useEffect, useState } from 'react';
 import { fetchHousehold } from '../api';
+import { QifImporter } from './QifImporter';
 import type { Account, HouseholdResponse } from '../types';
 
 type LoadState =
   | { status: 'loading' }
   | { status: 'error'; error: string }
   | { status: 'loaded'; data: HouseholdResponse };
+
+const cardStyle = { border: '1px solid #e5e7eb', borderRadius: 12, padding: '1rem', background: '#fff' };
+const primaryButtonStyle = {
+  border: '1px solid #d1d5db',
+  borderRadius: 10,
+  padding: '0.65rem 1rem',
+  background: '#111827',
+  color: '#fff',
+  fontWeight: 600,
+  cursor: 'pointer',
+};
 
 function toSlug(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
@@ -105,6 +117,8 @@ function getAccountCostBasis(account: Account): string {
 export function PortfolioView() {
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [expandedAccounts, setExpandedAccounts] = useState<Record<string, boolean>>({});
+  const [showImporter, setShowImporter] = useState(false);
+  const [reloadCounter, setReloadCounter] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -114,6 +128,7 @@ export function PortfolioView() {
         const data = await fetchHousehold();
         if (cancelled) return;
         setExpandedAccounts(Object.fromEntries(data.household.accounts.map((account) => [account.name, true])));
+        setShowImporter(false);
         setState({ status: 'loaded', data });
       } catch (error) {
         if (cancelled) return;
@@ -124,20 +139,17 @@ export function PortfolioView() {
       }
     }
 
-    loadHousehold();
+    void loadHousehold();
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [reloadCounter]);
 
   return (
     <div data-testid="portfolio-view" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
       {state.status === 'loading' && (
-        <div
-          data-testid="portfolio-loading"
-          style={{ border: '1px solid #e5e7eb', borderRadius: 12, padding: '1rem', background: '#fff' }}
-        >
+        <div data-testid="portfolio-loading" style={cardStyle}>
           Loading household portfolio…
         </div>
       )}
@@ -154,9 +166,15 @@ export function PortfolioView() {
       {state.status === 'loaded' && !state.data.exists && (
         <div
           data-testid="portfolio-empty"
-          style={{ border: '1px solid #e5e7eb', borderRadius: 12, padding: '1rem', background: '#fff', color: '#4b5563' }}
+          style={{ ...cardStyle, color: '#4b5563', display: 'flex', flexDirection: 'column', gap: '1rem' }}
         >
-          No household portfolio is configured yet.
+          <div>No household portfolio is configured yet. Import a QIF file to get started.</div>
+          <QifImporter
+            onImported={() => {
+              setState({ status: 'loading' });
+              setReloadCounter((current) => current + 1);
+            }}
+          />
         </div>
       )}
 
@@ -179,11 +197,25 @@ export function PortfolioView() {
               <div style={{ fontSize: '1.1rem', fontWeight: 700 }}>{state.data.household.name}</div>
               <div style={{ fontSize: '0.9rem', color: '#4b5563' }}>Revision {state.data.household.revision}</div>
             </div>
-            <div style={{ textAlign: 'right', fontSize: '0.9rem', color: '#4b5563' }}>
-              <div>Liquidity reserve floor: {formatCurrency(state.data.household.liquidity_reserve_floor)}</div>
-              <div>Updated {new Date(state.data.household.updated_at).toLocaleString()}</div>
+            <div style={{ display: 'flex', alignItems: 'end', gap: '1rem', flexWrap: 'wrap', marginLeft: 'auto' }}>
+              <div style={{ textAlign: 'right', fontSize: '0.9rem', color: '#4b5563' }}>
+                <div>Liquidity reserve floor: {formatCurrency(state.data.household.liquidity_reserve_floor)}</div>
+                <div>Updated {new Date(state.data.household.updated_at).toLocaleString()}</div>
+              </div>
+              <button type="button" onClick={() => setShowImporter((current) => !current)} style={primaryButtonStyle}>
+                {showImporter ? 'Hide Importer' : 'Import QIF'}
+              </button>
             </div>
           </div>
+
+          {showImporter ? (
+            <QifImporter
+              onImported={() => {
+                setState({ status: 'loading' });
+                setReloadCounter((current) => current + 1);
+              }}
+            />
+          ) : null}
 
           <div data-testid="portfolio-accounts" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             {state.data.household.accounts.map((account) => {
@@ -229,52 +261,48 @@ export function PortfolioView() {
                   </button>
 
                   <div id={`holdings-${slug}`} style={{ padding: '0 1rem 1rem', display: isExpanded ? 'block' : 'none' }}>
-                      <table
-                        data-testid={`holdings-table-${account.name}`}
-                        style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}
-                      >
-                        <thead>
-                          <tr style={{ textAlign: 'left', borderBottom: '1px solid #e5e7eb' }}>
-                            <th style={{ padding: '0.5rem 0.25rem' }}>Ticker</th>
-                            <th style={{ padding: '0.5rem 0.25rem' }}>Shares</th>
-                            <th style={{ padding: '0.5rem 0.25rem' }}>Cost Basis / Share</th>
-                            <th style={{ padding: '0.5rem 0.25rem' }}>Purchase Date</th>
-                            <th style={{ padding: '0.5rem 0.25rem' }}>Lot Cost Basis</th>
+                    <table data-testid={`holdings-table-${account.name}`} style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                      <thead>
+                        <tr style={{ textAlign: 'left', borderBottom: '1px solid #e5e7eb' }}>
+                          <th style={{ padding: '0.5rem 0.25rem' }}>Ticker</th>
+                          <th style={{ padding: '0.5rem 0.25rem' }}>Shares</th>
+                          <th style={{ padding: '0.5rem 0.25rem' }}>Cost Basis / Share</th>
+                          <th style={{ padding: '0.5rem 0.25rem' }}>Purchase Date</th>
+                          <th style={{ padding: '0.5rem 0.25rem' }}>Lot Cost Basis</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {account.tax_lots.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} style={{ padding: '0.75rem 0.25rem', color: '#6b7280' }}>
+                              No tax lots available.
+                            </td>
                           </tr>
-                        </thead>
-                        <tbody>
-                          {account.tax_lots.length === 0 ? (
-                            <tr>
-                              <td colSpan={5} style={{ padding: '0.75rem 0.25rem', color: '#6b7280' }}>
-                                No tax lots available.
-                              </td>
-                            </tr>
-                          ) : (
-                            account.tax_lots.map((lot) => (
-                              <tr key={`${account.name}-${lot.ticker}-${lot.purchase_date}`} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                                <td style={{ padding: '0.5rem 0.25rem', fontWeight: 600 }}>{lot.ticker}</td>
-                                <td style={{ padding: '0.5rem 0.25rem' }}>{formatShares(lot.shares)}</td>
-                                <td style={{ padding: '0.5rem 0.25rem' }}>{formatCurrency(lot.cost_basis_per_share)}</td>
-                                <td style={{ padding: '0.5rem 0.25rem' }}>{formatDate(lot.purchase_date)}</td>
-                                <td style={{ padding: '0.5rem 0.25rem' }}>{formatCurrency(multiplyDecimalStrings(lot.shares, lot.cost_basis_per_share))}</td>
-                              </tr>
-                            ))
-                          )}
-                        </tbody>
-                      </table>
-
-                      <div style={{ marginTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.85rem', color: '#4b5563' }}>
-                        {account.cash_holdings.length === 0 ? (
-                          <div>No cash holdings reported.</div>
                         ) : (
-                          account.cash_holdings.map((holding, index) => (
-                            <div key={`${account.name}-cash-${index}`}>
-                              Cash holding: {formatCurrency(holding.amount)} · {holding.is_money_market ? 'Money market' : 'Cash'} ·
-                              Valuation date {formatDate(holding.valuation_date)}
-                            </div>
+                          account.tax_lots.map((lot) => (
+                            <tr key={`${account.name}-${lot.ticker}-${lot.purchase_date}`} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                              <td style={{ padding: '0.5rem 0.25rem', fontWeight: 600 }}>{lot.ticker}</td>
+                              <td style={{ padding: '0.5rem 0.25rem' }}>{formatShares(lot.shares)}</td>
+                              <td style={{ padding: '0.5rem 0.25rem' }}>{formatCurrency(lot.cost_basis_per_share)}</td>
+                              <td style={{ padding: '0.5rem 0.25rem' }}>{formatDate(lot.purchase_date)}</td>
+                              <td style={{ padding: '0.5rem 0.25rem' }}>{formatCurrency(multiplyDecimalStrings(lot.shares, lot.cost_basis_per_share))}</td>
+                            </tr>
                           ))
                         )}
-                      </div>
+                      </tbody>
+                    </table>
+
+                    <div style={{ marginTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.85rem', color: '#4b5563' }}>
+                      {account.cash_holdings.length === 0 ? (
+                        <div>No cash holdings reported.</div>
+                      ) : (
+                        account.cash_holdings.map((holding, index) => (
+                          <div key={`${account.name}-cash-${index}`}>
+                            Cash holding: {formatCurrency(holding.amount)} · {holding.is_money_market ? 'Money market' : 'Cash'} · Valuation date {formatDate(holding.valuation_date)}
+                          </div>
+                        ))
+                      )}
+                    </div>
                   </div>
                 </div>
               );

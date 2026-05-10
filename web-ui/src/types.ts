@@ -58,6 +58,29 @@ export interface HouseholdResponse {
   exists: boolean;
 }
 
+export interface ImportWarning {
+  line: number | null;
+  message: string;
+}
+
+export interface ImportPreviewResponse {
+  accounts: Account[];
+  warnings: ImportWarning[];
+  position_only: boolean;
+}
+
+export interface UpdateHouseholdRequest {
+  name: string;
+  accounts: Account[];
+  liquidity_reserve_floor: string;
+  expected_revision: number;
+}
+
+export interface UpdateHouseholdResponse {
+  household: Household;
+  journal_entry: string;
+}
+
 export interface WatchlistData {
   tickers: string[];
 }

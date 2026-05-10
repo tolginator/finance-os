@@ -8,9 +8,12 @@ import type {
   DigestResponse,
   HealthResponse,
   HouseholdResponse,
+  ImportPreviewResponse,
   MacroRegimeResponse,
   RunPipelineRequest,
   RunPipelineResponse,
+  UpdateHouseholdRequest,
+  UpdateHouseholdResponse,
   WatchlistData,
   WatchlistsResponse,
 } from './types';
@@ -77,6 +80,20 @@ export function fetchAgents(): Promise<AgentInfo[]> {
 
 export function fetchHousehold(): Promise<HouseholdResponse> {
   return request('/household');
+}
+
+export function previewQifImport(qifContent: string, householdName: string): Promise<ImportPreviewResponse> {
+  return request('/household/import/qif/preview', {
+    method: 'POST',
+    body: JSON.stringify({ qif_content: qifContent, household_name: householdName }),
+  });
+}
+
+export function saveHousehold(req: UpdateHouseholdRequest): Promise<UpdateHouseholdResponse> {
+  return request('/household', {
+    method: 'PUT',
+    body: JSON.stringify(req),
+  });
 }
 
 export function runDigest(req: DigestRequest): Promise<DigestResponse> {

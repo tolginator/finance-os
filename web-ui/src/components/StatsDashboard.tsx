@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { fetchAgents, fetchHealth, fetchWatchlists } from '../api';
 import type { AgentInfo, HealthResponse, WatchlistsResponse } from '../types';
 
@@ -17,24 +17,24 @@ export function StatsDashboard() {
   const [watchlists, setWatchlists] = useState<WatchlistsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const mountedRef = useRef(true);
 
   useEffect(() => {
-    let cancelled = false;
     (async () => {
       try {
         const { healthData, agentData, watchlistData } = await fetchStats();
-        if (cancelled) return;
+        if (!mountedRef.current) return;
         setHealth(healthData);
         setAgents(agentData);
         setWatchlists(watchlistData);
       } catch (err) {
-        if (cancelled) return;
+        if (!mountedRef.current) return;
         setError(err instanceof Error ? err.message : 'Failed to load stats');
       } finally {
-        if (!cancelled) setLoading(false);
+        if (mountedRef.current) setLoading(false);
       }
     })();
-    return () => { cancelled = true; };
+    return () => { mountedRef.current = false; };
   }, []);
 
   const handleRefresh = async () => {
@@ -42,13 +42,15 @@ export function StatsDashboard() {
     setError('');
     try {
       const { healthData, agentData, watchlistData } = await fetchStats();
+      if (!mountedRef.current) return;
       setHealth(healthData);
       setAgents(agentData);
       setWatchlists(watchlistData);
     } catch (err) {
+      if (!mountedRef.current) return;
       setError(err instanceof Error ? err.message : 'Failed to load stats');
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   };
 

@@ -45,11 +45,12 @@ function toNumber(value: string): number {
   return Number.parseFloat(value);
 }
 
-function formatCurrency(value: number): string {
+function formatCurrency(value: number, decimals = 0): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
-    maximumFractionDigits: 0,
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
   }).format(value);
 }
 
@@ -136,6 +137,8 @@ export function PortfolioView() {
               >
                 <button
                   type="button"
+                  aria-expanded={isExpanded}
+                  aria-controls={`holdings-${account.name}`}
                   onClick={() => setExpandedAccounts((current) => ({ ...current, [account.name]: !isExpanded }))}
                   style={{
                     width: '100%',
@@ -160,7 +163,7 @@ export function PortfolioView() {
                 </button>
 
                 {isExpanded && (
-                  <div style={{ padding: '0 1rem 1rem' }}>
+                  <div id={`holdings-${account.name}`} style={{ padding: '0 1rem 1rem' }}>
                     <table
                       data-testid={`holdings-table-${account.name}`}
                       style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}
@@ -178,7 +181,7 @@ export function PortfolioView() {
                           <tr key={`${account.name}-${lot.ticker}-${lot.purchase_date}`} style={{ borderBottom: '1px solid #f3f4f6' }}>
                             <td style={{ padding: '0.5rem 0.25rem', fontWeight: 600 }}>{lot.ticker}</td>
                             <td style={{ padding: '0.5rem 0.25rem' }}>{formatShares(lot.shares)}</td>
-                            <td style={{ padding: '0.5rem 0.25rem' }}>{formatCurrency(toNumber(lot.cost_basis_per_share))}</td>
+                            <td style={{ padding: '0.5rem 0.25rem' }}>{formatCurrency(toNumber(lot.cost_basis_per_share), 2)}</td>
                             <td style={{ padding: '0.5rem 0.25rem' }}>{formatCurrency(toNumber(lot.shares) * (ETF_PRICE_MAP[lot.ticker] ?? 0))}</td>
                           </tr>
                         ))}

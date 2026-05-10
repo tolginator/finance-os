@@ -204,19 +204,26 @@ def compute_tilts(
 
     # Accumulate dimension contributions
     if report.growth is not None:
-        _apply_dimension(raw_tilts, GROWTH_TILTS.get(report.growth.regime, {}),
-                         report.growth.confidence)
+        _apply_dimension(
+            raw_tilts, GROWTH_TILTS.get(report.growth.regime, {}),
+            report.growth.confidence,
+        )
     if report.rates is not None:
-        _apply_dimension(raw_tilts, RATE_TILTS.get(report.rates.regime, {}),
-                         report.rates.confidence)
+        _apply_dimension(
+            raw_tilts, RATE_TILTS.get(report.rates.regime, {}),
+            report.rates.confidence,
+        )
     if report.inflation is not None:
-        _apply_dimension(raw_tilts, INFLATION_TILTS.get(report.inflation.regime, {}),
-                         report.inflation.confidence)
+        _apply_dimension(
+            raw_tilts, INFLATION_TILTS.get(report.inflation.regime, {}),
+            report.inflation.confidence,
+        )
 
     # Clamp raw tilts to max magnitude
     for ac in AssetClass:
-        raw_tilts[ac] = max(-MAX_TILT_MAGNITUDE,
-                           min(MAX_TILT_MAGNITUDE, raw_tilts[ac]))
+        raw_tilts[ac] = max(
+            -MAX_TILT_MAGNITUDE, min(MAX_TILT_MAGNITUDE, raw_tilts[ac])
+        )
 
     # Apply policy band clamping
     clamped_weights: dict[AssetClass, Decimal] = {}
@@ -254,9 +261,12 @@ def compute_tilts(
                 min_w, min(max_w, clamped_weights[ac] + per_class)
             )
 
-    # Quantize to 4 decimal places
+    # Quantize to 4 decimal places and re-clamp to policy bands
     for ac in AssetClass:
-        clamped_weights[ac] = clamped_weights[ac].quantize(Decimal("0.0001"))
+        min_w = policy.allocations[ac].min_weight
+        max_w = policy.allocations[ac].max_weight
+        quantized = clamped_weights[ac].quantize(Decimal("0.0001"))
+        clamped_weights[ac] = max(min_w, min(max_w, quantized))
     # Fix rounding residual by distributing across classes with band room
     residual = Decimal("1") - sum(clamped_weights.values())
     while residual != 0:

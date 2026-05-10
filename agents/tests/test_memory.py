@@ -1,18 +1,15 @@
-"""Tests for the vector memory module."""
+"""Tests for the memory utilities module."""
 
-
-import pytest
 
 from src.core.memory import (
-    Document,
     DocumentMetadata,
-    SearchResult,
     chunk_text,
     generate_doc_id,
 )
 
 # ---------------------------------------------------------------------------
-# Pure function tests (always run — no ChromaDB required)
+# Pure function tests
+# ---------------------------------------------------------------------------
 # ---------------------------------------------------------------------------
 
 
@@ -92,104 +89,3 @@ class TestGenerateDocId:
         doc_id = generate_doc_id("text", DocumentMetadata())
         assert len(doc_id) == 16
         assert all(c in "0123456789abcdef" for c in doc_id)
-
-
-# ---------------------------------------------------------------------------
-# VectorMemory integration tests (skip when chromadb is not installed)
-# ---------------------------------------------------------------------------
-
-
-class TestVectorMemory:
-    """Integration tests for VectorMemory — skipped if chromadb is missing."""
-
-    @pytest.fixture(autouse=True)
-    def _require_chromadb(self) -> None:
-        pytest.importorskip("chromadb")
-
-    @pytest.fixture()
-    def memory(self) -> object:
-        """Create a fresh in-memory VectorMemory instance."""
-        from src.core.memory import VectorMemory
-
-        return VectorMemory(collection_name=f"test_{id(self)}")
-
-    def test_ingest_and_search(self, memory: object) -> None:
-        from src.core.memory import VectorMemory
-
-        assert isinstance(memory, VectorMemory)
-        doc = Document(
-            content=(
-                "Apple reported record revenue in Q4 2024. "
-                "The iPhone segment grew 12% year over year. "
-                "Services revenue also set a new quarterly record."
-            ),
-            metadata=DocumentMetadata(ticker="AAPL", source="transcript"),
-        )
-        chunk_ids = memory.ingest_document(doc)
-        assert len(chunk_ids) >= 1
-        assert memory.count() >= 1
-
-        results = memory.search("Apple revenue growth")
-        assert len(results) >= 1
-        assert all(isinstance(r, SearchResult) for r in results)
-        assert results[0].relevance_score >= 0.0
-
-    def test_metadata_filtering(self, memory: object) -> None:
-        from src.core.memory import VectorMemory
-
-        assert isinstance(memory, VectorMemory)
-        doc_aapl = Document(
-            content="Apple financial results for fiscal year 2024 were strong.",
-            metadata=DocumentMetadata(ticker="AAPL", source="edgar"),
-        )
-        doc_msft = Document(
-            content="Microsoft cloud revenue exceeded expectations in 2024.",
-            metadata=DocumentMetadata(ticker="MSFT", source="edgar"),
-        )
-        memory.ingest_document(doc_aapl)
-        memory.ingest_document(doc_msft)
-
-        results = memory.search("revenue", metadata_filter={"ticker": "AAPL"})
-        for r in results:
-            assert r.metadata.ticker == "AAPL"
-
-    def test_delete_document(self, memory: object) -> None:
-        from src.core.memory import VectorMemory
-
-        assert isinstance(memory, VectorMemory)
-        doc = Document(
-            content="Some financial data to be deleted later.",
-            metadata=DocumentMetadata(ticker="TSLA"),
-            doc_id="delete-me",
-        )
-        memory.ingest_document(doc)
-        assert memory.count() >= 1
-
-        deleted = memory.delete_document("delete-me")
-        assert deleted >= 1
-        assert memory.count() == 0
-
-    def test_empty_search_returns_empty_list(self, memory: object) -> None:
-        from src.core.memory import VectorMemory
-
-        assert isinstance(memory, VectorMemory)
-        results = memory.search("anything")
-        assert results == []
-
-    def test_import_error_without_chromadb(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """VectorMemory raises a clear ImportError when chromadb is missing."""
-        import builtins
-
-        real_import = builtins.__import__
-
-        def mock_import(name: str, *args: object, **kwargs: object) -> object:
-            if name == "chromadb":
-                raise ImportError("mocked")
-            return real_import(name, *args, **kwargs)
-
-        monkeypatch.setattr(builtins, "__import__", mock_import)
-
-        from src.core.memory import VectorMemory as VectorMemoryClass
-
-        with pytest.raises(ImportError, match="chromadb is required"):
-            VectorMemoryClass()

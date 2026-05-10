@@ -506,7 +506,7 @@ class TestHistoricalSnapshots:
         """2022: Fed aggressively hiking, inflation high."""
         data = _rate_data(
             ff_value=_D("4.0"),
-            ff_pct=_D("0.75"),  # 75bp hike
+            ff_pct=_D("0.75"),  # +75% relative change (rising aggressively)
             spread_value=_D("-0.3"),  # inverted curve
         )
         result = classify_rates(data)

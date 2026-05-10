@@ -228,7 +228,7 @@ def compute_tilts(
         clamped_weights[ac] = recommended
 
     # Re-normalize so weights sum to 1 while respecting bands.
-    # Iterative adjustment: distribute excess/deficit proportionally
+    # Iterative adjustment: distribute excess/deficit equally
     # among asset classes that have room within their bands.
     for _ in range(10):  # converges quickly
         total = sum(clamped_weights.values())

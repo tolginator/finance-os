@@ -93,7 +93,7 @@ class MacroOutlookAgent(BaseAgent):
                 "active_tilts": len(outlook.active_tilts),
                 "confidence": str(outlook.confidence),
                 "regime_summary": outlook.regime_summary,
-                "_outlook": outlook,
+                "_outlook": outlook.model_dump(mode="json"),
             },
         )
 

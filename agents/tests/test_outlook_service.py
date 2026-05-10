@@ -422,8 +422,7 @@ class TestComputeTilts:
         assert eq.recommended_weight == _D("0.2583")
 
     def test_neutral_rationale_with_signal(self) -> None:
-        """Neutral tilts from band clamping should note signal was present."""
-        # Build a report where only growth dimension provides signal
+        """Neutral tilts distinguish raw-tilt-neutralized vs signals-cancel."""
         report = MacroRegimeReport(
             growth=GrowthClassification(
                 regime=GrowthRegime.EXPANSION,
@@ -434,10 +433,13 @@ class TestComputeTilts:
         )
         policy = _balanced_policy()
         result = compute_tilts(report, policy)
-        # Some assets may round to neutral despite signal being present
         neutral_tilts = [t for t in result.tilts if t.direction == TiltDirection.NEUTRAL]
         for nt in neutral_tilts:
-            assert "constrained" in nt.rationale or "no regime data" not in nt.rationale.lower()
+            # Must be one of the two signal-present rationales
+            assert nt.rationale in (
+                "Raw tilt neutralized by policy bands or normalization",
+                "Regime signals cancel out; hold at policy target",
+            )
 
     def test_neutral_rationale_without_signal(self) -> None:
         """Neutral tilts with no regime data should say 'no regime signal'."""

@@ -260,26 +260,20 @@ def compute_tilts(
     # Fix rounding residual by distributing across classes with band room
     residual = Decimal("1") - sum(clamped_weights.values())
     while residual != 0:
-        candidates = []
-        for ac in sorted(AssetClass, key=lambda a: clamped_weights[a], reverse=True):
-            min_w = policy.allocations[ac].min_weight
-            max_w = policy.allocations[ac].max_weight
-            if residual > 0 and clamped_weights[ac] < max_w:
-                candidates.append(ac)
-            elif residual < 0 and clamped_weights[ac] > min_w:
-                candidates.append(ac)
-        if not candidates:
-            break
         step = Decimal("0.0001") if residual > 0 else Decimal("-0.0001")
-        for ac in candidates:
+        applied = False
+        for ac in sorted(AssetClass, key=lambda a: clamped_weights[a], reverse=True):
             min_w = policy.allocations[ac].min_weight
             max_w = policy.allocations[ac].max_weight
             adjusted = clamped_weights[ac] + step
             if min_w <= adjusted <= max_w:
                 clamped_weights[ac] = adjusted
                 residual -= step
+                applied = True
                 if residual == 0:
                     break
+        if not applied:
+            break
 
     # Build tilt objects
     tilts: list[AssetClassTilt] = []
@@ -298,7 +292,7 @@ def compute_tilts(
             tilt=tilt,
             recommended_weight=clamped_weights[ac],
             target_weight=target,
-            rationale=_rationale(ac, direction, report),
+            rationale=_rationale(ac, direction, report, raw_tilts[ac]),
         ))
 
     # Build regime summary
@@ -326,12 +320,15 @@ def _rationale(
     ac: AssetClass,
     direction: TiltDirection,
     report: MacroRegimeReport,
+    raw_tilt: Decimal,
 ) -> str:
     """Generate a brief rationale for the tilt direction."""
     if direction == TiltDirection.NEUTRAL:
+        if raw_tilt != 0:
+            return "Raw tilt neutralized by policy bands or normalization"
         has_signal = any([report.growth, report.rates, report.inflation])
         if has_signal:
-            return "Regime signal present but constrained to neutral by policy bands"
+            return "Regime signals cancel out; hold at policy target"
         return "No regime signal; hold at policy target"
 
     parts: list[str] = []

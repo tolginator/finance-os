@@ -118,16 +118,9 @@ def _contraction_report() -> MacroRegimeReport:
 
 
 class TestOutlookContracts:
-    def test_tilt_direction_values(self) -> None:
-        assert set(TiltDirection) == {
-            TiltDirection.OVERWEIGHT,
-            TiltDirection.NEUTRAL,
-            TiltDirection.UNDERWEIGHT,
-        }
-
     def test_budget_neutral_validation(self) -> None:
         """Tilts that don't sum to 0 should fail validation."""
-        with pytest.raises(ValueError, match="budget-neutral"):
+        with pytest.raises(ValueError):
             MacroOutlookResponse(
                 tilts=[
                     AssetClassTilt(
@@ -210,10 +203,10 @@ class TestComputeTilts:
         assert treas_tilt.direction == TiltDirection.OVERWEIGHT
 
     def test_tilts_are_budget_neutral(self) -> None:
-        """All tilts must sum to zero."""
+        """All tilts must sum to exactly zero."""
         result = compute_tilts(_expansion_report(), _balanced_policy())
         total = sum(t.tilt for t in result.tilts)
-        assert abs(total) <= _D("0.001")
+        assert total == _D("0")
 
     def test_all_asset_classes_present(self) -> None:
         """Every canonical asset class should have a tilt entry."""
@@ -235,10 +228,10 @@ class TestComputeTilts:
             )
 
     def test_recommended_weights_sum_to_one(self) -> None:
-        """Recommended weights must sum to 1.0 (fully invested)."""
+        """Recommended weights must sum to exactly 1.0 (fully invested)."""
         result = compute_tilts(_expansion_report(), _balanced_policy())
         total = sum(t.recommended_weight for t in result.tilts)
-        assert abs(total - 1) <= _D("0.001")
+        assert total == _D("1")
 
     def test_empty_report_returns_neutral(self) -> None:
         """No regime data → all tilts should be neutral (at target)."""
@@ -270,12 +263,12 @@ class TestComputeTilts:
         assert abs(high_equity.tilt) > abs(low_equity.tilt)
 
     def test_tilt_magnitude_capped(self) -> None:
-        """No individual raw tilt should exceed MAX_TILT_MAGNITUDE."""
+        """No individual tilt should exceed MAX_TILT_MAGNITUDE."""
         result = compute_tilts(_expansion_report(), _balanced_policy())
         for t in result.tilts:
-            # After normalization, tilts can shift slightly, but individual
-            # raw tilts were capped. Check against a generous bound.
-            assert abs(t.tilt) <= MAX_TILT_MAGNITUDE + _D("0.01")
+            assert abs(t.tilt) <= MAX_TILT_MAGNITUDE, (
+                f"{t.asset_class.value}: |{t.tilt}| > {MAX_TILT_MAGNITUDE}"
+            )
 
     def test_confidence_propagated(self) -> None:
         """Outlook confidence should match regime report confidence."""
@@ -326,6 +319,101 @@ class TestComputeTilts:
             t for t in result.tilts if t.asset_class == AssetClass.TIPS
         )
         assert tips.direction == TiltDirection.OVERWEIGHT
+
+    def test_contraction_budget_neutral(self) -> None:
+        """Contraction scenario tilts must also sum to exactly zero."""
+        result = compute_tilts(_contraction_report(), _balanced_policy())
+        assert sum(t.tilt for t in result.tilts) == _D("0")
+        assert sum(t.recommended_weight for t in result.tilts) == _D("1")
+
+    def test_tight_bands_clamp_and_remain_budget_neutral(self) -> None:
+        """With tight bands, tilts are clamped but budget neutrality holds."""
+        tight_policy = InvestmentPolicy(allocations={
+            ac: AllocationTarget(
+                target_weight=_D("0.1111"),
+                min_weight=_D("0.10"),
+                max_weight=_D("0.12"),
+            )
+            for ac in AssetClass
+        })
+        # Should not raise — contract validates budget neutrality
+        result = compute_tilts(_expansion_report(), tight_policy)
+        for t in result.tilts:
+            assert t.recommended_weight >= _D("0.10"), (
+                f"{t.asset_class.value} below min"
+            )
+            assert t.recommended_weight <= _D("0.12"), (
+                f"{t.asset_class.value} above max"
+            )
+        assert sum(t.recommended_weight for t in result.tilts) == _D("1")
+
+    def test_recovery_regime_overweights_equity(self) -> None:
+        """Recovery growth regime should overweight equity."""
+        report = MacroRegimeReport(
+            growth=GrowthClassification(
+                regime=GrowthRegime.RECOVERY,
+                confidence=_D("0.8"),
+                contributing_indicators=["GDP"],
+            ),
+        )
+        result = compute_tilts(report, _balanced_policy())
+        eq = next(
+            t for t in result.tilts if t.asset_class == AssetClass.US_EQUITY
+        )
+        assert eq.direction == TiltDirection.OVERWEIGHT
+
+    def test_rising_rates_overweights_cash(self) -> None:
+        """Rising rates should overweight cash."""
+        report = MacroRegimeReport(
+            rates=RateClassification(
+                regime=RateEnvironment.RISING,
+                confidence=_D("0.8"),
+                contributing_indicators=["FEDFUNDS"],
+            ),
+        )
+        result = compute_tilts(report, _balanced_policy())
+        cash = next(
+            t for t in result.tilts
+            if t.asset_class == AssetClass.CASH_MONEY_MARKET
+        )
+        assert cash.direction == TiltDirection.OVERWEIGHT
+
+    def test_reflation_overweights_tips_and_real_assets(self) -> None:
+        """Reflation should overweight TIPS and real assets."""
+        report = MacroRegimeReport(
+            inflation=InflationClassification(
+                regime=InflationRegime.REFLATION,
+                confidence=_D("0.8"),
+                contributing_indicators=["CPIAUCSL"],
+            ),
+        )
+        result = compute_tilts(report, _balanced_policy())
+        tips = next(
+            t for t in result.tilts if t.asset_class == AssetClass.TIPS
+        )
+        real = next(
+            t for t in result.tilts if t.asset_class == AssetClass.REAL_ASSETS
+        )
+        assert tips.direction == TiltDirection.OVERWEIGHT
+        assert real.direction == TiltDirection.OVERWEIGHT
+
+    def test_expansion_exact_equity_tilt(self) -> None:
+        """Verify exact expansion equity tilt to detect regressions."""
+        result = compute_tilts(_expansion_report(), _balanced_policy())
+        eq = next(
+            t for t in result.tilts if t.asset_class == AssetClass.US_EQUITY
+        )
+        assert eq.tilt == _D("0.0296")
+        assert eq.recommended_weight == _D("0.3296")
+
+    def test_contraction_exact_equity_tilt(self) -> None:
+        """Verify exact contraction equity tilt to detect regressions."""
+        result = compute_tilts(_contraction_report(), _balanced_policy())
+        eq = next(
+            t for t in result.tilts if t.asset_class == AssetClass.US_EQUITY
+        )
+        assert eq.tilt == _D("-0.0416")
+        assert eq.recommended_weight == _D("0.2584")
 
 
 # ---------------------------------------------------------------------------

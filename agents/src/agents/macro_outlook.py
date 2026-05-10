@@ -1,9 +1,9 @@
 """Macro outlook agent — forward-looking asset-class tilts.
 
-Synthesizes multi-dimensional regime classification into policy-bounded
-asset-class tilt recommendations.  The agent is deterministic: it
-delegates to ``RegimeService`` for classification and
-``outlook_service.compute_tilts`` for tilt computation.
+Synthesizes a pre-computed multi-dimensional regime classification into
+policy-bounded asset-class tilt recommendations.  The agent is
+deterministic: it delegates to ``outlook_service.compute_tilts`` for
+tilt computation — no LLM calls are made.
 """
 
 from typing import Any

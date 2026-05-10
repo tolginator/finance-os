@@ -235,7 +235,7 @@ def compute_tilts(
         gap = Decimal("1") - total
         if abs(gap) <= Decimal("0.0001"):
             break
-        # Distribute gap proportionally among classes with band room
+        # Distribute gap equally among classes with band room
         adjustable: list[AssetClass] = []
         for ac in AssetClass:
             min_w = policy.allocations[ac].min_weight
@@ -257,11 +257,17 @@ def compute_tilts(
     # Quantize to 4 decimal places
     for ac in AssetClass:
         clamped_weights[ac] = clamped_weights[ac].quantize(Decimal("0.0001"))
-    # Fix rounding residual on the largest position
+    # Fix rounding residual on a position with available band room
     residual = Decimal("1") - sum(clamped_weights.values())
     if residual != 0:
-        largest = max(clamped_weights, key=lambda a: clamped_weights[a])
-        clamped_weights[largest] += residual
+        for ac in sorted(AssetClass, key=lambda a: clamped_weights[a],
+                         reverse=True):
+            min_w = policy.allocations[ac].min_weight
+            max_w = policy.allocations[ac].max_weight
+            adjusted = clamped_weights[ac] + residual
+            if min_w <= adjusted <= max_w:
+                clamped_weights[ac] = adjusted
+                break
 
     # Build tilt objects
     tilts: list[AssetClassTilt] = []
@@ -341,7 +347,7 @@ def _regime_summary(report: MacroRegimeReport) -> str:
     if not parts:
         return "Insufficient data for regime classification."
 
-    dims = report.populated_dimensions
+    dims = len(parts)
     conf = report.overall_confidence
     return (
         f"Macro regime ({dims} dimension{'s' if dims != 1 else ''}, "

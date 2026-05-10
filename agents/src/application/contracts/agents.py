@@ -75,8 +75,7 @@ class ClassifyMacroResponse(BaseModel):
 class MacroOutlookRequest(BaseModel):
     """Request for forward-looking asset-class tilts.
 
-    Requires a regime report and investment policy.  Optionally accepts
-    a FRED API key if the regime report is not pre-computed.
+    Requires a pre-computed regime report and investment policy.
     """
 
     regime_report: MacroRegimeReport = Field(

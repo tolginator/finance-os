@@ -3,7 +3,6 @@
 Handles contract validation, kwargs mapping, and response normalization.
 """
 
-import asyncio
 from typing import Any
 
 from src.agents.adversarial import AdversarialAgent
@@ -13,7 +12,6 @@ from src.agents.macro_regime import MacroRegimeAgent
 from src.agents.quant_signal import QuantSignalAgent
 from src.agents.risk_agent import RiskAgent
 from src.agents.thesis_guardian import ThesisGuardianAgent
-from src.application.config import AppConfig
 from src.application.contracts.agents import (
     AnalyzeEarningsRequest,
     AnalyzeEarningsResponse,
@@ -30,7 +28,7 @@ from src.application.contracts.agents import (
     SearchFilingsRequest,
     SearchFilingsResponse,
 )
-from src.application.data_services.fred_service import FREDService
+from src.application.data_services.base import DataResponse
 from src.application.services.regime_service import RegimeService
 from src.core.agent import AgentResponse, BaseAgent
 
@@ -38,14 +36,6 @@ from src.core.agent import AgentResponse, BaseAgent
 def _metadata_get(metadata: dict[str, Any], key: str, default: Any = "") -> Any:
     """Safely get a metadata value with a default."""
     return metadata.get(key, default)
-
-
-def _get_fred_api_key() -> str:
-    """Best-effort FRED API key from AppConfig."""
-    try:
-        return AppConfig().fred_api_key
-    except Exception:
-        return ""
 
 
 class AgentService:
@@ -60,7 +50,6 @@ class AgentService:
 
     def __init__(self) -> None:
         self._agents: dict[str, BaseAgent] = {}
-        self._regime_service: RegimeService | None = None
 
     def _get_or_create(self, agent_cls: type[BaseAgent], *args: Any) -> BaseAgent:
         """Cache agent instances by class name."""
@@ -100,22 +89,14 @@ class AgentService:
             kwargs["indicators"] = request.indicators
         response = await agent.run("Classify current macro regime", **kwargs)
 
-        # Enhanced multi-dimensional regime report
+        # Enhanced multi-dimensional regime report — reuses the DataResponses
+        # already fetched by MacroRegimeAgent to avoid a second FRED round-trip.
         regime_report = None
-        api_key = request.api_key or _get_fred_api_key()
-        if api_key:
-            if request.api_key:
-                # Per-request key — dedicated instances
-                fred = FREDService(api_key=request.api_key)
-                regime_svc = RegimeService(fred_service=fred)
-            else:
-                # App-config key — reuse long-lived instances for cache benefit
-                # TTLCache is thread-safe, so concurrent to_thread calls are safe
-                if self._regime_service is None:
-                    fred = FREDService(api_key=api_key)
-                    self._regime_service = RegimeService(fred_service=fred)
-                regime_svc = self._regime_service
-            regime_report = await asyncio.to_thread(regime_svc.classify)
+        data_responses: dict[str, DataResponse] | None = response.metadata.get(
+            "_data_responses"
+        )
+        if data_responses:
+            regime_report = RegimeService.classify_from_data(data_responses)
 
         return ClassifyMacroResponse(
             content=response.content,

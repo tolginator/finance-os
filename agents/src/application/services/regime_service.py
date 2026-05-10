@@ -351,7 +351,7 @@ def classify_inflation(
     Classification:
     - DISINFLATION: CPI month-over-month growth below 0.1%
     - STABLE: CPI month-over-month growth from 0.1% to 0.3% (inclusive)
-    - REFLATION: CPI month-over-month growth above 0.3% up to 0.4%
+    - REFLATION: CPI month-over-month growth above 0.3%
     - STAGFLATION: CPI above 0.4% while unemployment rising
     """
     contributing: list[str] = []
@@ -460,24 +460,24 @@ class RegimeService:
     def __init__(self, fred_service: FREDService) -> None:
         self._fred = fred_service
 
-    def classify(self) -> MacroRegimeReport:
-        """Classify all regime dimensions from current FRED data.
+    @staticmethod
+    def classify_from_data(data: dict[str, DataResponse]) -> MacroRegimeReport:
+        """Classify all regime dimensions from pre-fetched FRED indicator data.
 
-        Returns a MacroRegimeReport with populated dimensions.
-        Dimensions return None if insufficient data is available.
+        Use this to avoid a second FRED fetch when data has already been
+        retrieved (e.g., from ``MacroRegimeAgent``).
 
-        This method is synchronous because FREDService uses blocking I/O.
-        Callers in async contexts should use ``asyncio.to_thread``.
+        Args:
+            data: Mapping of FRED series ID to DataResponse.
+
+        Returns:
+            A MacroRegimeReport with populated dimensions.
+            Dimensions return None if insufficient data is available.
         """
-        # Fetch all indicators
-        data = self._fetch_indicators()
-
-        # Classify each dimension independently
         growth = classify_growth(data)
         rates = classify_rates(data)
         inflation = classify_inflation(data)
 
-        # Compute common as_of
         all_readings: list[DataReading] = []
         for resp in data.values():
             if resp.readings:
@@ -492,6 +492,17 @@ class RegimeService:
             global_trade=None,  # Awaiting IMF/WB services
             as_of=as_of,
         )
+
+    def classify(self) -> MacroRegimeReport:
+        """Classify all regime dimensions from current FRED data.
+
+        Returns a MacroRegimeReport with populated dimensions.
+        Dimensions return None if insufficient data is available.
+
+        This method is synchronous because FREDService uses blocking I/O.
+        Callers in async contexts should use ``asyncio.to_thread``.
+        """
+        return RegimeService.classify_from_data(self._fetch_indicators())
 
     def _fetch_indicators(self) -> dict[str, DataResponse]:
         """Fetch all regime indicators from FRED."""

@@ -108,10 +108,12 @@ class TTLCache:
             if time.monotonic() > entry.expires_at:
                 self._store.pop(key, None)
                 return None
-            # Deep copy to isolate callers from cached data
-            resp = entry.response.model_copy(deep=True)
-            resp.freshness.served_from_cache = True
-            return resp
+            # Grab the reference under the lock; deep copy outside to reduce
+            # lock contention (deep copy can be expensive for large responses).
+            cached: DataResponse = entry.response
+        resp = cached.model_copy(deep=True)
+        resp.freshness.served_from_cache = True
+        return resp
 
     def put(
         self, key: str, response: DataResponse, ttl: float | None = None

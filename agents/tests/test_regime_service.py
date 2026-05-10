@@ -22,6 +22,7 @@ from src.application.data_services.base import (
     FreshnessState,
 )
 from src.application.services.regime_service import (
+    RegimeService,
     classify_growth,
     classify_inflation,
     classify_rates,
@@ -580,3 +581,50 @@ class TestBackwardCompat:
         dumped = resp.model_dump(mode="json")
         assert dumped["regime_report"]["growth"]["regime"] == "expansion"
         assert dumped["regime"] == "EXPANSION"
+
+
+# ---------------------------------------------------------------------------
+# classify_from_data static method tests
+# ---------------------------------------------------------------------------
+
+
+class TestClassifyFromData:
+    """Tests for RegimeService.classify_from_data() static method."""
+
+    def test_classify_from_data_returns_report(self) -> None:
+        """classify_from_data produces a MacroRegimeReport from pre-fetched data."""
+        data = {**_growth_data(), **_rate_data(), **_inflation_data()}
+        report = RegimeService.classify_from_data(data)
+        assert isinstance(report, MacroRegimeReport)
+        assert report.growth is not None
+        assert report.rates is not None
+        assert report.inflation is not None
+        assert report.global_trade is None
+
+    def test_classify_from_data_empty_returns_none_dimensions(self) -> None:
+        """Empty data → all dimensions None."""
+        report = RegimeService.classify_from_data({})
+        assert report.growth is None
+        assert report.rates is None
+        assert report.inflation is None
+
+    def test_classify_from_data_partial_data(self) -> None:
+        """Partial data → only populated dimensions are non-None."""
+        data = _growth_data()
+        report = RegimeService.classify_from_data(data)
+        assert report.growth is not None
+        # FEDFUNDS absent → rates None
+        assert report.rates is None
+        # CPIAUCSL absent → inflation None
+        assert report.inflation is None
+
+    def test_classify_from_data_matches_direct_classifiers(self) -> None:
+        """classify_from_data produces same result as calling classifiers directly."""
+        data = {**_growth_data(), **_rate_data(), **_inflation_data()}
+        report = RegimeService.classify_from_data(data)
+        assert report.growth is not None
+        assert report.growth.regime == classify_growth(data).regime  # type: ignore[union-attr]
+        assert report.rates is not None
+        assert report.rates.regime == classify_rates(data).regime  # type: ignore[union-attr]
+        assert report.inflation is not None
+        assert report.inflation.regime == classify_inflation(data).regime  # type: ignore[union-attr]

@@ -41,6 +41,117 @@ TMutual Fund
     assert result.position_only is False
 
 
+def test_preview_qif_import_sells_consume_lots_fifo() -> None:
+    """Sell transactions consume lots FIFO, reducing shares and cost basis."""
+    qif_text = """!Account
+NBrokerage
+TInvst
+^
+!Type:Invst
+D1/15/2024
+NBuy
+YVTI
+I200.00
+Q100
+^
+D3/01/2024
+NBuy
+YVTI
+I220.00
+Q50
+^
+D6/01/2024
+NSell
+YVTI
+I250.00
+Q120
+^
+!Type:Security
+NVTI
+SVTI
+TStock
+^
+"""
+
+    result = preview_qif_import(qif_text)
+
+    assert len(result.accounts) == 1
+    account = result.accounts[0]
+    # Bought 150, sold 120 → 30 remaining (FIFO: 100-lot consumed, 50-lot reduced by 20).
+    total_shares = sum(lot.shares for lot in account.tax_lots)
+    assert total_shares == Decimal("30")
+    assert len(account.tax_lots) == 1
+    assert account.tax_lots[0].cost_basis_per_share == Decimal("220.00")
+    assert account.tax_lots[0].shares == Decimal("30")
+
+
+def test_preview_qif_import_sell_all_shares_removes_position() -> None:
+    """Selling all shares should result in no tax lots for that ticker."""
+    qif_text = """!Account
+NBrokerage
+TInvst
+^
+!Type:Invst
+D1/15/2024
+NBuy
+YVTI
+I200.00
+Q100
+^
+D6/01/2024
+NSell
+YVTI
+I250.00
+Q100
+^
+!Type:Security
+NVTI
+SVTI
+TStock
+^
+"""
+
+    result = preview_qif_import(qif_text)
+
+    # No remaining positions → account filtered out as empty.
+    assert len(result.accounts) == 0
+
+
+def test_preview_qif_import_handles_stock_split() -> None:
+    """Stock splits multiply shares and divide price across lots."""
+    qif_text = """!Account
+NBrokerage
+TInvst
+^
+!Type:Invst
+D1/15/2024
+NBuy
+YVTI
+I200.00
+Q100
+^
+D3/01/2024
+NStkSplit
+YVTI
+Q20
+^
+!Type:Security
+NVTI
+SVTI
+TStock
+^
+"""
+
+    result = preview_qif_import(qif_text)
+
+    assert len(result.accounts) == 1
+    account = result.accounts[0]
+    # 2:1 split (Q=20 → ratio=2): 100 shares → 200, price $200 → $100.
+    assert len(account.tax_lots) == 1
+    assert account.tax_lots[0].shares == Decimal("200")
+    assert account.tax_lots[0].cost_basis_per_share == Decimal("100.00")
+
+
 def test_preview_qif_import_maps_banking_balance_to_cash_holding() -> None:
     qif_text = """!Account
 NChecking

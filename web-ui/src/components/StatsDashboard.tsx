@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchAgents, fetchHealth, fetchWatchlists } from '../api';
 import type { AgentInfo, HealthResponse, WatchlistsResponse } from '../types';
 
@@ -17,42 +17,43 @@ export function StatsDashboard() {
   const [watchlists, setWatchlists] = useState<WatchlistsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const mountedRef = useRef(true);
+  const cancelledRef = useRef(false);
 
   useEffect(() => {
+    cancelledRef.current = false;
     (async () => {
       try {
         const { healthData, agentData, watchlistData } = await fetchStats();
-        if (!mountedRef.current) return;
+        if (cancelledRef.current) return;
         setHealth(healthData);
         setAgents(agentData);
         setWatchlists(watchlistData);
       } catch (err) {
-        if (!mountedRef.current) return;
+        if (cancelledRef.current) return;
         setError(err instanceof Error ? err.message : 'Failed to load stats');
       } finally {
-        if (mountedRef.current) setLoading(false);
+        if (!cancelledRef.current) setLoading(false);
       }
     })();
-    return () => { mountedRef.current = false; };
+    return () => { cancelledRef.current = true; };
   }, []);
 
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
       const { healthData, agentData, watchlistData } = await fetchStats();
-      if (!mountedRef.current) return;
+      if (cancelledRef.current) return;
       setHealth(healthData);
       setAgents(agentData);
       setWatchlists(watchlistData);
     } catch (err) {
-      if (!mountedRef.current) return;
+      if (cancelledRef.current) return;
       setError(err instanceof Error ? err.message : 'Failed to load stats');
     } finally {
-      if (mountedRef.current) setLoading(false);
+      if (!cancelledRef.current) setLoading(false);
     }
-  };
+  }, []);
 
   if (loading) return <p data-testid="stats-loading" style={{ color: '#6b7280' }}>Loading stats…</p>;
 

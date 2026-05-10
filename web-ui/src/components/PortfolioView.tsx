@@ -45,6 +45,10 @@ function toNumber(value: string): number {
   return Number.parseFloat(value);
 }
 
+function toSlug(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+}
+
 function formatCurrency(value: number, decimals = 0): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -126,6 +130,7 @@ export function PortfolioView() {
         <div data-testid="portfolio-accounts" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           {householdMock.accounts.map((account) => {
             const isExpanded = expandedAccounts[account.name] ?? false;
+            const slug = toSlug(account.name);
             const accountValue = account.tax_lots.reduce((sum, lot) => sum + toNumber(lot.shares) * (ETF_PRICE_MAP[lot.ticker] ?? 0), 0)
               + account.cash_holdings.reduce((sum, holding) => sum + toNumber(holding.amount), 0);
 
@@ -138,7 +143,7 @@ export function PortfolioView() {
                 <button
                   type="button"
                   aria-expanded={isExpanded}
-                  aria-controls={`holdings-${account.name}`}
+                  aria-controls={`holdings-${slug}`}
                   onClick={() => setExpandedAccounts((current) => ({ ...current, [account.name]: !isExpanded }))}
                   style={{
                     width: '100%',
@@ -163,7 +168,7 @@ export function PortfolioView() {
                 </button>
 
                 {isExpanded && (
-                  <div id={`holdings-${account.name}`} style={{ padding: '0 1rem 1rem' }}>
+                  <div id={`holdings-${slug}`} style={{ padding: '0 1rem 1rem' }}>
                     <table
                       data-testid={`holdings-table-${account.name}`}
                       style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}

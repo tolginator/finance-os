@@ -66,6 +66,38 @@ PGroceries
     assert account.cash_holdings[0].counts_toward_liquidity_reserve is True
 
 
+def test_preview_qif_import_computes_balance_from_banking_transactions() -> None:
+    """When no statement balance exists, sum banking transactions."""
+    qif_text = """!Account
+NChase Checking
+TBank
+^
+!Type:Bank
+D1/15/2024
+T5000.00
+PDeposit
+^
+D1/20/2024
+T-200.00
+PGroceries
+^
+D2/01/2024
+T3000.00
+PPaycheck
+^
+"""
+
+    result = preview_qif_import(qif_text)
+
+    assert len(result.accounts) == 1
+    account = result.accounts[0]
+    assert account.name == "Chase Checking"
+    assert len(account.cash_holdings) == 1
+    assert account.cash_holdings[0].amount == Decimal("7800.00")
+    assert account.cash_holdings[0].valuation_date == date(2024, 2, 1)
+    assert account.cash_holdings[0].counts_toward_liquidity_reserve is True
+
+
 def test_preview_qif_import_warns_and_skips_unsupported_account_types() -> None:
     qif_text = """!Account
 NCredit Card

@@ -197,11 +197,45 @@ def preview_qif_import(
             )
         )
 
-    if not parsed.accounts:
-        for banking in parsed.banking_transactions:
-            accounts_map.setdefault(
-                banking.account,
-                Account(name=banking.account, account_type=AccountType.TAXABLE),
+    # Compute cash balances for banking accounts from transaction history.
+    banking_balances: dict[str, Decimal] = {}
+    latest_dates: dict[str, date] = {}
+    for txn in parsed.banking_transactions:
+        banking_balances[txn.account] = banking_balances.get(txn.account, _ZERO) + txn.amount
+        if txn.date is not None:
+            prev = latest_dates.get(txn.account)
+            if prev is None or txn.date > prev:
+                latest_dates[txn.account] = txn.date
+
+    for acct_name, balance in banking_balances.items():
+        if balance <= _ZERO:
+            continue
+        qif_acct = parsed.accounts.get(acct_name)
+        acct_type = _map_qif_account_type(qif_acct, warnings) if qif_acct else AccountType.TAXABLE
+        if acct_type is None:
+            continue
+        # Skip if we already created a cash holding from statement balance
+        account = accounts_map.get(acct_name)
+        if account is not None and account.cash_holdings:
+            continue
+        account = accounts_map.setdefault(
+            acct_name, Account(name=acct_name, account_type=acct_type),
+        )
+        try:
+            account.cash_holdings.append(
+                CashHolding(
+                    amount=balance,
+                    valuation_date=latest_dates.get(acct_name) or date.today(),
+                    is_money_market=False,
+                    ticker=None,
+                    counts_toward_liquidity_reserve=True,
+                )
+            )
+        except ValidationError:
+            warnings.append(
+                ImportWarning(
+                    message=f"Skipped computed balance for '{acct_name}' — invalid cash holding.",
+                )
             )
 
     non_empty = [

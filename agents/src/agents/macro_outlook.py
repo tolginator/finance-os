@@ -77,6 +77,12 @@ class MacroOutlookAgent(BaseAgent):
                 metadata={"error": "missing_policy"},
             )
 
+        # Coerce dicts (e.g. from orchestrator/pipeline) into models
+        if isinstance(regime_report, dict):
+            regime_report = MacroRegimeReport.model_validate(regime_report)
+        if isinstance(policy, dict):
+            policy = InvestmentPolicy.model_validate(policy)
+
         outlook = compute_tilts(regime_report, policy)
         dashboard = _format_outlook(outlook)
 

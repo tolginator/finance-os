@@ -7,7 +7,6 @@ applies regime-driven tilt rules per canonical asset class, then clamps
 tilts to the policy bands and re-normalizes to maintain budget neutrality.
 """
 
-import logging
 from decimal import Decimal
 
 from src.application.contracts.household import AssetClass
@@ -24,8 +23,6 @@ from src.application.contracts.regime import (
     RateEnvironment,
 )
 
-logger = logging.getLogger(__name__)
-
 # ---------------------------------------------------------------------------
 # Tilt rules — per asset class, per regime dimension
 # ---------------------------------------------------------------------------
@@ -34,6 +31,9 @@ logger = logging.getLogger(__name__)
 # Each dimension contributes independently; contributions are summed
 # then clamped to MAX_TILT_MAGNITUDE before policy-band clamping.
 
+# Maximum raw tilt magnitude before policy-band clamping and
+# renormalization.  Final tilts may differ after band clamping
+# redistributes weight across asset classes.
 MAX_TILT_MAGNITUDE = Decimal("0.05")
 
 # Growth dimension tilts

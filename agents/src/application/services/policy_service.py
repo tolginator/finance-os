@@ -6,11 +6,8 @@ Uses OS-level file locking (``fcntl.flock``) to protect against
 concurrent writes from Web API, MCP server, and CLI processes.
 """
 
-import fcntl
 import json
 import logging
-import os
-import tempfile
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -33,6 +30,7 @@ from src.application.contracts.policy import (
     RebalancingBand,
     UpdateGoalRequest,
 )
+from src.core.file_io import FileLockContext, atomic_write
 
 logger = logging.getLogger(__name__)
 
@@ -51,41 +49,6 @@ class GoalNotFoundError(Exception):
 
 class GoalsCorruptError(Exception):
     """Raised when goals.json cannot be parsed."""
-
-
-# ---------------------------------------------------------------------------
-# File lock context
-# ---------------------------------------------------------------------------
-
-
-class _FileLockContext:
-    """OS-level advisory lock via fcntl.flock."""
-
-    def __init__(self, lock_path: Path) -> None:
-        self._lock_path = lock_path
-        self._fd: int | None = None
-
-    def __enter__(self) -> "_FileLockContext":
-        self._lock_path.parent.mkdir(parents=True, exist_ok=True)
-        self._fd = os.open(str(self._lock_path), os.O_CREAT | os.O_RDWR)
-        try:
-            fcntl.flock(self._fd, fcntl.LOCK_EX)
-        except BaseException:
-            try:
-                os.close(self._fd)
-            except OSError:
-                pass
-            self._fd = None
-            raise
-        return self
-
-    def __exit__(self, *_: object) -> None:
-        if self._fd is not None:
-            try:
-                fcntl.flock(self._fd, fcntl.LOCK_UN)
-            finally:
-                os.close(self._fd)
-                self._fd = None
 
 
 # ---------------------------------------------------------------------------
@@ -245,8 +208,8 @@ class PolicyService:
         self._cached_data: GoalsFile | None = None
         self._cached_mtime_ns: int = 0
 
-    def _flock(self) -> _FileLockContext:
-        return _FileLockContext(self._lock_path)
+    def _flock(self) -> FileLockContext:
+        return FileLockContext(self._lock_path)
 
     def _load_unlocked(self) -> GoalsFile:
         """Load goals without acquiring lock (caller must hold lock).
@@ -270,38 +233,8 @@ class PolicyService:
 
     def _write_atomic(self, data: GoalsFile) -> None:
         """Atomic write with fsync (caller must hold lock)."""
-        self._path.parent.mkdir(parents=True, exist_ok=True)
         content = data.model_dump_json(indent=2).encode("utf-8")
-        fd_num, tmp_name = tempfile.mkstemp(
-            dir=str(self._path.parent), suffix=".tmp",
-        )
-        tmp_path = Path(tmp_name)
-        try:
-            with os.fdopen(fd_num, "wb") as tmp_file:
-                tmp_file.write(content)
-                tmp_file.flush()
-                os.fsync(tmp_file.fileno())
-            os.chmod(str(tmp_path), 0o600)
-            tmp_path.replace(self._path)
-        except BaseException:
-            try:
-                tmp_path.unlink(missing_ok=True)
-            except OSError as cleanup_exc:
-                logger.warning(
-                    "Could not remove temp file %s: %s",
-                    tmp_path, cleanup_exc,
-                )
-            raise
-        # Best-effort dir fsync
-        dir_fd: int | None = None
-        try:
-            dir_fd = os.open(str(self._path.parent), os.O_RDONLY)
-            os.fsync(dir_fd)
-        except OSError:
-            pass
-        finally:
-            if dir_fd is not None:
-                os.close(dir_fd)
+        atomic_write(self._path, content)
         # Update mtime cache after successful write
         self._cached_data = data
         try:

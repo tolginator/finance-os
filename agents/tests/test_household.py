@@ -594,9 +594,9 @@ class TestHouseholdService:
             original_close(fd)
 
         with (
-            patch("src.application.services.household_service.fcntl") as mock_fcntl,
+            patch("src.core.file_io.fcntl") as mock_fcntl,
             patch(
-                "src.application.services.household_service.os.close",
+                "src.core.file_io.os.close",
                 side_effect=tracking_close,
             ),
         ):

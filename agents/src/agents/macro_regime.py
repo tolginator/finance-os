@@ -287,10 +287,13 @@ class MacroRegimeAgent(BaseAgent):
             AgentResponse with regime classification and dashboard.
         """
         api_key = kwargs.get("api_key", self._fred_api_key)
-        indicator_ids = kwargs.get(
-            "indicators",
-            list(MACRO_INDICATORS.keys()),
+        indicator_ids: list[str] = list(
+            kwargs.get("indicators", MACRO_INDICATORS.keys())
         )
+        # Ensure LEI (USALOLITONOSTSAM) is fetched for multi-dimensional
+        # regime classification even when not in the explicit indicator list.
+        if "USALOLITONOSTSAM" not in indicator_ids:
+            indicator_ids.append("USALOLITONOSTSAM")
 
         if not api_key:
             return AgentResponse(
@@ -337,5 +340,8 @@ class MacroRegimeAgent(BaseAgent):
                 "indicators_with_data": sum(
                     1 for r in all_readings.values() if r
                 ),
+                # Pre-fetched DataResponses reused by RegimeService.classify_from_data
+                # to avoid a second FRED round-trip.
+                "_data_responses": responses,
             },
         )

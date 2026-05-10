@@ -28,6 +28,8 @@ from src.application.contracts.agents import (
     SearchFilingsRequest,
     SearchFilingsResponse,
 )
+from src.application.data_services.base import DataResponse
+from src.application.services.regime_service import RegimeService
 from src.core.agent import AgentResponse, BaseAgent
 
 
@@ -86,6 +88,16 @@ class AgentService:
         if request.indicators:
             kwargs["indicators"] = request.indicators
         response = await agent.run("Classify current macro regime", **kwargs)
+
+        # Enhanced multi-dimensional regime report — reuses the DataResponses
+        # already fetched by MacroRegimeAgent to avoid a second FRED round-trip.
+        regime_report = None
+        data_responses: dict[str, DataResponse] | None = response.metadata.get(
+            "_data_responses"
+        )
+        if data_responses:
+            regime_report = RegimeService.classify_from_data(data_responses)
+
         return ClassifyMacroResponse(
             content=response.content,
             regime=_metadata_get(response.metadata, "regime"),
@@ -95,6 +107,7 @@ class AgentService:
             indicators_with_data=int(
                 _metadata_get(response.metadata, "indicators_with_data", 0)
             ),
+            regime_report=regime_report,
         )
 
     async def search_filings(

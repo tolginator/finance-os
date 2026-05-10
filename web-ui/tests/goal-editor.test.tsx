@@ -3,12 +3,11 @@ import { render, screen } from '@testing-library/react';
 import { GoalEditor } from '../src/components/GoalEditor';
 
 describe('GoalEditor', () => {
-  it('renders goals and policy table', () => {
+  it('renders the empty state when no goals API exists', () => {
     render(<GoalEditor />);
     expect(screen.getByTestId('goal-editor')).toBeInTheDocument();
-    expect(screen.getByTestId('goal-list')).toBeInTheDocument();
-    expect(screen.getByTestId('goal-retirement-primary')).toBeInTheDocument();
-    expect(screen.getByTestId('goal-wealth-building-secondary')).toBeInTheDocument();
-    expect(screen.getByTestId('policy-table')).toBeInTheDocument();
+    expect(screen.getByTestId('goal-empty')).toHaveTextContent(
+      'No goals configured. Goals and investment policy will appear here once configured via the API.',
+    );
   });
 });

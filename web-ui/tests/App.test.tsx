@@ -8,7 +8,46 @@ import { DigestPanel } from '../src/components/DigestPanel';
 import { server } from './mocks/server';
 
 describe('App', () => {
-  it('renders the portfolio-centric shell', async () => {
+  it('renders the portfolio-centric shell and async component states', async () => {
+    server.use(
+      http.get('/api/household', async () => {
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        return HttpResponse.json({
+          exists: true,
+          household: {
+            name: 'App Household',
+            liquidity_reserve_floor: '50000',
+            revision: 2,
+            updated_at: '2025-02-14T15:30:00Z',
+            accounts: [
+              {
+                name: 'App Account',
+                account_type: 'taxable',
+                tax_lots: [
+                  {
+                    ticker: 'VTI',
+                    shares: '5',
+                    cost_basis_per_share: '250.00',
+                    purchase_date: '2024-01-10',
+                  },
+                ],
+                cash_holdings: [],
+              },
+            ],
+          },
+        });
+      }),
+      http.post('/api/agents/macro_regime', async () => {
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        return HttpResponse.json({
+          regime: 'Balanced slowdown',
+          indicators_fetched: 6,
+          indicators_with_data: 5,
+          content: 'Macro regime classification completed.',
+        });
+      }),
+    );
+
     render(<App />);
     expect(screen.getByText('finance-os')).toBeInTheDocument();
     expect(screen.getByText('Portfolio')).toBeInTheDocument();
@@ -16,8 +55,14 @@ describe('App', () => {
     expect(screen.getByText('Goals')).toBeInTheDocument();
     expect(screen.queryByText('Knowledge Graph')).not.toBeInTheDocument();
     expect(screen.queryByText('Agent Runner')).not.toBeInTheDocument();
+    expect(screen.getByTestId('portfolio-loading')).toBeInTheDocument();
+    expect(screen.getByTestId('macro-loading')).toBeInTheDocument();
+    expect(screen.getByTestId('goal-empty')).toBeInTheDocument();
+
     await waitFor(() => {
       expect(screen.getByTestId('health-label')).toBeInTheDocument();
+      expect(screen.getByTestId('portfolio-accounts')).toBeInTheDocument();
+      expect(screen.getByTestId('macro-regime')).toBeInTheDocument();
     });
   });
 });

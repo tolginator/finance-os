@@ -1,106 +1,87 @@
-import { macroRegimeMock, type RegimeDimension } from '../mockData';
+import { useEffect, useState } from 'react';
+import { classifyMacroRegime } from '../api';
+import type { MacroRegimeResponse } from '../types';
 
-function confidenceWidth(confidence: string): number {
-  switch (confidence.toLowerCase()) {
-    case 'high':
-      return 85;
-    case 'moderate':
-      return 60;
-    case 'low':
-      return 35;
-    default:
-      return 50;
-  }
-}
-
-function trendArrow(trend: string): string {
-  switch (trend.toLowerCase()) {
-    case 'rising':
-      return '↑';
-    case 'falling':
-      return '↓';
-    default:
-      return '→';
-  }
-}
-
-function signalColor(value: string): string {
-  switch (value.toLowerCase()) {
-    case 'expansion':
-    case 'falling':
-    case 'low':
-      return '#16a34a';
-    case 'contraction':
-    case 'rising':
-    case 'high':
-      return '#dc2626';
-    default:
-      return '#d97706';
-  }
-}
-
-function confidenceColor(level: string): string {
-  switch (level.toLowerCase()) {
-    case 'high':
-      return '#16a34a';
-    case 'moderate':
-      return '#d97706';
-    case 'low':
-      return '#dc2626';
-    default:
-      return '#6b7280';
-  }
-}
-
-function RegimeCard({ label, dimension, testId }: { label: string; dimension: RegimeDimension; testId: string }) {
-  return (
-    <div
-      data-testid={testId}
-      style={{
-        border: '1px solid #e5e7eb',
-        borderRadius: 12,
-        padding: '1rem',
-        background: '#fff',
-      }}
-    >
-      <div style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '0.25rem' }}>{label}</div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-        <div style={{ fontSize: '1.1rem', fontWeight: 700, color: signalColor(dimension.regime) }}>{dimension.regime}</div>
-        <div style={{ fontSize: '1rem', color: signalColor(dimension.trend) }}>
-          {trendArrow(dimension.trend)} {dimension.trend}
-        </div>
-      </div>
-      <div style={{ fontSize: '0.85rem', marginBottom: '0.35rem', color: '#4b5563' }}>Confidence: {dimension.confidence}</div>
-      <div style={{ height: 10, borderRadius: 999, background: '#f3f4f6', overflow: 'hidden' }}>
-        <div
-          style={{
-            height: '100%',
-            width: `${confidenceWidth(dimension.confidence)}%`,
-            background: confidenceColor(dimension.confidence),
-          }}
-        />
-      </div>
-    </div>
-  );
-}
+type LoadState =
+  | { status: 'loading' }
+  | { status: 'error'; error: string }
+  | { status: 'loaded'; data: MacroRegimeResponse };
 
 export function MacroDashboard() {
+  const [state, setState] = useState<LoadState>({ status: 'loading' });
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadRegime() {
+      try {
+        const data = await classifyMacroRegime();
+        if (cancelled) return;
+        setState({ status: 'loaded', data });
+      } catch (error) {
+        if (cancelled) return;
+        setState({
+          status: 'error',
+          error: error instanceof Error ? error.message : 'Unable to load macro regime.',
+        });
+      }
+    }
+
+    loadRegime();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <div data-testid="macro-dashboard" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem' }}>
-        <RegimeCard label="Growth" dimension={macroRegimeMock.growth} testId="regime-growth" />
-        <RegimeCard label="Rates" dimension={macroRegimeMock.rates} testId="regime-rates" />
-        <RegimeCard label="Inflation" dimension={macroRegimeMock.inflation} testId="regime-inflation" />
-      </div>
+      {state.status === 'loading' && (
+        <div
+          data-testid="macro-loading"
+          style={{ border: '1px solid #e5e7eb', borderRadius: 12, padding: '1rem', background: '#fff' }}
+        >
+          Loading macro regime…
+        </div>
+      )}
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
-        <div data-testid="macro-confidence" style={{ fontSize: '0.95rem' }}>
-          Overall confidence: <strong style={{ color: confidenceColor(macroRegimeMock.overall_confidence) }}>{macroRegimeMock.overall_confidence}</strong>
+      {state.status === 'error' && (
+        <div
+          data-testid="macro-error"
+          style={{ border: '1px solid #fecaca', borderRadius: 12, padding: '1rem', background: '#fef2f2', color: '#b91c1c' }}
+        >
+          {state.error}
         </div>
-        <div data-testid="macro-as-of" style={{ fontSize: '0.9rem', color: '#6b7280' }}>
-          As of {new Date(macroRegimeMock.as_of).toLocaleString()}
-        </div>
-      </div>
+      )}
+
+      {state.status === 'loaded' && (
+        <>
+          <div style={{ border: '1px solid #e5e7eb', borderRadius: 12, padding: '1rem', background: '#fff' }}>
+            <div style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '0.25rem' }}>Current regime</div>
+            <div data-testid="macro-regime" style={{ fontSize: '1.4rem', fontWeight: 700 }}>
+              {state.data.regime}
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem' }}>
+            <div style={{ border: '1px solid #e5e7eb', borderRadius: 12, padding: '1rem', background: '#fff' }}>
+              <div style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '0.25rem' }}>Indicators fetched</div>
+              <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>{state.data.indicators_fetched}</div>
+            </div>
+            <div style={{ border: '1px solid #e5e7eb', borderRadius: 12, padding: '1rem', background: '#fff' }}>
+              <div style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '0.25rem' }}>Indicators with data</div>
+              <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>{state.data.indicators_with_data}</div>
+            </div>
+          </div>
+
+          <div
+            data-testid="macro-content"
+            style={{ border: '1px solid #e5e7eb', borderRadius: 12, padding: '1rem', background: '#fff', whiteSpace: 'pre-wrap' }}
+          >
+            {state.data.content}
+          </div>
+        </>
+      )}
     </div>
   );
 }

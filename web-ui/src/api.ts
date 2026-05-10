@@ -7,6 +7,8 @@ import type {
   DigestRequest,
   DigestResponse,
   HealthResponse,
+  HouseholdResponse,
+  MacroRegimeResponse,
   RunPipelineRequest,
   RunPipelineResponse,
   WatchlistData,
@@ -73,6 +75,10 @@ export function fetchAgents(): Promise<AgentInfo[]> {
   return request('/agents');
 }
 
+export function fetchHousehold(): Promise<HouseholdResponse> {
+  return request('/household');
+}
+
 export function runDigest(req: DigestRequest): Promise<DigestResponse> {
   return request('/digest', {
     method: 'POST',
@@ -84,6 +90,14 @@ export function classifyMacro(req: ClassifyMacroRequest): Promise<ClassifyMacroR
   return request('/agents/macro_regime', {
     method: 'POST',
     body: JSON.stringify(req),
+  });
+}
+
+export function classifyMacroRegime(): Promise<MacroRegimeResponse> {
+  return request('/agents/macro_regime', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({}),
   });
 }
 

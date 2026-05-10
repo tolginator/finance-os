@@ -16,6 +16,50 @@ export const handlers = [
     ]),
   ),
 
+  http.get('/api/household', () =>
+    HttpResponse.json({
+      exists: true,
+      household: {
+        name: 'Test Household',
+        liquidity_reserve_floor: '25000',
+        revision: 1,
+        updated_at: '2025-02-14T15:30:00Z',
+        accounts: [
+          {
+            name: 'Primary Brokerage',
+            account_type: 'taxable',
+            tax_lots: [
+              {
+                ticker: 'VTI',
+                shares: '10',
+                cost_basis_per_share: '250.00',
+                purchase_date: '2024-01-10',
+              },
+            ],
+            cash_holdings: [
+              {
+                amount: '5000',
+                valuation_date: '2025-02-14',
+                is_money_market: true,
+                ticker: null,
+                counts_toward_liquidity_reserve: true,
+              },
+            ],
+          },
+        ],
+      },
+    }),
+  ),
+
+  http.post('/api/agents/macro_regime', () =>
+    HttpResponse.json({
+      regime: 'Balanced slowdown',
+      indicators_fetched: 6,
+      indicators_with_data: 5,
+      content: 'Macro regime classification completed.',
+    }),
+  ),
+
   http.post('/api/digest', async ({ request }) => {
     const body = (await request.json()) as Record<string, unknown>;
     const tickers = body.tickers as string[];

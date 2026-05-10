@@ -23,6 +23,41 @@ export interface HealthResponse {
   status: string;
 }
 
+export interface TaxLot {
+  ticker: string;
+  shares: string;
+  cost_basis_per_share: string;
+  purchase_date: string;
+}
+
+export interface CashHolding {
+  amount: string;
+  valuation_date: string;
+  is_money_market: boolean;
+  ticker: string | null;
+  counts_toward_liquidity_reserve: boolean;
+}
+
+export interface Account {
+  name: string;
+  account_type: string;
+  tax_lots: TaxLot[];
+  cash_holdings: CashHolding[];
+}
+
+export interface Household {
+  name: string;
+  accounts: Account[];
+  liquidity_reserve_floor: string;
+  revision: number;
+  updated_at: string;
+}
+
+export interface HouseholdResponse {
+  household: Household;
+  exists: boolean;
+}
+
 export interface WatchlistData {
   tickers: string[];
 }
@@ -44,6 +79,8 @@ export interface ClassifyMacroResponse {
   indicators_fetched: number;
   indicators_with_data: number;
 }
+
+export type MacroRegimeResponse = ClassifyMacroResponse;
 
 export interface GenerateSignalsRequest {
   signals?: Record<string, unknown>[];

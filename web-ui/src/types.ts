@@ -33,23 +33,6 @@ export interface WatchlistsResponse {
   active_watchlist: WatchlistData;
 }
 
-// --- Agent request/response types ---
-
-export interface AnalyzeEarningsRequest {
-  transcript: string;
-  ticker?: string;
-}
-
-export interface AnalyzeEarningsResponse {
-  content: string;
-  tone: string;
-  net_sentiment: number;
-  confidence: string;
-  guidance_direction: string;
-  guidance_count: number;
-  key_phrase_count: number;
-}
-
 export interface ClassifyMacroRequest {
   api_key?: string;
   indicators?: string[];
@@ -60,19 +43,6 @@ export interface ClassifyMacroResponse {
   regime: string;
   indicators_fetched: number;
   indicators_with_data: number;
-}
-
-export interface SearchFilingsRequest {
-  ticker?: string;
-  cik?: string;
-  form_type?: string;
-}
-
-export interface SearchFilingsResponse {
-  content: string;
-  cik: string;
-  form_type: string;
-  filing_count: number;
 }
 
 export interface GenerateSignalsRequest {
@@ -113,20 +83,6 @@ export interface AssessRiskResponse {
   content: string;
 }
 
-export interface ChallengeThesisRequest {
-  claims?: string[];
-  prompt?: string;
-}
-
-export interface ChallengeThesisResponse {
-  content: string;
-  conviction_score: string;
-  counter_count: number;
-  blind_spot_count: number;
-}
-
-// --- Pipeline types ---
-
 export interface TaskDefinition {
   agent_name: string;
   prompt?: string;
@@ -156,103 +112,4 @@ export interface RunPipelineResponse {
   successful: number;
   failed: number;
   memo: Record<string, unknown> | null;
-}
-
-// --- Knowledge Graph types ---
-
-export interface EntityModel {
-  entity_id: string;
-  name: string;
-  entity_type: string;
-  ticker: string | null;
-  cik: string | null;
-  metadata: Record<string, unknown>;
-}
-
-export interface RelationshipModel {
-  source_id: string;
-  target_id: string;
-  rel_type: string;
-  evidence: string;
-  source_doc: string;
-  confidence: string;
-  metadata: Record<string, unknown>;
-}
-
-export interface ExtractEntitiesRequest {
-  text: string;
-  source_doc?: string;
-  ticker?: string;
-}
-
-export interface ExtractEntitiesResponse {
-  entities: EntityModel[];
-  relationships: RelationshipModel[];
-  entity_count: number;
-  relationship_count: number;
-}
-
-export interface QueryRelatedRequest {
-  entity_id: string;
-  max_depth?: number;
-}
-
-export interface QueryRelatedResponse {
-  entity_id: string;
-  related: EntityModel[];
-  count: number;
-}
-
-export interface QuerySupplyChainRequest {
-  entity_id: string;
-  direction?: 'upstream' | 'downstream';
-}
-
-export interface QuerySupplyChainResponse {
-  entity_id: string;
-  direction: string;
-  chain: EntityModel[];
-  count: number;
-}
-
-export interface QuerySharedRisksRequest {
-  entity_ids: string[];
-}
-
-export interface QuerySharedRisksResponse {
-  entity_ids: string[];
-  shared_risks: EntityModel[];
-  count: number;
-}
-
-export interface KGStatsResponse {
-  entity_count: number;
-  relationship_count: number;
-  entities_by_type: Record<string, number>;
-  relationships_by_type: Record<string, number>;
-}
-
-// --- Ticker Lookup ---
-
-export interface TickerSummary {
-  symbol: string;
-  name: string;
-  sector: string;
-  industry: string;
-  market_cap: string;
-  currency: string;
-  current_price: string;
-  previous_close: string;
-  fifty_two_week_high: string;
-  fifty_two_week_low: string;
-  earnings_date: string;
-  description: string;
-}
-
-export interface TickerTranscript {
-  symbol: string;
-  available: boolean;
-  transcript: string;
-  period: string;
-  source: string;
 }

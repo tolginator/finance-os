@@ -21,6 +21,28 @@ _REINVEST_ACTIONS = frozenset({"reinvdiv", "reinvint", "reinvlg", "reinvsh"})
 _POSITION_ACTIONS = frozenset({"shrsin"})
 _SKIP_ACTIONS = frozenset({"sell", "sellx", "div", "intinc", "cglong", "cgshort", "shrsout"})
 
+# Patterns for inferring account type from name (checked in order).
+_ACCOUNT_TYPE_PATTERNS: list[tuple[list[str], AccountType]] = [
+    (["roth ira", "roth_ira", "rollover roth"], AccountType.ROTH_IRA),
+    (["traditional ira", "trad ira", "rollover ira", "sep ira"], AccountType.TRADITIONAL_IRA),
+    (
+        ["401(k)", "401k", "403(b)", "403b", "401(a)", "401a", "457(b)", "457b", "dcp"],
+        AccountType.FOUR01K,
+    ),
+    (["hsa"], AccountType.HSA),
+    (["trust", "utma", "ugma", "529"], AccountType.TRUST),
+]
+
+
+def _infer_account_type(name: str) -> AccountType | None:
+    """Infer account type from common patterns in account name."""
+    lower = name.lower()
+    for patterns, account_type in _ACCOUNT_TYPE_PATTERNS:
+        for pat in patterns:
+            if pat in lower:
+                return account_type
+    return None
+
 
 def preview_qif_import(
     qif_content: str,
@@ -53,14 +75,19 @@ def preview_qif_import(
             Account(name=qif_account.name, account_type=account_type),
         )
         if qif_account.account_type == "Invst":
-            warnings.append(
-                ImportWarning(
-                    message=(
-                        f"Imported QIF investment account '{qif_account.name}' as taxable; "
-                        "verify whether it should be an IRA, 401(k), HSA, or trust account."
+            inferred = _infer_account_type(qif_account.name)
+            if inferred is not None:
+                account = accounts_map[qif_account.name]
+                account.account_type = inferred
+            else:
+                warnings.append(
+                    ImportWarning(
+                        message=(
+                            f"Imported QIF investment account '{qif_account.name}' as taxable; "
+                            "verify whether it should be an IRA, 401(k), HSA, or trust account."
+                        )
                     )
                 )
-            )
         _append_cash_holding_from_balance(account, qif_account, warnings)
 
     for investment in parsed.investment_transactions:
@@ -75,7 +102,7 @@ def preview_qif_import(
         if account.account_type == AccountType.TAXABLE and (
             parsed.accounts.get(investment.account) is None
             or parsed.accounts[investment.account].account_type == "Invst"
-        ):
+        ) and _infer_account_type(investment.account) is None:
             warnings.append(
                 ImportWarning(
                     message=(
@@ -277,8 +304,6 @@ def _map_qif_account_type(
     warnings: list[ImportWarning],
 ) -> AccountType | None:
     raw_type = qif_account.account_type or ""
-    if raw_type in {"Bank", "Cash", "Oth A", "Invst"}:
-        return AccountType.TAXABLE
     if raw_type in {"CCard", "Oth L"}:
         warnings.append(
             ImportWarning(
@@ -289,14 +314,15 @@ def _map_qif_account_type(
             )
         )
         return None
-    if raw_type:
+    if raw_type and raw_type not in {"Bank", "Cash", "Oth A", "Invst"}:
         warnings.append(
             ImportWarning(
                 message=f"Skipped unknown QIF account type '{raw_type}' for '{qif_account.name}'."
             )
         )
         return None
-    return AccountType.TAXABLE
+    inferred = _infer_account_type(qif_account.name)
+    return inferred if inferred is not None else AccountType.TAXABLE
 
 
 def _map_raw_account_type(qif_account: QifAccount | None) -> AccountType | None:
@@ -304,7 +330,8 @@ def _map_raw_account_type(qif_account: QifAccount | None) -> AccountType | None:
         return AccountType.TAXABLE
     if qif_account.account_type in {"CCard", "Oth L"}:
         return None
-    return AccountType.TAXABLE
+    inferred = _infer_account_type(qif_account.name)
+    return inferred if inferred is not None else AccountType.TAXABLE
 
 
 def _dedupe_warnings(warnings: list[ImportWarning]) -> list[ImportWarning]:

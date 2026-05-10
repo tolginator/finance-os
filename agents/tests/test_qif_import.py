@@ -176,3 +176,43 @@ Q3
     assert len(result.accounts) == 1
     assert result.accounts[0].name == "Brokerage"
     assert result.accounts[0].tax_lots[0].ticker == "ACMEETF"
+
+
+def test_infer_account_type_from_name() -> None:
+    """Account names with well-known patterns should auto-classify."""
+    cases = [
+        ("Roth IRA - Tolga", AccountType.ROTH_IRA),
+        ("Rollover Roth IRA - Tolga", AccountType.ROTH_IRA),
+        ("Rollover IRA - Barcin", AccountType.TRADITIONAL_IRA),
+        ("401(k) - Microsoft", AccountType.FOUR01K),
+        ("403(b) GSRA - PEBB", AccountType.FOUR01K),
+        ("401(a) GRA - PEBB", AccountType.FOUR01K),
+        ("Microsoft DCP", AccountType.FOUR01K),
+        ("Fidelity HSA", AccountType.HSA),
+        ("Health Equity HSA", AccountType.HSA),
+        ("529 Fidelity - Lidya", AccountType.TRUST),
+        ("UTMA - Lidya", AccountType.TRUST),
+        ("Fidelity Investment", AccountType.TAXABLE),  # no pattern match → taxable
+        ("Chase Brokerage", AccountType.TAXABLE),
+    ]
+    for name, expected_type in cases:
+        qif_text = f"!Account\nN{name}\nTInvst\n^\n"
+        result = preview_qif_import(qif_text)
+        assert result.accounts[0].account_type == expected_type, (
+            f"{name}: expected {expected_type}, got {result.accounts[0].account_type}"
+        )
+
+
+def test_inferred_accounts_skip_verify_warning() -> None:
+    """Accounts with inferred types should not produce 'verify' warnings."""
+    qif_text = "!Account\nNRoth IRA - Tolga\nTInvst\n^\n"
+    result = preview_qif_import(qif_text)
+    assert not any("verify" in w.message.lower() for w in result.warnings)
+
+
+def test_unknown_invst_account_still_warns() -> None:
+    """Investment accounts that can't be inferred should still warn."""
+    qif_text = "!Account\nNFidelity Investment\nTInvst\n^\n"
+    result = preview_qif_import(qif_text)
+    assert result.accounts[0].account_type == AccountType.TAXABLE
+    assert any("verify" in w.message.lower() for w in result.warnings)

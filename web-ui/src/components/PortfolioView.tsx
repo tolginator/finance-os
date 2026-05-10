@@ -144,7 +144,7 @@ export function PortfolioView() {
                   type="button"
                   aria-expanded={isExpanded}
                   aria-controls={`holdings-${slug}`}
-                  onClick={() => setExpandedAccounts((current) => ({ ...current, [account.name]: !isExpanded }))}
+                  onClick={() => setExpandedAccounts((current) => ({ ...current, [account.name]: !(current[account.name] ?? false) }))}
                   style={{
                     width: '100%',
                     background: 'white',

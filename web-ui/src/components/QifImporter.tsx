@@ -4,6 +4,7 @@ import type { ImportPreviewResponse } from '../types';
 
 interface QifImporterProps {
   onImported: () => void;
+  currentRevision?: number;
 }
 
 type ImportStatus = 'idle' | 'previewing' | 'preview' | 'saving' | 'done';
@@ -50,7 +51,7 @@ function readFileAsText(file: File): Promise<string> {
   });
 }
 
-export function QifImporter({ onImported }: QifImporterProps) {
+export function QifImporter({ onImported, currentRevision = 0 }: QifImporterProps) {
   const [status, setStatus] = useState<ImportStatus>('idle');
   const [householdName, setHouseholdName] = useState('My Household');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -93,7 +94,7 @@ export function QifImporter({ onImported }: QifImporterProps) {
         name: normalizedHouseholdName,
         accounts: preview.accounts.filter((a) => selectedAccounts.has(a.name)),
         liquidity_reserve_floor: '0',
-        expected_revision: 0,
+        expected_revision: currentRevision,
       });
       setJournalEntry(response.journal_entry);
       setStatus('done');

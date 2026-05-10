@@ -244,6 +244,7 @@ export function PortfolioView() {
 
           {showImporter ? (
             <QifImporter
+              currentRevision={state.data.household.revision}
               onImported={() => {
                 setState({ status: 'loading' });
                 setReloadCounter((current) => current + 1);

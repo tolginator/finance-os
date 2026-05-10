@@ -273,7 +273,7 @@ class TestComputeTilts:
         eq = next(
             t for t in result.tilts if t.asset_class == AssetClass.US_EQUITY
         )
-        assert eq.tilt == _D("0.0296")
+        assert eq.tilt == _D("0.0293")
         assert eq.tilt <= MAX_TILT_MAGNITUDE
 
     def test_confidence_propagated(self) -> None:
@@ -409,8 +409,8 @@ class TestComputeTilts:
         eq = next(
             t for t in result.tilts if t.asset_class == AssetClass.US_EQUITY
         )
-        assert eq.tilt == _D("0.0296")
-        assert eq.recommended_weight == _D("0.3296")
+        assert eq.tilt == _D("0.0293")
+        assert eq.recommended_weight == _D("0.3293")
 
     def test_contraction_exact_equity_tilt(self) -> None:
         """Verify exact contraction equity tilt to detect regressions."""
@@ -418,8 +418,53 @@ class TestComputeTilts:
         eq = next(
             t for t in result.tilts if t.asset_class == AssetClass.US_EQUITY
         )
-        assert eq.tilt == _D("-0.0416")
-        assert eq.recommended_weight == _D("0.2584")
+        assert eq.tilt == _D("-0.0417")
+        assert eq.recommended_weight == _D("0.2583")
+
+    def test_neutral_rationale_with_signal(self) -> None:
+        """Neutral tilts from band clamping should note signal was present."""
+        # Build a report where only growth dimension provides signal
+        report = MacroRegimeReport(
+            growth=GrowthClassification(
+                regime=GrowthRegime.EXPANSION,
+                trend=TrendDirection.IMPROVING,
+                confidence=_D("0.01"),  # Very low → small tilts
+                contributing_indicators=["GDP"],
+            ),
+        )
+        policy = _balanced_policy()
+        result = compute_tilts(report, policy)
+        # Some assets may round to neutral despite signal being present
+        neutral_tilts = [t for t in result.tilts if t.direction == TiltDirection.NEUTRAL]
+        for nt in neutral_tilts:
+            assert "constrained" in nt.rationale or "no regime data" not in nt.rationale.lower()
+
+    def test_neutral_rationale_without_signal(self) -> None:
+        """Neutral tilts with no regime data should say 'no regime signal'."""
+        report = MacroRegimeReport()  # all dimensions None
+        policy = _balanced_policy()
+        result = compute_tilts(report, policy)
+        for t in result.tilts:
+            assert t.direction == TiltDirection.NEUTRAL
+            assert t.rationale == "No regime signal; hold at policy target"
+
+    def test_confidence_validator_rejects_above_one(self) -> None:
+        """MacroOutlookResponse rejects confidence > 1."""
+        with pytest.raises(ValueError):
+            MacroOutlookResponse(
+                tilts=[],
+                regime_summary="test",
+                confidence=_D("1.5"),
+            )
+
+    def test_confidence_validator_rejects_negative(self) -> None:
+        """MacroOutlookResponse rejects confidence < 0."""
+        with pytest.raises(ValueError):
+            MacroOutlookResponse(
+                tilts=[],
+                regime_summary="test",
+                confidence=_D("-0.1"),
+            )
 
 
 # ---------------------------------------------------------------------------

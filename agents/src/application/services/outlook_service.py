@@ -257,17 +257,29 @@ def compute_tilts(
     # Quantize to 4 decimal places
     for ac in AssetClass:
         clamped_weights[ac] = clamped_weights[ac].quantize(Decimal("0.0001"))
-    # Fix rounding residual on a position with available band room
+    # Fix rounding residual by distributing across classes with band room
     residual = Decimal("1") - sum(clamped_weights.values())
-    if residual != 0:
-        for ac in sorted(AssetClass, key=lambda a: clamped_weights[a],
-                         reverse=True):
+    while residual != 0:
+        candidates = []
+        for ac in sorted(AssetClass, key=lambda a: clamped_weights[a], reverse=True):
             min_w = policy.allocations[ac].min_weight
             max_w = policy.allocations[ac].max_weight
-            adjusted = clamped_weights[ac] + residual
+            if residual > 0 and clamped_weights[ac] < max_w:
+                candidates.append(ac)
+            elif residual < 0 and clamped_weights[ac] > min_w:
+                candidates.append(ac)
+        if not candidates:
+            break
+        step = Decimal("0.0001") if residual > 0 else Decimal("-0.0001")
+        for ac in candidates:
+            min_w = policy.allocations[ac].min_weight
+            max_w = policy.allocations[ac].max_weight
+            adjusted = clamped_weights[ac] + step
             if min_w <= adjusted <= max_w:
                 clamped_weights[ac] = adjusted
-                break
+                residual -= step
+                if residual == 0:
+                    break
 
     # Build tilt objects
     tilts: list[AssetClassTilt] = []
@@ -317,6 +329,9 @@ def _rationale(
 ) -> str:
     """Generate a brief rationale for the tilt direction."""
     if direction == TiltDirection.NEUTRAL:
+        has_signal = any([report.growth, report.rates, report.inflation])
+        if has_signal:
+            return "Regime signal present but constrained to neutral by policy bands"
         return "No regime signal; hold at policy target"
 
     parts: list[str] = []

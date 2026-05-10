@@ -11,7 +11,7 @@ from decimal import Decimal
 from enum import StrEnum
 from typing import Self
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from src.application.contracts.household import AssetClass
 
@@ -68,6 +68,13 @@ class MacroOutlookResponse(BaseModel):
         default_factory=lambda: datetime.now(UTC),
         description="Timestamp of this outlook",
     )
+
+    @field_validator("confidence")
+    @classmethod
+    def _confidence_in_range(cls, v: Decimal) -> Decimal:
+        if not (Decimal("0") <= v <= Decimal("1")):
+            raise ValueError(f"confidence must be in [0, 1], got {v}")
+        return v
 
     @model_validator(mode="after")
     def _tilts_budget_neutral(self) -> Self:

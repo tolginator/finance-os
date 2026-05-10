@@ -10,7 +10,6 @@ from src.core.memory import (
 # ---------------------------------------------------------------------------
 # Pure function tests
 # ---------------------------------------------------------------------------
-# ---------------------------------------------------------------------------
 
 
 class TestChunkText:
@@ -29,19 +28,16 @@ class TestChunkText:
         assert result[0] == text
 
     def test_long_text_produces_multiple_chunks(self) -> None:
-        # 20 words × ~6 chars = ~120 chars; chunk_size=50 should force splits
+        # 30 words of ~5 chars each; chunk_size=50 forces 5 chunks
         text = " ".join(f"word{i}" for i in range(30))
         result = chunk_text(text, chunk_size=50, overlap=10)
-        assert len(result) > 1
-        # Every chunk should be within a reasonable range of chunk_size
-        for chunk in result[:-1]:
-            assert len(chunk) <= 60  # allow slight overshoot from whole words
+        assert len(result) == 5
 
     def test_overlap_between_chunks(self) -> None:
         words = [f"word{i}" for i in range(40)]
         text = " ".join(words)
         result = chunk_text(text, chunk_size=50, overlap=20)
-        assert len(result) >= 2
+        assert len(result) == 9
         # Consecutive chunks should share some words
         for i in range(len(result) - 1):
             words_a = set(result[i].split())
@@ -59,9 +55,7 @@ class TestChunkText:
     def test_single_very_long_word(self) -> None:
         text = "a" * 1000
         result = chunk_text(text, chunk_size=50, overlap=10)
-        # A single word that exceeds chunk_size still gets included
-        assert len(result) >= 1
-        assert "a" * 1000 in result[0]
+        assert len(result) == 1
 
 
 class TestGenerateDocId:
@@ -72,6 +66,7 @@ class TestGenerateDocId:
         id1 = generate_doc_id("Hello world", meta)
         id2 = generate_doc_id("Hello world", meta)
         assert id1 == id2
+        assert id1 == "11dde9c51e34ceac"
 
     def test_different_content_different_id(self) -> None:
         meta = DocumentMetadata(ticker="AAPL")

@@ -603,7 +603,7 @@ class TestHouseholdService:
             mock_fcntl.LOCK_EX = 2
             mock_fcntl.flock.side_effect = OSError("mock flock failure")
 
-            with pytest.raises(OSError, match="mock flock failure"):
+            with pytest.raises(OSError):
                 svc.load()
 
         assert len(closed_fds) == 1

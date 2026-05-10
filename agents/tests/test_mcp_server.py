@@ -175,7 +175,7 @@ class TestOrchestrate:
             },
         )
         parsed = json.loads(content_list[0].text)
-        assert parsed["successful"] >= 0
+        assert parsed["successful"] == 1
         assert isinstance(parsed["total_duration_ms"], int)
         assert isinstance(parsed["results"], list)
 

@@ -218,6 +218,13 @@ class ImportPreviewRequest(BaseModel):
     csv_content: str = Field(min_length=1, description="Raw CSV file content")
 
 
+class QifImportPreviewRequest(BaseModel):
+    """Request for POST /household/import/qif/preview."""
+
+    qif_content: str = Field(min_length=1, description="Raw QIF file content")
+    household_name: str = Field(default="My Household", min_length=1)
+
+
 class ImportWarning(BaseModel):
     """A warning generated during import parsing."""
 

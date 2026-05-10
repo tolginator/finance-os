@@ -358,6 +358,16 @@ class HouseholdService:
             position_only=position_only,
         )
 
+    def preview_qif_import(
+        self,
+        qif_content: str,
+        household_name: str = "My Household",
+    ) -> ImportPreviewResponse:
+        """Parse QIF content and return proposed accounts."""
+        from src.application.services.qif_import import preview_qif_import
+
+        return preview_qif_import(qif_content, household_name)
+
     # -- internals ---------------------------------------------------------
 
     def _flock(self) -> FileLockContext:

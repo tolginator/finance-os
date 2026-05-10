@@ -1,9 +1,9 @@
 """QIF parser utilities and dataclasses for household import flows."""
 
+import re
 from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal, InvalidOperation
-import re
 
 _CP1252_MAP = {
     0x80: 0x20AC,

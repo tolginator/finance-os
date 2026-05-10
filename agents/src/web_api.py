@@ -55,6 +55,7 @@ from src.application.contracts.household import (
     GetHouseholdResponse,
     ImportPreviewRequest,
     ImportPreviewResponse,
+    QifImportPreviewRequest,
     UpdateHouseholdRequest,
     UpdateHouseholdResponse,
 )
@@ -407,6 +408,14 @@ async def preview_csv_import(request: ImportPreviewRequest) -> Any:
     """Parse CSV content and return proposed accounts without persisting."""
     result = await asyncio.to_thread(_household_service.preview_csv_import, request)
     return result.model_dump(mode="json")
+
+
+@app.post("/household/import/qif/preview", response_model=ImportPreviewResponse)
+async def import_qif_preview(req: QifImportPreviewRequest) -> Any:
+    """Parse QIF file and preview proposed accounts."""
+    from src.application.services.qif_import import preview_qif_import
+
+    return preview_qif_import(req.qif_content, req.household_name).model_dump(mode="json")
 
 
 # --- Watchlists ---

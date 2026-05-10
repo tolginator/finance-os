@@ -55,6 +55,7 @@ export function QifImporter({ onImported }: QifImporterProps) {
   const [householdName, setHouseholdName] = useState('My Household');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<ImportPreviewResponse | null>(null);
+  const [selectedAccounts, setSelectedAccounts] = useState<Set<string>>(new Set());
   const [journalEntry, setJournalEntry] = useState('');
   const [error, setError] = useState('');
   const [fileInputKey, setFileInputKey] = useState(0);
@@ -72,6 +73,7 @@ export function QifImporter({ onImported }: QifImporterProps) {
       const qifContent = await readFileAsText(selectedFile);
       const response = await previewQifImport(qifContent, normalizedHouseholdName);
       setPreview(response);
+      setSelectedAccounts(new Set(response.accounts.map((a) => a.name)));
       setStatus('preview');
     } catch (previewError) {
       setPreview(null);
@@ -89,7 +91,7 @@ export function QifImporter({ onImported }: QifImporterProps) {
     try {
       const response = await saveHousehold({
         name: normalizedHouseholdName,
-        accounts: preview.accounts,
+        accounts: preview.accounts.filter((a) => selectedAccounts.has(a.name)),
         liquidity_reserve_floor: '0',
         expected_revision: 0,
       });
@@ -104,6 +106,7 @@ export function QifImporter({ onImported }: QifImporterProps) {
   function handleCancel() {
     setStatus('idle');
     setPreview(null);
+    setSelectedAccounts(new Set());
     setSelectedFile(null);
     setJournalEntry('');
     setError('');
@@ -173,22 +176,72 @@ export function QifImporter({ onImported }: QifImporterProps) {
       {status === 'preview' && preview ? (
         <>
           <div style={{ display: 'grid', gap: '0.5rem' }}>
-            <div style={{ fontWeight: 600 }}>Accounts found: {preview.accounts.length}</div>
+            <div style={{ fontWeight: 600 }}>
+              Accounts found: {preview.accounts.length} · Selected: {selectedAccounts.size}
+            </div>
             <div style={secondaryTextStyle}>Position-only import: {preview.position_only ? 'Yes' : 'No'}</div>
+            <div style={{ display: 'flex', gap: '0.75rem', fontSize: '0.85rem' }}>
+              <button
+                type="button"
+                data-testid="qif-select-all"
+                onClick={() => setSelectedAccounts(new Set(preview.accounts.map((a) => a.name)))}
+                style={{ ...secondaryButtonStyle, padding: '0.35rem 0.65rem', fontSize: '0.85rem' }}
+              >
+                Select all
+              </button>
+              <button
+                type="button"
+                data-testid="qif-select-none"
+                onClick={() => setSelectedAccounts(new Set())}
+                style={{ ...secondaryButtonStyle, padding: '0.35rem 0.65rem', fontSize: '0.85rem' }}
+              >
+                Select none
+              </button>
+            </div>
           </div>
 
           <div data-testid="qif-preview-accounts" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            {preview.accounts.map((account) => (
-              <div
-                key={`${account.name}-${account.account_type}`}
-                style={{ border: '1px solid #e5e7eb', borderRadius: 10, padding: '0.85rem', background: '#f9fafb' }}
-              >
-                <div style={{ fontWeight: 600 }}>{account.name}</div>
-                <div style={secondaryTextStyle}>Type: {account.account_type}</div>
-                <div style={secondaryTextStyle}>Tax lots: {account.tax_lots.length}</div>
-                <div style={secondaryTextStyle}>Cash holdings: {account.cash_holdings.length}</div>
-              </div>
-            ))}
+            {preview.accounts.map((account) => {
+              const checked = selectedAccounts.has(account.name);
+              return (
+                <label
+                  key={`${account.name}-${account.account_type}`}
+                  style={{
+                    border: `1px solid ${checked ? '#93c5fd' : '#e5e7eb'}`,
+                    borderRadius: 10,
+                    padding: '0.85rem',
+                    background: checked ? '#eff6ff' : '#f9fafb',
+                    display: 'flex',
+                    gap: '0.75rem',
+                    cursor: 'pointer',
+                    alignItems: 'flex-start',
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => {
+                      setSelectedAccounts((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(account.name)) {
+                          next.delete(account.name);
+                        } else {
+                          next.add(account.name);
+                        }
+                        return next;
+                      });
+                    }}
+                    style={{ marginTop: '0.2rem' }}
+                  />
+                  <div>
+                    <div style={{ fontWeight: 600 }}>{account.name}</div>
+                    <div style={secondaryTextStyle}>Type: {account.account_type}</div>
+                    <div style={secondaryTextStyle}>Tax lots: {account.tax_lots.length}</div>
+                    <div style={secondaryTextStyle}>Cash holdings: {account.cash_holdings.length}</div>
+                  </div>
+                </label>
+              );
+            })}
           </div>
 
           {preview.warnings.length > 0 ? (
@@ -208,12 +261,17 @@ export function QifImporter({ onImported }: QifImporterProps) {
             <button
               type="button"
               data-testid="qif-confirm-button"
+              disabled={selectedAccounts.size === 0}
               onClick={() => {
                 void handleConfirm();
               }}
-              style={buttonStyle}
+              style={{
+                ...buttonStyle,
+                opacity: selectedAccounts.size === 0 ? 0.6 : 1,
+                cursor: selectedAccounts.size === 0 ? 'not-allowed' : 'pointer',
+              }}
             >
-              Confirm Import
+              Confirm Import ({selectedAccounts.size} accounts)
             </button>
             <button type="button" data-testid="qif-cancel-button" onClick={handleCancel} style={secondaryButtonStyle}>
               Cancel

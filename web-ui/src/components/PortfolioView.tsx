@@ -114,6 +114,40 @@ function getAccountCostBasis(account: Account): string {
   return total;
 }
 
+interface AggregatedPosition {
+  ticker: string;
+  totalShares: string;
+  totalCostBasis: string;
+  lotCount: number;
+}
+
+function aggregatePositions(account: Account): AggregatedPosition[] {
+  const byTicker = new Map<string, { shares: string; costBasis: string; lots: number }>();
+  for (const lot of account.tax_lots) {
+    const existing = byTicker.get(lot.ticker);
+    const lotCost = multiplyDecimalStrings(lot.shares, lot.cost_basis_per_share);
+    if (existing) {
+      existing.shares = addDecimalStrings(existing.shares, lot.shares);
+      existing.costBasis = addDecimalStrings(existing.costBasis, lotCost);
+      existing.lots += 1;
+    } else {
+      byTicker.set(lot.ticker, { shares: lot.shares, costBasis: lotCost, lots: 1 });
+    }
+  }
+  return Array.from(byTicker.entries())
+    .map(([ticker, data]) => ({
+      ticker,
+      totalShares: data.shares,
+      totalCostBasis: data.costBasis,
+      lotCount: data.lots,
+    }))
+    .sort((a, b) => {
+      const aCost = Number.parseFloat(a.totalCostBasis) || 0;
+      const bCost = Number.parseFloat(b.totalCostBasis) || 0;
+      return bCost - aCost;
+    });
+}
+
 export function PortfolioView() {
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [expandedAccounts, setExpandedAccounts] = useState<Record<string, boolean>>({});
@@ -222,7 +256,8 @@ export function PortfolioView() {
               const isExpanded = expandedAccounts[account.name] ?? false;
               const slug = toSlug(account.name);
               const totalCostBasis = getAccountCostBasis(account);
-              const holdingsCount = account.tax_lots.length + account.cash_holdings.length;
+              const positions = aggregatePositions(account);
+              const holdingsCount = positions.length + account.cash_holdings.length;
 
               return (
                 <div
@@ -265,27 +300,25 @@ export function PortfolioView() {
                       <thead>
                         <tr style={{ textAlign: 'left', borderBottom: '1px solid #e5e7eb' }}>
                           <th style={{ padding: '0.5rem 0.25rem' }}>Ticker</th>
-                          <th style={{ padding: '0.5rem 0.25rem' }}>Shares</th>
-                          <th style={{ padding: '0.5rem 0.25rem' }}>Cost Basis / Share</th>
-                          <th style={{ padding: '0.5rem 0.25rem' }}>Purchase Date</th>
-                          <th style={{ padding: '0.5rem 0.25rem' }}>Lot Cost Basis</th>
+                          <th style={{ padding: '0.5rem 0.25rem', textAlign: 'right' }}>Shares</th>
+                          <th style={{ padding: '0.5rem 0.25rem', textAlign: 'right' }}>Cost Basis</th>
+                          <th style={{ padding: '0.5rem 0.25rem', textAlign: 'right' }}>Lots</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {account.tax_lots.length === 0 ? (
+                        {positions.length === 0 ? (
                           <tr>
-                            <td colSpan={5} style={{ padding: '0.75rem 0.25rem', color: '#6b7280' }}>
-                              No tax lots available.
+                            <td colSpan={4} style={{ padding: '0.75rem 0.25rem', color: '#6b7280' }}>
+                              No positions.
                             </td>
                           </tr>
                         ) : (
-                          account.tax_lots.map((lot) => (
-                            <tr key={`${account.name}-${lot.ticker}-${lot.purchase_date}`} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                              <td style={{ padding: '0.5rem 0.25rem', fontWeight: 600 }}>{lot.ticker}</td>
-                              <td style={{ padding: '0.5rem 0.25rem' }}>{formatShares(lot.shares)}</td>
-                              <td style={{ padding: '0.5rem 0.25rem' }}>{formatCurrency(lot.cost_basis_per_share)}</td>
-                              <td style={{ padding: '0.5rem 0.25rem' }}>{formatDate(lot.purchase_date)}</td>
-                              <td style={{ padding: '0.5rem 0.25rem' }}>{formatCurrency(multiplyDecimalStrings(lot.shares, lot.cost_basis_per_share))}</td>
+                          positions.map((pos) => (
+                            <tr key={`${account.name}-${pos.ticker}`} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                              <td style={{ padding: '0.5rem 0.25rem', fontWeight: 600 }}>{pos.ticker}</td>
+                              <td style={{ padding: '0.5rem 0.25rem', textAlign: 'right' }}>{formatShares(pos.totalShares)}</td>
+                              <td style={{ padding: '0.5rem 0.25rem', textAlign: 'right' }}>{formatCurrency(pos.totalCostBasis)}</td>
+                              <td style={{ padding: '0.5rem 0.25rem', textAlign: 'right' }}>{pos.lotCount}</td>
                             </tr>
                           ))
                         )}

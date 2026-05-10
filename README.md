@@ -24,7 +24,7 @@ finance-os/
 ├── agents/              # Python agent framework + application layer
 │   └── src/
 │       ├── agents/      # Domain agents (macro, risk, outlook, evaluator, rebalancer)
-│       ├── core/        # BaseAgent, orchestrator, vector memory
+│       ├── core/        # BaseAgent, orchestrator, file I/O primitives
 │       ├── application/ # Contracts, LLM gateway, services, config, registry
 │       │   └── services/
 │       │       ├── household_service.py   # Portfolio CRUD, import (CSV/QIF)
@@ -162,13 +162,17 @@ Once running, open http://127.0.0.1:8000/docs for interactive Swagger UI.
 |--------|------|-------------|
 | GET | `/health` | Health check |
 | GET | `/agents` | List available agents |
-| GET | `/ticker/{symbol}/summary` | Fetch ETF/company summary from Yahoo Finance (cached 5 min) |
-| GET | `/ticker/{symbol}/transcript` | Fetch latest earnings transcript (cached 1 hour) |
 | POST | `/agents/macro_regime` | Classify macro regime from FRED data |
+| POST | `/agents/macro_outlook` | Macro outlook with asset-class tilts |
 | POST | `/agents/quant_signal` | Generate quant signals |
+| POST | `/agents/thesis_guardian` | Evaluate investment theses |
 | POST | `/agents/risk_analyst` | Portfolio risk analysis |
+| POST | `/agents/adversarial` | Challenge investment claims |
 | POST | `/pipeline` | Multi-agent research pipeline |
 | POST | `/digest` | Research digest for watchlist |
+| GET | `/household` | Get household portfolio |
+| PUT | `/household` | Update household portfolio |
+| POST | `/household/import/csv/preview` | Preview CSV import |
 | GET | `/watchlists` | List all watchlists |
 | POST | `/watchlists` | Create a new watchlist |
 | GET | `/watchlists/{name}` | Get a specific watchlist |
@@ -176,19 +180,17 @@ Once running, open http://127.0.0.1:8000/docs for interactive Swagger UI.
 | DELETE | `/watchlists/{name}` | Delete a watchlist |
 | PUT | `/watchlists/{name}/activate` | Set a watchlist as active |
 
-**Planned Endpoints (coming in Phases 1–4):**
+**Planned Endpoints (coming in Phases 2–4):**
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET/POST | `/portfolio/*` | Household portfolio CRUD, import |
-| POST | `/agents/macro_outlook` | Forward-looking macro outlook with asset-class tilts |
 | POST | `/agents/portfolio_evaluator` | Dimensioned portfolio evaluation |
 | POST | `/agents/rebalance` | Goal-driven rebalancing recommendations |
 | GET | `/scenarios` | Scenario library for stress testing |
 
 ### Web UI
 
-React frontend consuming the Web API. Requires the API server to be running.
+Portfolio-centric React frontend. Shows household portfolio, macro regime dashboard, goal/policy editor, research digest, and agent catalog. Currently renders with mock data while backend integration is underway.
 
 ```bash
 # Terminal 1 — start the API server
@@ -199,6 +201,18 @@ cd web-ui
 npm install
 npm run dev    # opens http://localhost:5173 with API proxy
 ```
+
+**Panels:**
+
+| Panel | Description |
+|-------|-------------|
+| Portfolio View | Account cards with holdings tables, total NAV, asset class exposure breakdown |
+| Macro Dashboard | Growth / rates / inflation regime display with trend, confidence bars |
+| Goal Editor | Goals with type badges, priority, targets; policy allocation table (target/min/max) |
+| Research Digest | Watchlist-driven research digest from macro data |
+| Pipeline Runner | Multi-agent orchestration runner |
+| Stats Dashboard | System health, agent coverage, watchlist summary |
+| Agent Catalog | List of available agents from the API |
 
 The dev server proxies `/api/*` requests to the backend at `http://127.0.0.1:8000`. For production builds:
 

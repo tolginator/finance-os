@@ -618,13 +618,13 @@ class TestClassifyFromData:
         # CPIAUCSL absent → inflation None
         assert report.inflation is None
 
-    def test_classify_from_data_matches_direct_classifiers(self) -> None:
-        """classify_from_data produces same result as calling classifiers directly."""
+    def test_classify_from_data_matches_expected_regimes(self) -> None:
+        """classify_from_data produces correct regimes for default fixtures."""
         data = {**_growth_data(), **_rate_data(), **_inflation_data()}
         report = RegimeService.classify_from_data(data)
         assert report.growth is not None
-        assert report.growth.regime == classify_growth(data).regime  # type: ignore[union-attr]
+        assert report.growth.regime == GrowthRegime.EXPANSION
         assert report.rates is not None
-        assert report.rates.regime == classify_rates(data).regime  # type: ignore[union-attr]
+        assert report.rates.regime == RateEnvironment.PEAK
         assert report.inflation is not None
-        assert report.inflation.regime == classify_inflation(data).regime  # type: ignore[union-attr]
+        assert report.inflation.regime == InflationRegime.STABLE

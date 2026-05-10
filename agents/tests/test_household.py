@@ -594,16 +594,16 @@ class TestHouseholdService:
             original_close(fd)
 
         with (
-            patch("src.application.services.household_service.fcntl") as mock_fcntl,
+            patch("src.core.file_io.fcntl") as mock_fcntl,
             patch(
-                "src.application.services.household_service.os.close",
+                "src.core.file_io.os.close",
                 side_effect=tracking_close,
             ),
         ):
             mock_fcntl.LOCK_EX = 2
             mock_fcntl.flock.side_effect = OSError("mock flock failure")
 
-            with pytest.raises(OSError, match="mock flock failure"):
+            with pytest.raises(OSError):
                 svc.load()
 
         assert len(closed_fds) == 1

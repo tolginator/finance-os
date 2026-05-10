@@ -42,6 +42,8 @@ from src.application.contracts.agents import (
     EvaluateThesisResponse,
     GenerateSignalsRequest,
     GenerateSignalsResponse,
+    MacroOutlookAgentResponse,
+    MacroOutlookRequest,
     RunDigestRequest,
     RunDigestResponse,
     RunPipelineRequest,
@@ -239,6 +241,14 @@ async def classify_macro(request: ClassifyMacroRequest) -> Any:
         request = request.model_copy(update={"api_key": get_config().fred_api_key})
     service = AgentService()
     response = await service.classify_macro(request)
+    return response.model_dump(mode="json")
+
+
+@app.post("/agents/macro_outlook", response_model=MacroOutlookAgentResponse)
+async def macro_outlook(request: MacroOutlookRequest) -> Any:
+    """Produce forward-looking asset-class tilts from regime and policy."""
+    service = AgentService()
+    response = await service.macro_outlook(request)
     return response.model_dump(mode="json")
 
 

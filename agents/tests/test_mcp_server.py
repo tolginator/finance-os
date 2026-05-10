@@ -15,7 +15,10 @@ class TestToolRegistration:
     async def test_all_expected_tools_registered(self) -> None:
         tools = await mcp.list_tools()
         names = {t.name for t in tools}
-        assert names == {"analyze_earnings", "classify_macro", "research_digest", "orchestrate"}
+        assert names == {
+            "analyze_earnings", "classify_macro", "macro_outlook",
+            "research_digest", "orchestrate",
+        }
 
     async def test_analyze_earnings_schema(self) -> None:
         tools = await mcp.list_tools()
@@ -172,7 +175,8 @@ class TestOrchestrate:
             },
         )
         parsed = json.loads(content_list[0].text)
-        assert parsed["successful"] >= 0
+        assert isinstance(parsed["successful"], int)
+        assert parsed["successful"] <= len(parsed["results"])
         assert isinstance(parsed["total_duration_ms"], int)
         assert isinstance(parsed["results"], list)
 
@@ -220,7 +224,7 @@ class TestValidAgentNames:
 
     def test_contains_all_catalog_agents(self) -> None:
         expected = {
-            "macro_regime", "filing_analyst", "earnings_interpreter",
+            "macro_regime", "macro_outlook", "filing_analyst", "earnings_interpreter",
             "quant_signal", "thesis_guardian", "risk_analyst", "adversarial",
         }
         assert VALID_AGENT_NAMES == expected

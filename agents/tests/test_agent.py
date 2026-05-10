@@ -1,5 +1,7 @@
 """Tests for finance-os agents."""
 
+import pytest
+
 from src.core.agent import AgentMessage, AgentResponse, BaseAgent
 
 
@@ -7,11 +9,8 @@ class TestBaseAgent:
     """Tests for BaseAgent abstract class."""
 
     def test_cannot_instantiate_directly(self) -> None:
-        try:
+        with pytest.raises(TypeError):
             BaseAgent("test", "test agent")  # type: ignore[abstract]
-            assert False, "Should have raised TypeError"
-        except TypeError:
-            pass
 
     def test_history_management(self) -> None:
         class DummyAgent(BaseAgent):

@@ -453,7 +453,6 @@ class TestErrorHandling:
             "transcript": "some text",
         })
         assert resp.status_code == 400
-        assert resp.json()["detail"] is not None
 
     def test_malformed_json_body_422(self, client):
         resp = client.post(

@@ -7,11 +7,8 @@ Uses OS-level file locking (``fcntl.flock``) to protect against
 concurrent writes from Web API, MCP server, and CLI processes.
 """
 
-import fcntl
 import json
 import logging
-import os
-import tempfile
 from datetime import datetime
 from pathlib import Path
 
@@ -26,6 +23,7 @@ from src.application.contracts.household import (
     ImportWarning,
     UpdateHouseholdRequest,
 )
+from src.core.file_io import FileLockContext, atomic_write
 
 logger = logging.getLogger(__name__)
 
@@ -362,9 +360,9 @@ class HouseholdService:
 
     # -- internals ---------------------------------------------------------
 
-    def _flock(self) -> "_FileLockContext":
+    def _flock(self) -> FileLockContext:
         """Return a context manager that holds an OS-level advisory lock."""
-        return _FileLockContext(self._lock_path)
+        return FileLockContext(self._lock_path)
 
     def _load_unlocked(self) -> tuple[Household, bool]:
         """Load without acquiring the lock (caller must hold it)."""
@@ -390,31 +388,13 @@ class HouseholdService:
 
     def _write_atomic(self, household: Household) -> None:
         """Atomically write household to disk (temp file + rename)."""
-        self._path.parent.mkdir(parents=True, exist_ok=True)
         content = json.dumps(
             household.model_dump(mode="json"),
             indent=2,
             ensure_ascii=False,
             default=str,
-        )
-        temp_path: Path | None = None
-        try:
-            with tempfile.NamedTemporaryFile(
-                mode="w",
-                dir=self._path.parent,
-                suffix=".tmp",
-                delete=False,
-                encoding="utf-8",
-            ) as fd:
-                temp_path = Path(fd.name)
-                fd.write(content)
-                fd.flush()
-                os.fsync(fd.fileno())
-            temp_path.replace(self._path)
-        except BaseException:
-            if temp_path is not None:
-                temp_path.unlink(missing_ok=True)
-            raise
+        ).encode("utf-8")
+        atomic_write(self._path, content)
 
     def _preserve_corrupt_file(self) -> None:
         """Rename a corrupt household.json so the user can recover it."""
@@ -452,38 +432,3 @@ class HouseholdService:
     def _default_household() -> Household:
         return Household(name="My Household")
 
-
-# ---------------------------------------------------------------------------
-# OS-level file lock context manager
-# ---------------------------------------------------------------------------
-
-class _FileLockContext:
-    """Advisory file lock using ``fcntl.flock``.
-
-    Serialises access across processes (Web API, MCP, CLI) sharing the
-    same config directory.
-    """
-
-    def __init__(self, lock_path: Path) -> None:
-        self._lock_path = lock_path
-        self._fd: int | None = None
-
-    def __enter__(self) -> "_FileLockContext":
-        self._lock_path.parent.mkdir(parents=True, exist_ok=True)
-        self._fd = os.open(str(self._lock_path), os.O_CREAT | os.O_RDWR)
-        try:
-            fcntl.flock(self._fd, fcntl.LOCK_EX)
-        except BaseException:
-            try:
-                os.close(self._fd)
-            except OSError:
-                pass
-            self._fd = None
-            raise
-        return self
-
-    def __exit__(self, *_: object) -> None:
-        if self._fd is not None:
-            fcntl.flock(self._fd, fcntl.LOCK_UN)
-            os.close(self._fd)
-            self._fd = None

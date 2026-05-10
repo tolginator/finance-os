@@ -25,6 +25,8 @@ from src.application.contracts.agents import (
     EvaluateThesisResponse,
     GenerateSignalsRequest,
     GenerateSignalsResponse,
+    MacroOutlookAgentResponse,
+    MacroOutlookRequest,
     SearchFilingsRequest,
     SearchFilingsResponse,
 )
@@ -108,6 +110,30 @@ class AgentService:
                 _metadata_get(response.metadata, "indicators_with_data", 0)
             ),
             regime_report=regime_report,
+        )
+
+    async def macro_outlook(
+        self, request: MacroOutlookRequest
+    ) -> MacroOutlookAgentResponse:
+        """Produce forward-looking asset-class tilts."""
+        from src.agents.macro_outlook import MacroOutlookAgent
+
+        agent = self._get_or_create(MacroOutlookAgent)
+        response = await agent.run(
+            "Generate macro outlook tilts",
+            regime_report=request.regime_report,
+            policy=request.policy,
+        )
+        outlook = response.metadata.get("_outlook")
+        return MacroOutlookAgentResponse(
+            content=response.content,
+            tilts=int(_metadata_get(response.metadata, "tilts", 0)),
+            active_tilts=int(_metadata_get(response.metadata, "active_tilts", 0)),
+            confidence=_metadata_get(response.metadata, "confidence", "0"),
+            regime_summary=str(
+                _metadata_get(response.metadata, "regime_summary", "")
+            ),
+            outlook=outlook,
         )
 
     async def search_filings(

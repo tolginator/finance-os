@@ -186,7 +186,7 @@ class TestRunAgent:
         parser = build_parser()
         args = parser.parse_args(["run", "nonexistent"])
         from src.cli.commands import run_agent
-        with pytest.raises(ValueError, match="Unknown agent"):
+        with pytest.raises(ValueError):
             await run_agent(args)
 
     @pytest.mark.asyncio

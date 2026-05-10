@@ -3,6 +3,7 @@
 from src.agents.adversarial import AdversarialAgent
 from src.agents.earnings_interpreter import EarningsInterpreterAgent
 from src.agents.filing_analyst import FilingAnalystAgent
+from src.agents.macro_outlook import MacroOutlookAgent
 from src.agents.macro_regime import MacroRegimeAgent
 from src.agents.quant_signal import QuantSignalAgent
 from src.agents.risk_agent import RiskAgent
@@ -13,6 +14,7 @@ from src.core.agent import BaseAgent
 
 AGENT_CATALOG: list[dict[str, str]] = [
     {"name": "macro_regime", "description": "Classifies macro regime from FRED indicators"},
+    {"name": "macro_outlook", "description": "Forward-looking asset-class tilts bounded by policy"},
     {"name": "filing_analyst", "description": "Searches and analyzes SEC filings (10-K/10-Q)"},
     {"name": "earnings_interpreter", "description": "Analyzes earnings call transcripts"},
     {"name": "quant_signal", "description": "Generates composite quantitative signals"},
@@ -34,6 +36,7 @@ def create_all_agents(config: AppConfig | None = None) -> list[BaseAgent]:
     cfg = config or AppConfig()
     return [
         MacroRegimeAgent(fred_api_key=cfg.fred_api_key),
+        MacroOutlookAgent(),
         FilingAnalystAgent(),
         EarningsInterpreterAgent(),
         QuantSignalAgent(),

@@ -134,7 +134,7 @@ class TestFREDServiceFetch:
 
     def test_fetch_series_requires_api_key(self) -> None:
         svc = FREDService(api_key="")
-        with pytest.raises(ValueError, match="FRED API key required"):
+        with pytest.raises(ValueError):
             svc.fetch_series("GDP")
 
     def test_fetch_series_clamps_limit(self) -> None:

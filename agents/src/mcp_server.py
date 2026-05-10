@@ -101,6 +101,31 @@ async def classify_macro(indicators: list[str] | None = None) -> dict[str, Any]:
 
 
 @mcp.tool()
+async def macro_outlook(
+    regime_report: dict[str, Any],
+    policy: dict[str, Any],
+) -> dict[str, Any]:
+    """Produce forward-looking asset-class tilts from regime and policy.
+
+    Args:
+        regime_report: Multi-dimensional regime classification (from classify_macro).
+        policy: Investment policy with allocation targets and bands.
+
+    Returns:
+        Asset-class tilts with recommended weights, confidence, and rationale.
+    """
+    from src.application.contracts.agents import MacroOutlookRequest
+
+    request = MacroOutlookRequest.model_validate({
+        "regime_report": regime_report,
+        "policy": policy,
+    })
+    service = AgentService()
+    response = await service.macro_outlook(request)
+    return response.model_dump(mode="json")
+
+
+@mcp.tool()
 async def research_digest(
     tickers: list[str],
     lookback_days: int = 7,

@@ -8,6 +8,8 @@ from decimal import Decimal
 
 from pydantic import BaseModel, Field
 
+from src.application.contracts.outlook import MacroOutlookResponse
+from src.application.contracts.policy import InvestmentPolicy
 from src.application.contracts.regime import MacroRegimeReport
 
 # --- Earnings Interpreter ---
@@ -64,6 +66,38 @@ class ClassifyMacroResponse(BaseModel):
     regime_report: MacroRegimeReport | None = Field(
         default=None,
         description="Multi-dimensional regime report (enhanced classifier)",
+    )
+
+
+# --- Macro Outlook ---
+
+
+class MacroOutlookRequest(BaseModel):
+    """Request for forward-looking asset-class tilts.
+
+    Requires a regime report and investment policy.  Optionally accepts
+    a FRED API key if the regime report is not pre-computed.
+    """
+
+    regime_report: MacroRegimeReport = Field(
+        description="Multi-dimensional regime classification",
+    )
+    policy: InvestmentPolicy = Field(
+        description="Investment policy with allocation targets and bands",
+    )
+
+
+class MacroOutlookAgentResponse(BaseModel):
+    """Macro outlook results with asset-class tilts."""
+
+    content: str = Field(description="Human-readable outlook dashboard")
+    tilts: int = Field(description="Total number of asset-class tilts")
+    active_tilts: int = Field(description="Number of non-neutral tilts")
+    confidence: Decimal = Field(description="Overall outlook confidence")
+    regime_summary: str = Field(description="Brief regime narrative")
+    outlook: MacroOutlookResponse | None = Field(
+        default=None,
+        description="Full structured outlook with per-asset-class details",
     )
 
 

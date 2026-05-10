@@ -21,8 +21,8 @@ function formatCurrency(value: string | null): string {
   }).format(Number.parseFloat(value));
 }
 
-function formatPercent(value: string): string {
-  return `${(Number.parseFloat(value) * 100).toFixed(0)}%`;
+function formatPercent(value: string, decimals = 0): string {
+  return `${(Number.parseFloat(value) * 100).toFixed(decimals)}%`;
 }
 
 function typeBadge(goal: Goal): { label: string; color: string; background: string } {
@@ -71,7 +71,7 @@ export function GoalEditor() {
                 <div>Target: <strong>{formatCurrency(goal.target_amount)}</strong></div>
                 <div>Timeline: <strong>{goal.target_date ?? 'Flexible'}</strong></div>
                 <div>Horizon: <strong>{goal.time_horizon_years ? `${goal.time_horizon_years} years` : 'N/A'}</strong></div>
-                <div>Withdrawal rate: <strong>{goal.withdrawal_rate ? formatPercent(goal.withdrawal_rate) : 'N/A'}</strong></div>
+                <div>Withdrawal rate: <strong>{goal.withdrawal_rate ? formatPercent(goal.withdrawal_rate, 1) : 'N/A'}</strong></div>
               </div>
             </div>
           );

@@ -39,6 +39,19 @@ function signalColor(value: string): string {
   }
 }
 
+function confidenceColor(level: string): string {
+  switch (level.toLowerCase()) {
+    case 'high':
+      return '#16a34a';
+    case 'moderate':
+      return '#d97706';
+    case 'low':
+      return '#dc2626';
+    default:
+      return '#6b7280';
+  }
+}
+
 function RegimeCard({ label, dimension, testId }: { label: string; dimension: RegimeDimension; testId: string }) {
   return (
     <div
@@ -63,7 +76,7 @@ function RegimeCard({ label, dimension, testId }: { label: string; dimension: Re
           style={{
             height: '100%',
             width: `${confidenceWidth(dimension.confidence)}%`,
-            background: signalColor(dimension.confidence),
+            background: confidenceColor(dimension.confidence),
           }}
         />
       </div>
@@ -82,7 +95,7 @@ export function MacroDashboard() {
 
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
         <div data-testid="macro-confidence" style={{ fontSize: '0.95rem' }}>
-          Overall confidence: <strong style={{ color: signalColor(macroRegimeMock.overall_confidence) }}>{macroRegimeMock.overall_confidence}</strong>
+          Overall confidence: <strong style={{ color: confidenceColor(macroRegimeMock.overall_confidence) }}>{macroRegimeMock.overall_confidence}</strong>
         </div>
         <div data-testid="macro-as-of" style={{ fontSize: '0.9rem', color: '#6b7280' }}>
           As of {new Date(macroRegimeMock.as_of).toLocaleString()}

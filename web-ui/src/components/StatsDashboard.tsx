@@ -1,6 +1,15 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { fetchAgents, fetchHealth, fetchWatchlists } from '../api';
 import type { AgentInfo, HealthResponse, WatchlistsResponse } from '../types';
+
+async function fetchStats() {
+  const [healthData, agentData, watchlistData] = await Promise.all([
+    fetchHealth(),
+    fetchAgents(),
+    fetchWatchlists(),
+  ]);
+  return { healthData, agentData, watchlistData };
+}
 
 export function StatsDashboard() {
   const [health, setHealth] = useState<HealthResponse | null>(null);
@@ -9,35 +18,11 @@ export function StatsDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const [healthData, agentData, watchlistData] = await Promise.all([
-        fetchHealth(),
-        fetchAgents(),
-        fetchWatchlists(),
-      ]);
-      setHealth(healthData);
-      setAgents(agentData);
-      setWatchlists(watchlistData);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load stats');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
     let cancelled = false;
-
     (async () => {
       try {
-        const [healthData, agentData, watchlistData] = await Promise.all([
-          fetchHealth(),
-          fetchAgents(),
-          fetchWatchlists(),
-        ]);
+        const { healthData, agentData, watchlistData } = await fetchStats();
         if (cancelled) return;
         setHealth(healthData);
         setAgents(agentData);
@@ -49,11 +34,23 @@ export function StatsDashboard() {
         if (!cancelled) setLoading(false);
       }
     })();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
+
+  const handleRefresh = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const { healthData, agentData, watchlistData } = await fetchStats();
+      setHealth(healthData);
+      setAgents(agentData);
+      setWatchlists(watchlistData);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load stats');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (loading) return <p data-testid="stats-loading" style={{ color: '#6b7280' }}>Loading stats…</p>;
 
@@ -90,7 +87,7 @@ export function StatsDashboard() {
       <div style={{ gridColumn: '1 / -1', textAlign: 'right' }}>
         <button
           type="button"
-          onClick={() => void load()}
+          onClick={() => void handleRefresh()}
           data-testid="stats-refresh"
           style={{ padding: '0.4rem 0.75rem', borderRadius: 6, border: '1px solid #d1d5db', background: 'white', cursor: 'pointer' }}
         >

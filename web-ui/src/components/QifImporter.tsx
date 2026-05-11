@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { setQifSource, setExcludedAccounts } from '../api';
 import type { ImportPreviewResponse } from '../types';
 
@@ -7,6 +7,12 @@ interface QifImporterProps {
 }
 
 type ImportStatus = 'idle' | 'previewing' | 'preview' | 'saving' | 'done';
+
+interface BrowseEntry {
+  name: string;
+  path: string;
+  is_dir: boolean;
+}
 
 const panelStyle = {
   border: '1px solid #e5e7eb',
@@ -33,9 +39,123 @@ const secondaryButtonStyle = {
   color: '#111827',
 };
 
+// ---------------------------------------------------------------------------
+// File browser modal
+// ---------------------------------------------------------------------------
+
+function FileBrowser({ onSelect, onCancel }: { onSelect: (path: string) => void; onCancel: () => void }) {
+  const [currentDir, setCurrentDir] = useState('~');
+  const [entries, setEntries] = useState<BrowseEntry[]>([]);
+  const [parentDir, setParentDir] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [browseError, setBrowseError] = useState('');
+
+  const loadDir = useCallback(async (dir: string) => {
+    setLoading(true);
+    setBrowseError('');
+    try {
+      const params = new URLSearchParams({ path: dir, filter: '.qif' });
+      const response = await fetch(`/api/filesystem/browse?${params}`);
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({ detail: 'Failed to browse directory' }));
+        throw new Error(data.detail ?? 'Failed to browse directory');
+      }
+      const data = await response.json();
+      setCurrentDir(data.current);
+      setParentDir(data.parent);
+      setEntries(data.entries);
+    } catch (err) {
+      setBrowseError(err instanceof Error ? err.message : 'Browse failed');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadDir(currentDir);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div
+      data-testid="qif-file-browser"
+      style={{
+        border: '1px solid #d1d5db',
+        borderRadius: 12,
+        background: '#f9fafb',
+        padding: '1rem',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.75rem',
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>Select QIF File</div>
+        <button type="button" onClick={onCancel} style={{ ...secondaryButtonStyle, padding: '0.35rem 0.65rem', fontSize: '0.85rem' }}>
+          Cancel
+        </button>
+      </div>
+
+      <div style={{ fontSize: '0.85rem', color: '#374151', fontFamily: 'monospace', padding: '0.4rem 0.6rem', background: '#e5e7eb', borderRadius: 8 }}>
+        {currentDir}
+      </div>
+
+      {browseError ? (
+        <div style={{ color: '#b91c1c', fontSize: '0.85rem' }}>{browseError}</div>
+      ) : null}
+
+      <div style={{ maxHeight: 300, overflowY: 'auto', border: '1px solid #e5e7eb', borderRadius: 8, background: '#fff' }}>
+        {parentDir ? (
+          <button
+            type="button"
+            onClick={() => void loadDir(parentDir)}
+            style={{ width: '100%', textAlign: 'left', padding: '0.55rem 0.75rem', border: 'none', background: 'transparent', cursor: 'pointer', fontWeight: 600, color: '#2563eb', borderBottom: '1px solid #f3f4f6' }}
+          >
+            ↑ ..
+          </button>
+        ) : null}
+        {loading ? (
+          <div style={{ padding: '1rem', textAlign: 'center', color: '#6b7280' }}>Loading…</div>
+        ) : entries.length === 0 ? (
+          <div style={{ padding: '1rem', textAlign: 'center', color: '#6b7280' }}>No files or folders</div>
+        ) : (
+          entries.map((entry) => (
+            <button
+              type="button"
+              key={entry.path}
+              onClick={() => (entry.is_dir ? void loadDir(entry.path) : onSelect(entry.path))}
+              style={{
+                width: '100%',
+                textAlign: 'left',
+                padding: '0.55rem 0.75rem',
+                border: 'none',
+                background: 'transparent',
+                cursor: 'pointer',
+                display: 'flex',
+                gap: '0.5rem',
+                alignItems: 'center',
+                borderBottom: '1px solid #f3f4f6',
+              }}
+            >
+              <span style={{ fontSize: '1rem' }}>{entry.is_dir ? '📁' : '📄'}</span>
+              <span style={{ fontWeight: entry.is_dir ? 600 : 400, color: entry.is_dir ? '#374151' : '#111827' }}>
+                {entry.name}
+              </span>
+            </button>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main QIF Importer
+// ---------------------------------------------------------------------------
+
 export function QifImporter({ onImported }: QifImporterProps) {
   const [status, setStatus] = useState<ImportStatus>('idle');
   const [qifPath, setQifPath] = useState('');
+  const [browsing, setBrowsing] = useState(false);
   const [preview, setPreview] = useState<ImportPreviewResponse | null>(null);
   const [selectedAccounts, setSelectedAccounts] = useState<Set<string>>(new Set());
   const [error, setError] = useState('');
@@ -50,20 +170,13 @@ export function QifImporter({ onImported }: QifImporterProps) {
     setStatus('previewing');
 
     try {
-      // Set the QIF source path in config, which validates the file exists.
       await setQifSource(trimmed);
 
-      // Now read the file server-side via the preview endpoint using the
-      // configured path. We use a GET to /household which parses from config.
-      // But first we need to preview — use the import preview endpoint.
-      // Read the file content server-side by fetching household (which now
-      // parses QIF from the configured path).
       const response = await fetch('/api/household');
       if (!response.ok) throw new Error('Failed to load household from QIF.');
       const data = await response.json();
       if (!data.exists) throw new Error('QIF file could not be parsed.');
 
-      // Build preview-like response from the household data.
       const accounts = data.household.accounts ?? [];
       setPreview({
         accounts,
@@ -86,7 +199,6 @@ export function QifImporter({ onImported }: QifImporterProps) {
     setStatus('saving');
 
     try {
-      // Store excluded accounts (those NOT selected) in config.
       const allNames = preview.accounts.map((a) => a.name);
       const excluded = allNames.filter((name) => !selectedAccounts.has(name));
       await setExcludedAccounts(excluded);
@@ -104,11 +216,16 @@ export function QifImporter({ onImported }: QifImporterProps) {
     setError('');
   }
 
+  function handleFileSelected(path: string) {
+    setQifPath(path);
+    setBrowsing(false);
+  }
+
   return (
     <div data-testid="qif-importer" style={{ ...panelStyle, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
         <div style={{ fontSize: '1rem', fontWeight: 700 }}>Import a QIF file</div>
-        <div style={secondaryTextStyle}>Enter the path to your QIF file on the server. It will be parsed fresh on every load.</div>
+        <div style={secondaryTextStyle}>Browse to select your QIF file. It will be parsed fresh on every portfolio load.</div>
       </div>
 
       {error ? (
@@ -117,19 +234,28 @@ export function QifImporter({ onImported }: QifImporterProps) {
         </div>
       ) : null}
 
-      {(status === 'idle' || status === 'previewing') && (
+      {(status === 'idle' || status === 'previewing') && !browsing && (
         <>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-            <span style={{ fontWeight: 600 }}>QIF file path</span>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'stretch' }}>
             <input
               data-testid="qif-path-input"
               type="text"
               value={qifPath}
               onChange={(event) => setQifPath(event.target.value)}
-              placeholder="/path/to/portfolio.qif"
-              style={{ border: '1px solid #d1d5db', borderRadius: 10, padding: '0.7rem 0.85rem', font: 'inherit' }}
+              placeholder="No file selected"
+              readOnly
+              style={{ flex: 1, border: '1px solid #d1d5db', borderRadius: 10, padding: '0.7rem 0.85rem', font: 'inherit', background: '#f9fafb', color: '#374151' }}
             />
-          </label>
+            <button
+              type="button"
+              data-testid="qif-browse-button"
+              onClick={() => setBrowsing(true)}
+              disabled={status === 'previewing'}
+              style={secondaryButtonStyle}
+            >
+              Browse…
+            </button>
+          </div>
 
           <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
             <button
@@ -149,6 +275,10 @@ export function QifImporter({ onImported }: QifImporterProps) {
             </button>
           </div>
         </>
+      )}
+
+      {browsing && (
+        <FileBrowser onSelect={handleFileSelected} onCancel={() => setBrowsing(false)} />
       )}
 
       {status === 'preview' && preview ? (

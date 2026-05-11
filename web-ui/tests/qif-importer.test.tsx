@@ -5,25 +5,51 @@ import { QifImporter } from '../src/components/QifImporter';
 import { server } from './mocks/server';
 
 describe('QifImporter', () => {
-  it('shows path input in the idle state', () => {
+  it('shows browse button in the idle state', () => {
     render(<QifImporter onImported={() => {}} />);
 
     expect(screen.getByTestId('qif-importer')).toBeInTheDocument();
-    expect(screen.getByTestId('qif-path-input')).toBeInTheDocument();
+    expect(screen.getByTestId('qif-browse-button')).toBeInTheDocument();
     expect(screen.getByTestId('qif-preview-button')).toBeDisabled();
   });
 
-  it('enables preview button when path is entered', () => {
+  it('opens file browser when Browse is clicked', async () => {
     render(<QifImporter onImported={() => {}} />);
 
-    fireEvent.change(screen.getByTestId('qif-path-input'), { target: { value: '/path/to/test.qif' } });
+    fireEvent.click(screen.getByTestId('qif-browse-button'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('qif-file-browser')).toBeInTheDocument();
+    });
+    expect(screen.getByText('portfolio.qif')).toBeInTheDocument();
+    expect(screen.getByText('Documents')).toBeInTheDocument();
+  });
+
+  it('selects a file from the browser and enables Load QIF', async () => {
+    render(<QifImporter onImported={() => {}} />);
+
+    fireEvent.click(screen.getByTestId('qif-browse-button'));
+
+    await waitFor(() => {
+      expect(screen.getByText('portfolio.qif')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('portfolio.qif'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('qif-path-input')).toHaveValue('/home/user/portfolio.qif');
+    });
     expect(screen.getByTestId('qif-preview-button')).not.toBeDisabled();
   });
 
-  it('shows account preview after entering path and loading', async () => {
+  it('shows account preview after selecting file and loading', async () => {
     render(<QifImporter onImported={() => {}} />);
 
-    fireEvent.change(screen.getByTestId('qif-path-input'), { target: { value: '/path/to/test.qif' } });
+    fireEvent.click(screen.getByTestId('qif-browse-button'));
+    await waitFor(() => { expect(screen.getByText('portfolio.qif')).toBeInTheDocument(); });
+    fireEvent.click(screen.getByText('portfolio.qif'));
+    await waitFor(() => { expect(screen.getByTestId('qif-preview-button')).not.toBeDisabled(); });
+
     fireEvent.click(screen.getByTestId('qif-preview-button'));
 
     await waitFor(() => {
@@ -35,12 +61,12 @@ describe('QifImporter', () => {
   it('clicking confirm saves excluded accounts and shows success', async () => {
     render(<QifImporter onImported={() => {}} />);
 
-    fireEvent.change(screen.getByTestId('qif-path-input'), { target: { value: '/path/to/test.qif' } });
+    fireEvent.click(screen.getByTestId('qif-browse-button'));
+    await waitFor(() => { expect(screen.getByText('portfolio.qif')).toBeInTheDocument(); });
+    fireEvent.click(screen.getByText('portfolio.qif'));
+    await waitFor(() => { expect(screen.getByTestId('qif-preview-button')).not.toBeDisabled(); });
     fireEvent.click(screen.getByTestId('qif-preview-button'));
-
-    await waitFor(() => {
-      expect(screen.getByTestId('qif-confirm-button')).toBeInTheDocument();
-    });
+    await waitFor(() => { expect(screen.getByTestId('qif-confirm-button')).toBeInTheDocument(); });
 
     fireEvent.click(screen.getByTestId('qif-confirm-button'));
 
@@ -52,17 +78,17 @@ describe('QifImporter', () => {
   it('clicking cancel returns to idle state', async () => {
     render(<QifImporter onImported={() => {}} />);
 
-    fireEvent.change(screen.getByTestId('qif-path-input'), { target: { value: '/path/to/test.qif' } });
+    fireEvent.click(screen.getByTestId('qif-browse-button'));
+    await waitFor(() => { expect(screen.getByText('portfolio.qif')).toBeInTheDocument(); });
+    fireEvent.click(screen.getByText('portfolio.qif'));
+    await waitFor(() => { expect(screen.getByTestId('qif-preview-button')).not.toBeDisabled(); });
     fireEvent.click(screen.getByTestId('qif-preview-button'));
-
-    await waitFor(() => {
-      expect(screen.getByTestId('qif-confirm-button')).toBeInTheDocument();
-    });
+    await waitFor(() => { expect(screen.getByTestId('qif-confirm-button')).toBeInTheDocument(); });
 
     fireEvent.click(screen.getByTestId('qif-cancel-button'));
 
     expect(screen.queryByTestId('qif-confirm-button')).not.toBeInTheDocument();
-    expect(screen.getByTestId('qif-path-input')).toBeInTheDocument();
+    expect(screen.getByTestId('qif-browse-button')).toBeInTheDocument();
   });
 
   it('shows an error state on network failure', async () => {
@@ -74,7 +100,10 @@ describe('QifImporter', () => {
 
     render(<QifImporter onImported={() => {}} />);
 
-    fireEvent.change(screen.getByTestId('qif-path-input'), { target: { value: '/nonexistent/file.qif' } });
+    fireEvent.click(screen.getByTestId('qif-browse-button'));
+    await waitFor(() => { expect(screen.getByText('portfolio.qif')).toBeInTheDocument(); });
+    fireEvent.click(screen.getByText('portfolio.qif'));
+    await waitFor(() => { expect(screen.getByTestId('qif-preview-button')).not.toBeDisabled(); });
     fireEvent.click(screen.getByTestId('qif-preview-button'));
 
     await waitFor(() => {
@@ -87,13 +116,12 @@ describe('QifImporter', () => {
     const onImported = vi.fn();
     render(<QifImporter onImported={onImported} />);
 
-    fireEvent.change(screen.getByTestId('qif-path-input'), { target: { value: '/path/to/test.qif' } });
+    fireEvent.click(screen.getByTestId('qif-browse-button'));
+    await waitFor(() => { expect(screen.getByText('portfolio.qif')).toBeInTheDocument(); });
+    fireEvent.click(screen.getByText('portfolio.qif'));
+    await waitFor(() => { expect(screen.getByTestId('qif-preview-button')).not.toBeDisabled(); });
     fireEvent.click(screen.getByTestId('qif-preview-button'));
-
-    await waitFor(() => {
-      expect(screen.getByTestId('qif-confirm-button')).toBeInTheDocument();
-    });
-
+    await waitFor(() => { expect(screen.getByTestId('qif-confirm-button')).toBeInTheDocument(); });
     fireEvent.click(screen.getByTestId('qif-confirm-button'));
 
     await waitFor(() => {

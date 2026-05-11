@@ -389,6 +389,52 @@ async def import_qif_preview(req: QifImportPreviewRequest) -> Any:
     return preview_qif_import(req.qif_content, req.household_name).model_dump(mode="json")
 
 
+# ---------------------------------------------------------------------------
+# Filesystem browse (for server-side file picker)
+# ---------------------------------------------------------------------------
+
+
+class FileBrowseEntry(BaseModel):
+    """A single file or directory entry."""
+
+    name: str
+    path: str
+    is_dir: bool
+
+
+class FileBrowseResponse(BaseModel):
+    """Directory listing for the file picker."""
+
+    current: str
+    parent: str | None
+    entries: list[FileBrowseEntry]
+
+
+@app.get("/filesystem/browse", response_model=FileBrowseResponse)
+async def browse_filesystem(path: str = "~", filter: str = "") -> Any:
+    """List files/directories at the given path for the file picker."""
+    from pathlib import Path as PathLib
+
+    resolved = PathLib(path).expanduser().resolve()
+    if not resolved.is_dir():
+        raise HTTPException(status_code=400, detail=f"Not a directory: {resolved}")
+
+    entries: list[FileBrowseEntry] = []
+    try:
+        for item in sorted(resolved.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower())):
+            if item.name.startswith("."):
+                continue
+            if filter and item.is_file() and not item.name.lower().endswith(filter.lower()):
+                continue
+            entries.append(FileBrowseEntry(name=item.name, path=str(item), is_dir=item.is_dir()))
+    except PermissionError:
+        raise HTTPException(status_code=403, detail=f"Permission denied: {resolved}")
+
+    parent = str(resolved.parent) if resolved.parent != resolved else None
+    result = FileBrowseResponse(current=str(resolved), parent=parent, entries=entries)
+    return result.model_dump(mode="json")
+
+
 class QifSourceRequest(BaseModel):
     """Request for POST /household/qif_source."""
 

@@ -3,6 +3,17 @@ import { http, HttpResponse } from 'msw';
 export const handlers = [
   http.get('/api/health', () => HttpResponse.json({ status: 'ok' })),
 
+  http.get('/api/filesystem/browse', () =>
+    HttpResponse.json({
+      current: '/home/user',
+      parent: '/home',
+      entries: [
+        { name: 'Documents', path: '/home/user/Documents', is_dir: true },
+        { name: 'portfolio.qif', path: '/home/user/portfolio.qif', is_dir: false },
+      ],
+    }),
+  ),
+
   http.get('/api/agents', () =>
     HttpResponse.json([
       { name: 'earnings_interpreter', description: 'Analyzes earnings call transcripts for sentiment and guidance' },

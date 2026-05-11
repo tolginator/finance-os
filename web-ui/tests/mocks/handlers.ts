@@ -22,8 +22,6 @@ export const handlers = [
       household: {
         name: 'Test Household',
         liquidity_reserve_floor: '25000',
-        revision: 1,
-        updated_at: '2025-02-14T15:30:00Z',
         accounts: [
           {
             name: 'Primary Brokerage',
@@ -74,17 +72,12 @@ export const handlers = [
     });
   }),
 
-  http.put('/api/household', () =>
-    HttpResponse.json({
-      household: {
-        name: 'My Household',
-        accounts: [],
-        liquidity_reserve_floor: '0',
-        revision: 1,
-        updated_at: new Date().toISOString(),
-      },
-      journal_entry: 'Imported 1 account from QIF file.',
-    }),
+  http.post('/api/household/qif_source', () =>
+    HttpResponse.json({ qif_source_path: '/path/to/test.qif' }),
+  ),
+
+  http.put('/api/household/excluded_accounts', () =>
+    HttpResponse.json({ excluded_accounts: [] }),
   ),
 
   http.post('/api/agents/macro_regime', () =>

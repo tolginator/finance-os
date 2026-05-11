@@ -7,7 +7,7 @@ holdings, and cash-flow assumptions for a wealthy-family household.
 All monetary values use ``decimal.Decimal`` — never ``float``.
 """
 
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal
 from enum import StrEnum
 
@@ -143,9 +143,8 @@ class CashFlowAssumption(BaseModel):
 class Household(BaseModel):
     """Root data model for a household's investment portfolio.
 
-    Persisted to ``~/.config/finance-os/household.json``.
-    ``schema_version`` tracks file-format migrations.
-    ``revision`` is an optimistic-concurrency token incremented on every save.
+    Computed on the fly from the read-only QIF source file.
+    No persistence — the QIF file is the single source of truth.
     """
 
     name: str = Field(min_length=1, description="Household label")
@@ -160,14 +159,6 @@ class Household(BaseModel):
         default=1,
         description="File-format version for future migrations",
     )
-    revision: int = Field(
-        default=0,
-        description="Optimistic-concurrency token — incremented on every save",
-    )
-    updated_at: datetime = Field(
-        default_factory=datetime.now,
-        description="Timestamp of last persisted change",
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -180,32 +171,8 @@ class GetHouseholdResponse(BaseModel):
     household: Household
     exists: bool = Field(
         default=True,
-        description="False when no household.json exists yet (returns defaults)",
+        description="False when no QIF source is configured (returns defaults)",
     )
-
-
-class UpdateHouseholdRequest(BaseModel):
-    """Request for PUT /household.
-
-    Clients supply the business fields; server owns schema_version,
-    revision, and updated_at.  ``expected_revision`` is the concurrency
-    check — the server rejects the write if it doesn't match.
-    """
-
-    name: str = Field(min_length=1)
-    accounts: list[Account]
-    cash_flow_assumptions: list[CashFlowAssumption] = Field(default_factory=list)
-    liquidity_reserve_floor: Decimal = Field(default=Decimal("0"), ge=0)
-    expected_revision: int = Field(
-        description="Must match current revision on disk, or 409 Conflict"
-    )
-
-
-class UpdateHouseholdResponse(BaseModel):
-    """Response for PUT /household."""
-
-    household: Household
-    journal_entry: str = Field(description="Summary written to the change journal")
 
 
 class ImportPreviewRequest(BaseModel):

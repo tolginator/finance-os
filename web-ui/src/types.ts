@@ -49,8 +49,6 @@ export interface Household {
   name: string;
   accounts: Account[];
   liquidity_reserve_floor: string;
-  revision: number;
-  updated_at: string;
 }
 
 export interface HouseholdResponse {
@@ -67,18 +65,6 @@ export interface ImportPreviewResponse {
   accounts: Account[];
   warnings: ImportWarning[];
   position_only: boolean;
-}
-
-export interface UpdateHouseholdRequest {
-  name: string;
-  accounts: Account[];
-  liquidity_reserve_floor: string;
-  expected_revision: number;
-}
-
-export interface UpdateHouseholdResponse {
-  household: Household;
-  journal_entry: string;
 }
 
 export interface WatchlistData {

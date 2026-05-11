@@ -229,12 +229,10 @@ export function PortfolioView() {
           >
             <div>
               <div style={{ fontSize: '1.1rem', fontWeight: 700 }}>{state.data.household.name}</div>
-              <div style={{ fontSize: '0.9rem', color: '#4b5563' }}>Revision {state.data.household.revision}</div>
             </div>
             <div style={{ display: 'flex', alignItems: 'end', gap: '1rem', flexWrap: 'wrap', marginLeft: 'auto' }}>
               <div style={{ textAlign: 'right', fontSize: '0.9rem', color: '#4b5563' }}>
                 <div>Liquidity reserve floor: {formatCurrency(state.data.household.liquidity_reserve_floor)}</div>
-                <div>Updated {new Date(state.data.household.updated_at).toLocaleString()}</div>
               </div>
               <button type="button" onClick={() => setShowImporter((current) => !current)} style={primaryButtonStyle}>
                 {showImporter ? 'Hide Importer' : 'Import QIF'}
@@ -244,7 +242,6 @@ export function PortfolioView() {
 
           {showImporter ? (
             <QifImporter
-              currentRevision={state.data.household.revision}
               onImported={() => {
                 setState({ status: 'loading' });
                 setReloadCounter((current) => current + 1);

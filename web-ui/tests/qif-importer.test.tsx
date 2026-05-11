@@ -5,58 +5,37 @@ import { QifImporter } from '../src/components/QifImporter';
 import { server } from './mocks/server';
 
 describe('QifImporter', () => {
-  it('shows file input in the idle state', () => {
+  it('shows path input in the idle state', () => {
     render(<QifImporter onImported={() => {}} />);
 
     expect(screen.getByTestId('qif-importer')).toBeInTheDocument();
-    expect(screen.getByTestId('qif-file-input')).toBeInTheDocument();
-    expect(screen.getByTestId('qif-household-name')).toHaveValue('My Household');
+    expect(screen.getByTestId('qif-path-input')).toBeInTheDocument();
     expect(screen.getByTestId('qif-preview-button')).toBeDisabled();
   });
 
-  it('shows account preview after selecting a file and previewing', async () => {
+  it('enables preview button when path is entered', () => {
     render(<QifImporter onImported={() => {}} />);
 
-    const file = new File(['!Type:Invst\n^'], 'test.qif', { type: 'text/plain' });
-    fireEvent.change(screen.getByTestId('qif-file-input'), { target: { files: [file] } });
+    fireEvent.change(screen.getByTestId('qif-path-input'), { target: { value: '/path/to/test.qif' } });
+    expect(screen.getByTestId('qif-preview-button')).not.toBeDisabled();
+  });
+
+  it('shows account preview after entering path and loading', async () => {
+    render(<QifImporter onImported={() => {}} />);
+
+    fireEvent.change(screen.getByTestId('qif-path-input'), { target: { value: '/path/to/test.qif' } });
     fireEvent.click(screen.getByTestId('qif-preview-button'));
 
     await waitFor(() => {
       expect(screen.getByTestId('qif-preview-accounts')).toBeInTheDocument();
     });
-    expect(screen.getByText('Investment Account')).toBeInTheDocument();
-    expect(screen.getByText('Tax lots: 1')).toBeInTheDocument();
+    expect(screen.getByText('Primary Brokerage')).toBeInTheDocument();
   });
 
-  it('shows warnings when preview returns them', async () => {
-    server.use(
-      http.post('/api/household/import/qif/preview', () =>
-        HttpResponse.json({
-          accounts: [],
-          warnings: [{ line: 12, message: 'Skipped unsupported record' }],
-          position_only: true,
-        }),
-      ),
-    );
-
+  it('clicking confirm saves excluded accounts and shows success', async () => {
     render(<QifImporter onImported={() => {}} />);
 
-    const file = new File(['!Type:Invst\nwarning\n^'], 'warning.qif', { type: 'text/plain' });
-    fireEvent.change(screen.getByTestId('qif-file-input'), { target: { files: [file] } });
-    fireEvent.click(screen.getByTestId('qif-preview-button'));
-
-    await waitFor(() => {
-      expect(screen.getByTestId('qif-preview-warnings')).toBeInTheDocument();
-    });
-    expect(screen.getByText('Line 12: Skipped unsupported record')).toBeInTheDocument();
-    expect(screen.getByText('Position-only import: Yes')).toBeInTheDocument();
-  });
-
-  it('clicking confirm saves and shows success message', async () => {
-    render(<QifImporter onImported={() => {}} />);
-
-    const file = new File(['!Type:Invst\n^'], 'confirm.qif', { type: 'text/plain' });
-    fireEvent.change(screen.getByTestId('qif-file-input'), { target: { files: [file] } });
+    fireEvent.change(screen.getByTestId('qif-path-input'), { target: { value: '/path/to/test.qif' } });
     fireEvent.click(screen.getByTestId('qif-preview-button'));
 
     await waitFor(() => {
@@ -68,14 +47,12 @@ describe('QifImporter', () => {
     await waitFor(() => {
       expect(screen.getByTestId('qif-success')).toBeInTheDocument();
     });
-    expect(screen.getByText('Imported 1 account from QIF file.')).toBeInTheDocument();
   });
 
   it('clicking cancel returns to idle state', async () => {
     render(<QifImporter onImported={() => {}} />);
 
-    const file = new File(['!Type:Invst\n^'], 'cancel.qif', { type: 'text/plain' });
-    fireEvent.change(screen.getByTestId('qif-file-input'), { target: { files: [file] } });
+    fireEvent.change(screen.getByTestId('qif-path-input'), { target: { value: '/path/to/test.qif' } });
     fireEvent.click(screen.getByTestId('qif-preview-button'));
 
     await waitFor(() => {
@@ -85,24 +62,23 @@ describe('QifImporter', () => {
     fireEvent.click(screen.getByTestId('qif-cancel-button'));
 
     expect(screen.queryByTestId('qif-confirm-button')).not.toBeInTheDocument();
-    expect(screen.getByTestId('qif-preview-button')).toBeDisabled();
+    expect(screen.getByTestId('qif-path-input')).toBeInTheDocument();
   });
 
   it('shows an error state on network failure', async () => {
     server.use(
-      http.post('/api/household/import/qif/preview', () =>
-        HttpResponse.json({ detail: 'Preview failed' }, { status: 500 }),
+      http.post('/api/household/qif_source', () =>
+        HttpResponse.json({ detail: 'File not found' }, { status: 400 }),
       ),
     );
 
     render(<QifImporter onImported={() => {}} />);
 
-    const file = new File(['!Type:Invst\n^'], 'error.qif', { type: 'text/plain' });
-    fireEvent.change(screen.getByTestId('qif-file-input'), { target: { files: [file] } });
+    fireEvent.change(screen.getByTestId('qif-path-input'), { target: { value: '/nonexistent/file.qif' } });
     fireEvent.click(screen.getByTestId('qif-preview-button'));
 
     await waitFor(() => {
-      expect(screen.getByText('Preview failed')).toBeInTheDocument();
+      expect(screen.getByText(/File not found|Unable to preview/)).toBeInTheDocument();
     });
     expect(screen.queryByTestId('qif-preview-accounts')).not.toBeInTheDocument();
   });
@@ -111,8 +87,7 @@ describe('QifImporter', () => {
     const onImported = vi.fn();
     render(<QifImporter onImported={onImported} />);
 
-    const file = new File(['!Type:Invst\n^'], 'done.qif', { type: 'text/plain' });
-    fireEvent.change(screen.getByTestId('qif-file-input'), { target: { files: [file] } });
+    fireEvent.change(screen.getByTestId('qif-path-input'), { target: { value: '/path/to/test.qif' } });
     fireEvent.click(screen.getByTestId('qif-preview-button'));
 
     await waitFor(() => {

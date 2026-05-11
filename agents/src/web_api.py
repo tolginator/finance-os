@@ -56,8 +56,6 @@ from src.application.contracts.household import (
     ImportPreviewRequest,
     ImportPreviewResponse,
     QifImportPreviewRequest,
-    UpdateHouseholdRequest,
-    UpdateHouseholdResponse,
 )
 from src.application.contracts.knowledge_graph import (
     ExtractEntitiesRequest,
@@ -75,9 +73,7 @@ from src.application.registry import AGENT_CATALOG, create_pipeline_service
 from src.application.services.agent_service import AgentService
 from src.application.services.digest_service import DigestService
 from src.application.services.household_service import (
-    HouseholdCorruptError,
     HouseholdService,
-    StaleRevisionError,
 )
 from src.application.services.kg_service import KnowledgeGraphService
 from src.application.watchlists import WatchlistNotFoundError, WatchlistStore
@@ -145,22 +141,6 @@ async def watchlist_not_found_handler(
 ) -> JSONResponse:
     """Map WatchlistNotFoundError to 404."""
     return JSONResponse(status_code=404, content={"detail": str(exc)})
-
-
-@app.exception_handler(StaleRevisionError)
-async def stale_revision_handler(
-    _request: Request, exc: StaleRevisionError,
-) -> JSONResponse:
-    """Map StaleRevisionError to 409 Conflict."""
-    return JSONResponse(status_code=409, content={"detail": str(exc)})
-
-
-@app.exception_handler(HouseholdCorruptError)
-async def household_corrupt_handler(
-    _request: Request, exc: HouseholdCorruptError,
-) -> JSONResponse:
-    """Map HouseholdCorruptError to 500 — corrupt file preserved for recovery."""
-    return JSONResponse(status_code=500, content={"detail": str(exc)})
 
 
 # --- Health & Info ---
@@ -394,15 +374,6 @@ async def get_household() -> Any:
     return GetHouseholdResponse(household=household, exists=exists).model_dump(mode="json")
 
 
-@app.put("/household", response_model=UpdateHouseholdResponse)
-async def update_household(request: UpdateHouseholdRequest) -> Any:
-    """Update the household portfolio (optimistic concurrency via expected_revision)."""
-    household, summary = await asyncio.to_thread(_household_service.save, request)
-    return UpdateHouseholdResponse(
-        household=household, journal_entry=summary,
-    ).model_dump(mode="json")
-
-
 @app.post("/household/import/csv/preview", response_model=ImportPreviewResponse)
 async def preview_csv_import(request: ImportPreviewRequest) -> Any:
     """Parse CSV content and return proposed accounts without persisting."""
@@ -460,6 +431,36 @@ async def clear_qif_source() -> Any:
 
     update_config_value("qif_source_path", None)
     return QifSourceResponse(qif_source_path="").model_dump(mode="json")
+
+
+class ExcludedAccountsRequest(BaseModel):
+    """Request for PUT /household/excluded_accounts."""
+
+    excluded_accounts: list[str] = Field(description="Account names to exclude from analysis")
+
+
+class ExcludedAccountsResponse(BaseModel):
+    """Response for GET/PUT /household/excluded_accounts."""
+
+    excluded_accounts: list[str] = Field(default_factory=list)
+
+
+@app.get("/household/excluded_accounts", response_model=ExcludedAccountsResponse)
+async def get_excluded_accounts() -> Any:
+    """Return the list of excluded account names."""
+    from src.application.config import AppConfig
+
+    cfg = AppConfig()
+    return ExcludedAccountsResponse(excluded_accounts=cfg.excluded_accounts).model_dump(mode="json")
+
+
+@app.put("/household/excluded_accounts", response_model=ExcludedAccountsResponse)
+async def set_excluded_accounts(req: ExcludedAccountsRequest) -> Any:
+    """Update the list of excluded account names."""
+    from src.application.config import update_config_value
+
+    update_config_value("excluded_accounts", req.excluded_accounts)
+    return ExcludedAccountsResponse(excluded_accounts=req.excluded_accounts).model_dump(mode="json")
 
 
 # --- Watchlists ---

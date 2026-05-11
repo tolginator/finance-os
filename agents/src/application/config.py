@@ -15,7 +15,7 @@ CONFIG_DIR = Path.home() / ".config" / "finance-os"
 CONFIG_FILE = CONFIG_DIR / "config.json"
 
 
-def update_config_value(key: str, value: str | None) -> None:
+def update_config_value(key: str, value: str | list[str] | None) -> None:
     """Set or remove a key in config.json, preserving other values."""
     data = _load_config_file()
     if value is None or value == "":
@@ -89,6 +89,7 @@ class AppConfig(BaseSettings):
     bls_api_key: str = ""
     sec_edgar_email: str = ""
     qif_source_path: str = ""
+    excluded_accounts: list[str] = []
     azure: AzureOpenAIConfig = AzureOpenAIConfig()
 
     @classmethod

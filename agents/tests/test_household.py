@@ -1,7 +1,5 @@
 """Tests for household portfolio model — contracts, service, and math helpers."""
 
-import json
-import os
 import textwrap
 from datetime import date
 from decimal import Decimal
@@ -20,7 +18,6 @@ from src.application.contracts.household import (
     Household,
     ImportPreviewRequest,
     TaxLot,
-    UpdateHouseholdRequest,
 )
 from src.application.household_math import (
     aggregate_lots,
@@ -35,9 +32,7 @@ from src.application.household_math import (
     unique_tickers,
 )
 from src.application.services.household_service import (
-    HouseholdCorruptError,
     HouseholdService,
-    StaleRevisionError,
 )
 
 # ---------------------------------------------------------------------------
@@ -85,13 +80,8 @@ def sample_household(sample_account: Account) -> Household:
 
 
 @pytest.fixture()
-def tmp_household_path(tmp_path: Path) -> Path:
-    return tmp_path / "household.json"
-
-
-@pytest.fixture()
-def service(tmp_household_path: Path) -> HouseholdService:
-    return HouseholdService(path=tmp_household_path)
+def service() -> HouseholdService:
+    return HouseholdService()
 
 
 # ---------------------------------------------------------------------------
@@ -179,7 +169,6 @@ class TestHousehold:
     def test_defaults(self) -> None:
         h = Household(name="Test")
         assert h.schema_version == 1
-        assert h.revision == 0
         assert h.accounts == []
         assert h.liquidity_reserve_floor == Decimal("0")
 
@@ -386,227 +375,76 @@ class TestHouseholdMath:
 
 
 class TestHouseholdService:
-    def test_load_no_file(self, service: HouseholdService) -> None:
-        household, exists = service.load()
+    def test_load_no_qif_source(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """When no qif_source_path is configured, load returns defaults."""
+        monkeypatch.setattr(
+            "src.application.services.household_service.AppConfig",
+            lambda: type("C", (), {"qif_source_path": "", "excluded_accounts": []})(),
+        )
+        svc = HouseholdService()
+        household, exists = svc.load()
         assert exists is False
         assert household.name == "My Household"
-        assert household.revision == 0
 
-    def test_save_and_load(
-        self,
-        service: HouseholdService,
-        sample_account: Account,
+    def test_load_from_qif_file(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        req = UpdateHouseholdRequest(
-            name="Acar Family",
-            accounts=[sample_account],
-            liquidity_reserve_floor=Decimal("25000"),
-            expected_revision=0,
-        )
-        saved, summary = service.save(req)
-        assert saved.revision == 1
-        assert saved.name == "Acar Family"
-        assert "rev 0 → 1" in summary
-
-        loaded, exists = service.load()
-        assert exists is True
-        assert loaded.name == "Acar Family"
-        assert loaded.revision == 1
-        assert len(loaded.accounts) == 1
-        # Verify Decimal precision round-trips
-        lot = loaded.accounts[0].tax_lots[0]
-        assert lot.cost_basis_per_share == Decimal("200.50")
-
-    def test_optimistic_concurrency_reject(
-        self,
-        service: HouseholdService,
-        sample_account: Account,
-    ) -> None:
-        # First save succeeds (revision 0 → 1)
-        req1 = UpdateHouseholdRequest(
-            name="First",
-            accounts=[sample_account],
-            expected_revision=0,
-        )
-        service.save(req1)
-
-        # Second save with stale revision 0 → StaleRevisionError
-        req2 = UpdateHouseholdRequest(
-            name="Stale",
-            accounts=[],
-            expected_revision=0,
-        )
-        with pytest.raises(StaleRevisionError):
-            service.save(req2)
-
-    def test_optimistic_concurrency_accept(
-        self,
-        service: HouseholdService,
-        sample_account: Account,
-    ) -> None:
-        req1 = UpdateHouseholdRequest(
-            name="First",
-            accounts=[sample_account],
-            expected_revision=0,
-        )
-        service.save(req1)
-
-        req2 = UpdateHouseholdRequest(
-            name="Second",
-            accounts=[],
-            expected_revision=1,
-        )
-        saved, _ = service.save(req2)
-        assert saved.revision == 2
-        assert saved.name == "Second"
-
-    def test_journal_written(
-        self,
-        service: HouseholdService,
-        tmp_path: Path,
-    ) -> None:
-        req = UpdateHouseholdRequest(
-            name="Journal Test",
-            accounts=[],
-            expected_revision=0,
-        )
-        service.save(req)
-
-        journal_path = tmp_path / "household-journal.jsonl"
-        assert journal_path.is_file()
-        lines = journal_path.read_text().strip().split("\n")
-        assert len(lines) == 1
-        entry = json.loads(lines[0])
-        assert entry["action"] == "update"
-        assert entry["base_revision"] == 0
-        assert entry["new_revision"] == 1
-
-    def test_corrupt_file_preserved(
-        self,
-        service: HouseholdService,
-        tmp_household_path: Path,
-    ) -> None:
-        tmp_household_path.parent.mkdir(parents=True, exist_ok=True)
-        tmp_household_path.write_text("not valid json {{{", encoding="utf-8")
-
-        with pytest.raises(HouseholdCorruptError):
-            service.load()
-
-        # Original file renamed to .corrupt.*.json
-        corrupt_files = list(tmp_household_path.parent.glob("*.corrupt.*.json"))
-        assert len(corrupt_files) == 1
-
-    def test_invalid_schema_preserved(
-        self,
-        service: HouseholdService,
-        tmp_household_path: Path,
-    ) -> None:
-        tmp_household_path.parent.mkdir(parents=True, exist_ok=True)
-        tmp_household_path.write_text(
-            json.dumps({"name": 12345}),  # name must be str
+        """When qif_source_path points to a valid file, load parses it."""
+        qif_file = tmp_path / "portfolio.qif"
+        qif_file.write_text(
+            "!Account\nNBrokerage\nTInvst\n^\n"
+            "!Type:Invst\nD01/15/2024\nNBuy\nYVTI\nQ100\nT20050\nI200.50\n^\n",
             encoding="utf-8",
         )
-
-        with pytest.raises(HouseholdCorruptError):
-            service.load()
-
-        corrupt_files = list(tmp_household_path.parent.glob("*.corrupt.*.json"))
-        assert len(corrupt_files) == 1
-
-    def test_atomic_write_creates_parent_dir(self, tmp_path: Path) -> None:
-        nested = tmp_path / "deep" / "nested" / "household.json"
-        svc = HouseholdService(path=nested)
-        req = UpdateHouseholdRequest(
-            name="Deep",
-            accounts=[],
-            expected_revision=0,
+        monkeypatch.setattr(
+            "src.application.services.household_service.AppConfig",
+            lambda: type("C", (), {
+                "qif_source_path": str(qif_file),
+                "excluded_accounts": [],
+            })(),
         )
-        saved, _ = svc.save(req)
-        assert nested.is_file()
-        assert saved.name == "Deep"
+        svc = HouseholdService()
+        household, exists = svc.load()
+        assert exists is True
+        assert len(household.accounts) == 1
+        assert household.accounts[0].name == "Brokerage"
 
-    def test_multiple_accounts_roundtrip(self, service: HouseholdService) -> None:
-        accounts = [
-            Account(
-                name="Taxable",
-                account_type=AccountType.TAXABLE,
-                tax_lots=[
-                    TaxLot(
-                        ticker="VTI",
-                        shares=Decimal("100"),
-                        cost_basis_per_share=Decimal("200"),
-                        purchase_date=date(2023, 1, 1),
-                    ),
-                ],
-                cash_holdings=[
-                    CashHolding(amount=Decimal("50000"), valuation_date=date(2024, 1, 1)),
-                ],
-            ),
-            Account(
-                name="Roth IRA",
-                account_type=AccountType.ROTH_IRA,
-                tax_lots=[
-                    TaxLot(
-                        ticker="VXUS",
-                        shares=Decimal("200"),
-                        cost_basis_per_share=Decimal("55"),
-                        purchase_date=date(2022, 6, 1),
-                    ),
-                ],
-            ),
-            Account(
-                name="Trust",
-                account_type=AccountType.TRUST,
-                cash_holdings=[
-                    CashHolding(
-                        amount=Decimal("100000"),
-                        valuation_date=date(2024, 1, 1),
-                        is_money_market=True,
-                        ticker="VMFXX",
-                    ),
-                ],
-            ),
-        ]
-        req = UpdateHouseholdRequest(
-            name="Multi-Account",
-            accounts=accounts,
-            liquidity_reserve_floor=Decimal("75000"),
-            expected_revision=0,
+    def test_load_excludes_accounts(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Accounts in excluded_accounts config are filtered out."""
+        qif_file = tmp_path / "portfolio.qif"
+        qif_file.write_text(
+            "!Account\nNBrokerage\nTInvst\n^\n"
+            "!Account\nNRetirement\nTInvst\n^\n"
+            "!Type:Invst\nD01/15/2024\nNBuy\nYVTI\nQ100\nI200.50\n^\n",
+            encoding="utf-8",
         )
-        saved, _ = service.save(req)
-        assert len(saved.accounts) == 3
+        monkeypatch.setattr(
+            "src.application.services.household_service.AppConfig",
+            lambda: type("C", (), {
+                "qif_source_path": str(qif_file),
+                "excluded_accounts": ["Retirement"],
+            })(),
+        )
+        svc = HouseholdService()
+        household, exists = svc.load()
+        assert exists is True
+        acct_names = [a.name for a in household.accounts]
+        assert "Retirement" not in acct_names
 
-        loaded, _ = service.load()
-        assert len(loaded.accounts) == 3
-        assert loaded.accounts[1].account_type == AccountType.ROTH_IRA
-        assert loaded.accounts[2].cash_holdings[0].ticker == "VMFXX"
-
-    def test_flock_failure_closes_fd(self, tmp_path: Path) -> None:
-        """File descriptor must be closed if fcntl.flock() raises."""
-        from unittest.mock import patch
-
-        svc = HouseholdService(path=tmp_path / "household.json")
-        closed_fds: list[int] = []
-        original_close = os.close
-
-        def tracking_close(fd: int) -> None:
-            closed_fds.append(fd)
-            original_close(fd)
-
-        with (
-            patch("src.core.file_io.fcntl") as mock_fcntl,
-            patch(
-                "src.core.file_io.os.close",
-                side_effect=tracking_close,
-            ),
-        ):
-            mock_fcntl.LOCK_EX = 2
-            mock_fcntl.flock.side_effect = OSError("mock flock failure")
-
-            with pytest.raises(OSError):
-                svc.load()
-
-        assert len(closed_fds) == 1
+    def test_load_missing_file(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """When qif_source_path points to a missing file, returns defaults."""
+        monkeypatch.setattr(
+            "src.application.services.household_service.AppConfig",
+            lambda: type("C", (), {
+                "qif_source_path": "/nonexistent/file.qif",
+                "excluded_accounts": [],
+            })(),
+        )
+        svc = HouseholdService()
+        household, exists = svc.load()
+        assert exists is False
 
 
 # ---------------------------------------------------------------------------
@@ -708,57 +546,3 @@ class TestCSVImport:
         assert any("Invalid lot data" in w.message for w in result.warnings)
         assert len(result.accounts[0].tax_lots) == 0
 
-
-# ---------------------------------------------------------------------------
-# QIF auto-import tests
-# ---------------------------------------------------------------------------
-
-
-class TestQifAutoImport:
-    def test_auto_imports_when_qif_source_configured(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        """When qif_source_path points to a valid QIF file and no
-        household.json exists, load() should auto-import."""
-        qif_file = tmp_path / "portfolio.qif"
-        qif_file.write_text(
-            "!Account\nNBrokerage\nTInvst\n^\n"
-            "!Type:Invst\nD01/15/2024\nNBuy\nYVTI\nQ100\nT20050\nI200.50\n^\n",
-            encoding="utf-8",
-        )
-
-        monkeypatch.setattr(
-            "src.application.services.household_service.AppConfig",
-            lambda: type("C", (), {"qif_source_path": str(qif_file)})(),
-        )
-
-        svc = HouseholdService(path=tmp_path / "household.json")
-        household, exists = svc.load()
-
-        assert exists is True
-        assert len(household.accounts) == 1
-        assert household.accounts[0].name == "Brokerage"
-        assert household.revision == 1
-        assert (tmp_path / "household.json").is_file()
-
-    def test_no_auto_import_when_path_empty(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        monkeypatch.setattr(
-            "src.application.services.household_service.AppConfig",
-            lambda: type("C", (), {"qif_source_path": ""})(),
-        )
-        svc = HouseholdService(path=tmp_path / "household.json")
-        household, exists = svc.load()
-        assert exists is False
-
-    def test_no_auto_import_when_file_missing(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        monkeypatch.setattr(
-            "src.application.services.household_service.AppConfig",
-            lambda: type("C", (), {"qif_source_path": "/nonexistent/file.qif"})(),
-        )
-        svc = HouseholdService(path=tmp_path / "household.json")
-        household, exists = svc.load()
-        assert exists is False

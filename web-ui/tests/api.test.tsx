@@ -12,7 +12,6 @@ import {
   previewQifImport,
   runDigest,
   runPipeline,
-  saveHousehold,
   updateWatchlist,
 } from '../src/api';
 
@@ -56,21 +55,12 @@ describe('api helpers', () => {
     await expect(deleteWatchlist('growth')).resolves.toBeUndefined();
   });
 
-  it('previews qif imports and saves households', async () => {
+  it('previews qif imports', async () => {
     await expect(previewQifImport('!Type:Invst\n^', 'My Household')).resolves.toMatchObject({
       accounts: [{ name: 'Investment Account' }],
       warnings: [],
       position_only: false,
     });
-
-    await expect(
-      saveHousehold({
-        name: 'My Household',
-        accounts: [],
-        liquidity_reserve_floor: '0',
-        expected_revision: 0,
-      }),
-    ).resolves.toMatchObject({ journal_entry: 'Imported 1 account from QIF file.' });
   });
 
   it('runs pipeline', async () => {

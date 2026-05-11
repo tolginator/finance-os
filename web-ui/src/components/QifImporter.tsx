@@ -1,10 +1,9 @@
 import { useState } from 'react';
-import { previewQifImport, saveHousehold } from '../api';
+import { setQifSource, setExcludedAccounts } from '../api';
 import type { ImportPreviewResponse } from '../types';
 
 interface QifImporterProps {
   onImported: () => void;
-  currentRevision?: number;
 }
 
 type ImportStatus = 'idle' | 'previewing' | 'preview' | 'saving' | 'done';
@@ -34,47 +33,44 @@ const secondaryButtonStyle = {
   color: '#111827',
 };
 
-function readFileAsText(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        resolve(reader.result);
-        return;
-      }
-      reject(new Error('Unable to read selected file.'));
-    };
-    reader.onerror = () => {
-      reject(reader.error ?? new Error('Unable to read selected file.'));
-    };
-    reader.readAsText(file);
-  });
-}
-
-export function QifImporter({ onImported, currentRevision = 0 }: QifImporterProps) {
+export function QifImporter({ onImported }: QifImporterProps) {
   const [status, setStatus] = useState<ImportStatus>('idle');
-  const [householdName, setHouseholdName] = useState('My Household');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [qifPath, setQifPath] = useState('');
   const [preview, setPreview] = useState<ImportPreviewResponse | null>(null);
   const [selectedAccounts, setSelectedAccounts] = useState<Set<string>>(new Set());
-  const [journalEntry, setJournalEntry] = useState('');
   const [error, setError] = useState('');
-  const [fileInputKey, setFileInputKey] = useState(0);
 
-  const canPreview = selectedFile !== null && status !== 'previewing' && status !== 'saving';
-  const normalizedHouseholdName = householdName.trim() || 'My Household';
+  const canPreview = qifPath.trim().length > 0 && status !== 'previewing' && status !== 'saving';
 
   async function handlePreview() {
-    if (selectedFile === null) return;
+    const trimmed = qifPath.trim();
+    if (!trimmed) return;
 
     setError('');
     setStatus('previewing');
 
     try {
-      const qifContent = await readFileAsText(selectedFile);
-      const response = await previewQifImport(qifContent, normalizedHouseholdName);
-      setPreview(response);
-      setSelectedAccounts(new Set(response.accounts.map((a) => a.name)));
+      // Set the QIF source path in config, which validates the file exists.
+      await setQifSource(trimmed);
+
+      // Now read the file server-side via the preview endpoint using the
+      // configured path. We use a GET to /household which parses from config.
+      // But first we need to preview — use the import preview endpoint.
+      // Read the file content server-side by fetching household (which now
+      // parses QIF from the configured path).
+      const response = await fetch('/api/household');
+      if (!response.ok) throw new Error('Failed to load household from QIF.');
+      const data = await response.json();
+      if (!data.exists) throw new Error('QIF file could not be parsed.');
+
+      // Build preview-like response from the household data.
+      const accounts = data.household.accounts ?? [];
+      setPreview({
+        accounts,
+        warnings: [],
+        position_only: false,
+      });
+      setSelectedAccounts(new Set(accounts.map((a: { name: string }) => a.name)));
       setStatus('preview');
     } catch (previewError) {
       setPreview(null);
@@ -90,17 +86,14 @@ export function QifImporter({ onImported, currentRevision = 0 }: QifImporterProp
     setStatus('saving');
 
     try {
-      const response = await saveHousehold({
-        name: normalizedHouseholdName,
-        accounts: preview.accounts.filter((a) => selectedAccounts.has(a.name)),
-        liquidity_reserve_floor: '0',
-        expected_revision: currentRevision,
-      });
-      setJournalEntry(response.journal_entry);
+      // Store excluded accounts (those NOT selected) in config.
+      const allNames = preview.accounts.map((a) => a.name);
+      const excluded = allNames.filter((name) => !selectedAccounts.has(name));
+      await setExcludedAccounts(excluded);
       setStatus('done');
     } catch (saveError) {
       setStatus('preview');
-      setError(saveError instanceof Error ? saveError.message : 'Unable to save imported household.');
+      setError(saveError instanceof Error ? saveError.message : 'Unable to save account selection.');
     }
   }
 
@@ -108,17 +101,14 @@ export function QifImporter({ onImported, currentRevision = 0 }: QifImporterProp
     setStatus('idle');
     setPreview(null);
     setSelectedAccounts(new Set());
-    setSelectedFile(null);
-    setJournalEntry('');
     setError('');
-    setFileInputKey((current) => current + 1);
   }
 
   return (
     <div data-testid="qif-importer" style={{ ...panelStyle, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
         <div style={{ fontSize: '1rem', fontWeight: 700 }}>Import a QIF file</div>
-        <div style={secondaryTextStyle}>Preview parsed accounts before saving them to your household portfolio.</div>
+        <div style={secondaryTextStyle}>Enter the path to your QIF file on the server. It will be parsed fresh on every load.</div>
       </div>
 
       {error ? (
@@ -130,29 +120,16 @@ export function QifImporter({ onImported, currentRevision = 0 }: QifImporterProp
       {(status === 'idle' || status === 'previewing') && (
         <>
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-            <span style={{ fontWeight: 600 }}>Household name</span>
+            <span style={{ fontWeight: 600 }}>QIF file path</span>
             <input
-              data-testid="qif-household-name"
+              data-testid="qif-path-input"
               type="text"
-              value={householdName}
-              onChange={(event) => setHouseholdName(event.target.value)}
+              value={qifPath}
+              onChange={(event) => setQifPath(event.target.value)}
+              placeholder="/path/to/portfolio.qif"
               style={{ border: '1px solid #d1d5db', borderRadius: 10, padding: '0.7rem 0.85rem', font: 'inherit' }}
             />
           </label>
-
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-            <span style={{ fontWeight: 600 }}>QIF file</span>
-            <input
-              key={fileInputKey}
-              data-testid="qif-file-input"
-              type="file"
-              accept=".qif"
-              onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)}
-              style={{ font: 'inherit' }}
-            />
-          </label>
-
-          {selectedFile ? <div style={secondaryTextStyle}>Selected file: {selectedFile.name}</div> : null}
 
           <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
             <button
@@ -168,7 +145,7 @@ export function QifImporter({ onImported, currentRevision = 0 }: QifImporterProp
                 cursor: canPreview ? 'pointer' : 'not-allowed',
               }}
             >
-              {status === 'previewing' ? 'Previewing…' : 'Preview Import'}
+              {status === 'previewing' ? 'Loading…' : 'Load QIF'}
             </button>
           </div>
         </>
@@ -245,19 +222,6 @@ export function QifImporter({ onImported, currentRevision = 0 }: QifImporterProp
             })}
           </div>
 
-          {preview.warnings.length > 0 ? (
-            <div data-testid="qif-preview-warnings" style={{ border: '1px solid #fde68a', borderRadius: 10, background: '#fffbeb', padding: '0.85rem' }}>
-              <div style={{ fontWeight: 600, marginBottom: '0.5rem' }}>Warnings</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', ...secondaryTextStyle }}>
-                {preview.warnings.map((warning, index) => (
-                  <div key={`${warning.line ?? 'general'}-${index}`}>
-                    {warning.line === null ? warning.message : `Line ${warning.line}: ${warning.message}`}
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
-
           <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
             <button
               type="button"
@@ -272,7 +236,7 @@ export function QifImporter({ onImported, currentRevision = 0 }: QifImporterProp
                 cursor: selectedAccounts.size === 0 ? 'not-allowed' : 'pointer',
               }}
             >
-              Confirm Import ({selectedAccounts.size} accounts)
+              Confirm ({selectedAccounts.size} accounts)
             </button>
             <button type="button" data-testid="qif-cancel-button" onClick={handleCancel} style={secondaryButtonStyle}>
               Cancel
@@ -286,7 +250,7 @@ export function QifImporter({ onImported, currentRevision = 0 }: QifImporterProp
       {status === 'done' ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           <div data-testid="qif-success" style={{ border: '1px solid #bbf7d0', borderRadius: 10, background: '#f0fdf4', color: '#166534', padding: '0.85rem' }}>
-            {journalEntry}
+            QIF source configured. Portfolio will be parsed fresh from the QIF file on each load.
           </div>
           <div>
             <button type="button" onClick={onImported} style={buttonStyle}>

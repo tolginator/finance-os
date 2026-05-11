@@ -12,8 +12,6 @@ import type {
   MacroRegimeResponse,
   RunPipelineRequest,
   RunPipelineResponse,
-  UpdateHouseholdRequest,
-  UpdateHouseholdResponse,
   WatchlistData,
   WatchlistsResponse,
 } from './types';
@@ -89,10 +87,17 @@ export function previewQifImport(qifContent: string, householdName: string): Pro
   });
 }
 
-export function saveHousehold(req: UpdateHouseholdRequest): Promise<UpdateHouseholdResponse> {
-  return request('/household', {
+export function setQifSource(path: string): Promise<{ qif_source_path: string }> {
+  return request('/household/qif_source', {
+    method: 'POST',
+    body: JSON.stringify({ path }),
+  });
+}
+
+export function setExcludedAccounts(excludedAccounts: string[]): Promise<{ excluded_accounts: string[] }> {
+  return request('/household/excluded_accounts', {
     method: 'PUT',
-    body: JSON.stringify(req),
+    body: JSON.stringify({ excluded_accounts: excludedAccounts }),
   });
 }
 

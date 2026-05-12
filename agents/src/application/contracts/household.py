@@ -10,8 +10,15 @@ All monetary values use ``decimal.Decimal`` — never ``float``.
 from datetime import date
 from decimal import Decimal
 from enum import StrEnum
+from typing import Annotated
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, PlainSerializer, field_validator, model_validator
+
+# Decimal type that always serializes as fixed-point (never scientific notation)
+FixedDecimal = Annotated[
+    Decimal,
+    PlainSerializer(lambda v: format(v, "f"), return_type=str),
+]
 
 # ---------------------------------------------------------------------------
 # Enums
@@ -62,8 +69,8 @@ class TaxLot(BaseModel):
     """
 
     ticker: str = Field(description="ETF ticker symbol (uppercase)")
-    shares: Decimal = Field(gt=0, description="Number of shares in this lot")
-    cost_basis_per_share: Decimal = Field(
+    shares: FixedDecimal = Field(gt=0, description="Number of shares in this lot")
+    cost_basis_per_share: FixedDecimal = Field(
         ge=0, description="Per-share cost basis at purchase"
     )
     purchase_date: date = Field(description="Date the lot was acquired")
@@ -80,7 +87,7 @@ class CashHolding(BaseModel):
     Cash is a first-class asset class for allocation math.
     """
 
-    amount: Decimal = Field(ge=0, description="Dollar amount")
+    amount: FixedDecimal = Field(ge=0, description="Dollar amount")
     valuation_date: date = Field(description="As-of date for this balance")
     is_money_market: bool = Field(
         default=False,
@@ -109,7 +116,7 @@ class CashFlowAssumption(BaseModel):
     """A recurring cash-flow assumption for simulation / planning."""
 
     description: str = Field(min_length=1)
-    amount_annual: Decimal = Field(
+    amount_annual: FixedDecimal = Field(
         gt=0, description="Annual dollar amount (always positive; direction from type)"
     )
     flow_type: CashFlowType
@@ -150,7 +157,7 @@ class Household(BaseModel):
     name: str = Field(min_length=1, description="Household label")
     accounts: list[Account] = Field(default_factory=list)
     cash_flow_assumptions: list[CashFlowAssumption] = Field(default_factory=list)
-    liquidity_reserve_floor: Decimal = Field(
+    liquidity_reserve_floor: FixedDecimal = Field(
         default=Decimal("0"),
         ge=0,
         description="Minimum cash/short-term balance to maintain (Total NAV basis)",

@@ -32,11 +32,16 @@ export const handlers = [
       exists: true,
       household: {
         name: 'Test Household',
+        members: [],
         liquidity_reserve_floor: '25000',
+        tax_year: null,
         accounts: [
           {
             name: 'Primary Brokerage',
             account_type: 'taxable',
+            owner: null,
+            beneficiary: null,
+            institution: null,
             tax_lots: [
               {
                 ticker: 'VTI',
@@ -54,6 +59,7 @@ export const handlers = [
                 counts_toward_liquidity_reserve: true,
               },
             ],
+            withdrawal_restrictions: [],
           },
         ],
       },

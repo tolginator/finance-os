@@ -333,8 +333,8 @@ def test_infer_account_type_from_name() -> None:
         ("Microsoft DCP", AccountType.FOUR01K),
         ("Fidelity HSA", AccountType.HSA),
         ("Health Equity HSA", AccountType.HSA),
-        ("529 Fidelity - Lidya", AccountType.TRUST),
-        ("UTMA - Lidya", AccountType.TRUST),
+        ("529 Fidelity - Lidya", AccountType.FIVE29),
+        ("UTMA - Lidya", AccountType.CUSTODIAL),
         ("Fidelity Investment", AccountType.TAXABLE),  # no pattern match → taxable
         ("Chase Brokerage", AccountType.TAXABLE),
     ]

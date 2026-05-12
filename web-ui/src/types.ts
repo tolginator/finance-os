@@ -41,14 +41,33 @@ export interface CashHolding {
 export interface Account {
   name: string;
   account_type: string;
+  owner: string | null;
+  beneficiary: string | null;
+  institution: string | null;
   tax_lots: TaxLot[];
   cash_holdings: CashHolding[];
+  withdrawal_restrictions: WithdrawalRestriction[];
+}
+
+export interface WithdrawalRestriction {
+  description: string;
+  penalty_pct: string | null;
+  penalty_free_age: number | null;
+  rmd_start_age: number | null;
+}
+
+export interface HouseholdMember {
+  name: string;
+  date_of_birth: string | null;
+  is_primary: boolean;
 }
 
 export interface Household {
   name: string;
+  members: HouseholdMember[];
   accounts: Account[];
   liquidity_reserve_floor: string;
+  tax_year: number | null;
 }
 
 export interface HouseholdResponse {

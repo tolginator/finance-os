@@ -16,8 +16,10 @@ from src.application.contracts.household import (
     CashFlowType,
     CashHolding,
     Household,
+    HouseholdMember,
     ImportPreviewRequest,
     TaxLot,
+    WithdrawalRestriction,
 )
 from src.application.household_math import (
     aggregate_lots,
@@ -164,13 +166,82 @@ class TestAccount:
         assert len(sample_account.tax_lots) == 1
         assert len(sample_account.cash_holdings) == 1
 
+    def test_account_owner_and_metadata(self) -> None:
+        acct = Account(
+            name="Roth IRA",
+            account_type=AccountType.ROTH_IRA,
+            owner="Alice",
+            institution="Fidelity",
+        )
+        assert acct.owner == "Alice"
+        assert acct.institution == "Fidelity"
+        assert acct.beneficiary is None
+        assert acct.withdrawal_restrictions == []
+
+    def test_account_with_withdrawal_restriction(self) -> None:
+        acct = Account(
+            name="Traditional IRA",
+            account_type=AccountType.TRADITIONAL_IRA,
+            withdrawal_restrictions=[
+                WithdrawalRestriction(
+                    description="Early withdrawal penalty",
+                    penalty_pct=Decimal("10"),
+                    penalty_free_age=59,
+                    rmd_start_age=73,
+                ),
+            ],
+        )
+        assert len(acct.withdrawal_restrictions) == 1
+        assert acct.withdrawal_restrictions[0].rmd_start_age == 73
+
+
+class TestHouseholdMember:
+    def test_age_at(self) -> None:
+        member = HouseholdMember(
+            name="Alice",
+            date_of_birth=date(1980, 6, 15),
+            is_primary=True,
+        )
+        assert member.age_at(date(2025, 6, 14)) == 44
+        assert member.age_at(date(2025, 6, 15)) == 45
+        assert member.age_at(date(2025, 12, 31)) == 45
+
+    def test_age_at_no_dob(self) -> None:
+        member = HouseholdMember(name="Unknown")
+        assert member.age_at(date(2025, 1, 1)) is None
+
+    def test_defaults(self) -> None:
+        member = HouseholdMember(name="Bob")
+        assert member.date_of_birth is None
+        assert member.is_primary is False
+
+
+class TestWithdrawalRestriction:
+    def test_valid(self) -> None:
+        wr = WithdrawalRestriction(
+            description="10% early withdrawal",
+            penalty_pct=Decimal("10"),
+            penalty_free_age=59,
+        )
+        assert wr.penalty_pct == Decimal("10")
+        assert wr.rmd_start_age is None
+
+    def test_penalty_bounds(self) -> None:
+        with pytest.raises(ValidationError):
+            WithdrawalRestriction(
+                description="Bad",
+                penalty_pct=Decimal("101"),
+            )
+
 
 class TestHousehold:
     def test_defaults(self) -> None:
         h = Household(name="Test")
-        assert h.schema_version == 1
+        assert h.schema_version == 2
         assert h.accounts == []
+        assert h.members == []
         assert h.liquidity_reserve_floor == Decimal("0")
+        assert h.tax_year is None
 
     def test_valid_household(self, sample_household: Household) -> None:
         assert sample_household.name == "Test Household"
@@ -184,6 +255,37 @@ class TestHousehold:
         lot = restored.accounts[0].tax_lots[0]
         assert lot.shares == Decimal("100")
         assert lot.cost_basis_per_share == Decimal("200.50")
+
+    def test_household_with_members(self) -> None:
+        h = Household(
+            name="Family",
+            members=[
+                HouseholdMember(
+                    name="Alice",
+                    date_of_birth=date(1980, 3, 15),
+                    is_primary=True,
+                ),
+                HouseholdMember(name="Bob", date_of_birth=date(1982, 7, 20)),
+            ],
+            tax_year=2025,
+        )
+        assert len(h.members) == 2
+        assert h.members[0].is_primary is True
+        assert h.tax_year == 2025
+        assert h.schema_version == 2
+
+    def test_backward_compat_v1_data(self) -> None:
+        """v1 data without members/tax_year still loads correctly."""
+        v1_data = {
+            "name": "Legacy",
+            "accounts": [],
+            "liquidity_reserve_floor": "10000",
+            "schema_version": 1,
+        }
+        h = Household.model_validate(v1_data)
+        assert h.members == []
+        assert h.tax_year is None
+        assert h.name == "Legacy"
 
 
 class TestCashFlowAssumption:
@@ -227,11 +329,17 @@ class TestAssetClassEnum:
 
 
 class TestAccountTypeEnum:
-    def test_all_six_types(self) -> None:
-        assert len(AccountType) == 6
+    def test_all_types(self) -> None:
+        assert len(AccountType) == 10
 
     def test_401k(self) -> None:
         assert AccountType.FOUR01K.value == "401k"
+
+    def test_new_types(self) -> None:
+        assert AccountType.FIVE29.value == "529"
+        assert AccountType.INHERITED_IRA.value == "inherited_ira"
+        assert AccountType.INHERITED_ROTH.value == "inherited_roth"
+        assert AccountType.CUSTODIAL.value == "custodial"
 
 
 # ---------------------------------------------------------------------------

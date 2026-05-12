@@ -41,6 +41,8 @@ _SPLIT_ACTION = "stksplit"
 
 # Patterns for inferring account type from name (checked in order).
 _ACCOUNT_TYPE_PATTERNS: list[tuple[list[str], AccountType]] = [
+    (["inherited roth"], AccountType.INHERITED_ROTH),
+    (["inherited ira", "inherited trad"], AccountType.INHERITED_IRA),
     (["roth ira", "roth_ira", "rollover roth"], AccountType.ROTH_IRA),
     (["traditional ira", "trad ira", "rollover ira", "sep ira"], AccountType.TRADITIONAL_IRA),
     (
@@ -48,7 +50,9 @@ _ACCOUNT_TYPE_PATTERNS: list[tuple[list[str], AccountType]] = [
         AccountType.FOUR01K,
     ),
     (["hsa"], AccountType.HSA),
-    (["trust", "utma", "ugma", "529"], AccountType.TRUST),
+    (["529"], AccountType.FIVE29),
+    (["utma", "ugma"], AccountType.CUSTODIAL),
+    (["trust"], AccountType.TRUST),
 ]
 
 

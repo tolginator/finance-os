@@ -22,6 +22,7 @@ from src.application.contracts.agents import (
     RunPipelineResponse,
     SearchFilingsResponse,
 )
+from src.application.contracts.household import Account, AccountType, ImportPreviewResponse
 from src.application.contracts.ticker import TickerSummary, TickerTranscript
 from src.application.registry import AGENT_CATALOG
 from src.core.knowledge_graph import KnowledgeGraph
@@ -754,6 +755,25 @@ class TestTickerSummary:
     def test_invalid_symbol_422(self, client):
         resp = client.get("/ticker/INVALID!!!/summary")
         assert resp.status_code == 422
+
+
+class TestQifImportPreview:
+    @patch("src.application.services.qif_import.preview_qif_import")
+    def test_preview_qif_import_endpoint_returns_preview(self, mock_preview, client):
+        mock_preview.return_value = ImportPreviewResponse(
+            accounts=[Account(name="Brokerage", account_type=AccountType.TAXABLE)],
+            warnings=[],
+            position_only=False,
+        )
+
+        resp = client.post(
+            "/household/import/qif/preview",
+            json={"qif_content": "!Type:Invst\n^", "household_name": "Family"},
+        )
+
+        assert resp.status_code == 200
+        assert resp.json()["accounts"][0]["name"] == "Brokerage"
+        mock_preview.assert_called_once_with("!Type:Invst\n^", "Family")
 
 
 class TestTickerTranscript:

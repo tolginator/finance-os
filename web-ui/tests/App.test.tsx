@@ -7,20 +7,65 @@ import { AgentList } from '../src/components/AgentList';
 import { DigestPanel } from '../src/components/DigestPanel';
 import { server } from './mocks/server';
 
-// --- App (smoke) ---
-
 describe('App', () => {
-  it('renders the header and all panels', async () => {
+  it('renders the portfolio-centric shell and async component states', async () => {
+    server.use(
+      http.get('/api/household', async () => {
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        return HttpResponse.json({
+          exists: true,
+          household: {
+            name: 'App Household',
+            liquidity_reserve_floor: '50000',
+            revision: 2,
+            updated_at: '2025-02-14T15:30:00Z',
+            accounts: [
+              {
+                name: 'App Account',
+                account_type: 'taxable',
+                tax_lots: [
+                  {
+                    ticker: 'VTI',
+                    shares: '5',
+                    cost_basis_per_share: '250.00',
+                    purchase_date: '2024-01-10',
+                  },
+                ],
+                cash_holdings: [],
+              },
+            ],
+          },
+        });
+      }),
+      http.post('/api/agents/macro_regime', async () => {
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        return HttpResponse.json({
+          regime: 'Balanced slowdown',
+          indicators_fetched: 6,
+          indicators_with_data: 5,
+          content: 'Macro regime classification completed.',
+        });
+      }),
+    );
+
     render(<App />);
     expect(screen.getByText('finance-os')).toBeInTheDocument();
-    expect(screen.getByText('Run Digest')).toBeInTheDocument();
+    expect(screen.getByText('Portfolio')).toBeInTheDocument();
+    expect(screen.getByText('Macro Dashboard')).toBeInTheDocument();
+    expect(screen.getByText('Goals')).toBeInTheDocument();
+    expect(screen.queryByText('Knowledge Graph')).not.toBeInTheDocument();
+    expect(screen.queryByText('Agent Runner')).not.toBeInTheDocument();
+    expect(screen.getByTestId('portfolio-loading')).toBeInTheDocument();
+    expect(screen.getByTestId('macro-loading')).toBeInTheDocument();
+    expect(screen.getByTestId('goal-empty')).toBeInTheDocument();
+
     await waitFor(() => {
       expect(screen.getByTestId('health-label')).toBeInTheDocument();
+      expect(screen.getByTestId('portfolio-accounts')).toBeInTheDocument();
+      expect(screen.getByTestId('macro-regime')).toBeInTheDocument();
     });
   });
 });
-
-// --- HealthStatus ---
 
 describe('HealthStatus', () => {
   it('shows connected when API returns ok', async () => {
@@ -50,7 +95,7 @@ describe('HealthStatus', () => {
 
   it('shows loading state initially', async () => {
     server.use(http.get('/api/health', async () => {
-      await new Promise((r) => setTimeout(r, 500));
+      await new Promise((resolve) => setTimeout(resolve, 500));
       return HttpResponse.json({ status: 'ok' });
     }));
     render(<HealthStatus />);
@@ -61,8 +106,6 @@ describe('HealthStatus', () => {
     });
   });
 });
-
-// --- AgentList ---
 
 describe('AgentList', () => {
   it('renders agent cards from API', async () => {
@@ -76,7 +119,7 @@ describe('AgentList', () => {
 
   it('shows loading state initially', async () => {
     server.use(http.get('/api/agents', async () => {
-      await new Promise((r) => setTimeout(r, 500));
+      await new Promise((resolve) => setTimeout(resolve, 500));
       return HttpResponse.json([]);
     }));
     render(<AgentList />);
@@ -103,18 +146,13 @@ describe('AgentList', () => {
   });
 });
 
-// --- DigestPanel ---
-
 describe('DigestPanel', () => {
   it('shows validation error for empty tickers', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
     render(<DigestPanel />);
     fireEvent.click(screen.getByText('Run Digest'));
     expect(screen.getByTestId('digest-error')).toBeInTheDocument();
-    // Validation should prevent network request
-    const digestCalls = fetchSpy.mock.calls.filter(
-      ([url]) => typeof url === 'string' && url.includes('/digest'),
-    );
+    const digestCalls = fetchSpy.mock.calls.filter(([url]) => typeof url === 'string' && url.includes('/digest'));
     expect(digestCalls).toHaveLength(0);
     fetchSpy.mockRestore();
   });
@@ -180,12 +218,10 @@ describe('DigestPanel', () => {
   });
 
   it('clears previous error on successful submission', async () => {
-    // First: trigger validation error
     render(<DigestPanel />);
     fireEvent.click(screen.getByText('Run Digest'));
     expect(screen.getByTestId('digest-error')).toBeInTheDocument();
 
-    // Then: submit valid input
     const input = screen.getByPlaceholderText('AAPL, MSFT, GOOGL');
     fireEvent.change(input, { target: { value: 'AAPL' } });
     fireEvent.click(screen.getByText('Run Digest'));
@@ -199,10 +235,8 @@ describe('DigestPanel', () => {
   it('shows loading state while fetching', async () => {
     server.use(
       http.post('/api/digest', async () => {
-        await new Promise((r) => setTimeout(r, 500));
-        return HttpResponse.json({
-          ticker_count: 1, entry_count: 0, alert_count: 0, material_count: 0, content: 'done',
-        });
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        return HttpResponse.json({ ticker_count: 1, entry_count: 0, alert_count: 0, material_count: 0, content: 'done' });
       }),
     );
     render(<DigestPanel />);
@@ -210,11 +244,9 @@ describe('DigestPanel', () => {
     fireEvent.change(input, { target: { value: 'AAPL' } });
     fireEvent.click(screen.getByText('Run Digest'));
 
-    // Button should show loading state immediately
     expect(screen.getByText('Running…')).toBeInTheDocument();
     expect(screen.getByText('Running…')).toBeDisabled();
 
-    // Eventually resolves back to normal
     await waitFor(() => {
       expect(screen.getByText('Run Digest')).toBeInTheDocument();
     });
@@ -226,16 +258,12 @@ describe('DigestPanel', () => {
       http.post('/api/digest', async ({ request }) => {
         const body = (await request.json()) as Record<string, unknown>;
         capturedLookback = body.lookback_days as number;
-        return HttpResponse.json({
-          ticker_count: 1, entry_count: 0, alert_count: 0, material_count: 0, content: 'ok',
-        });
+        return HttpResponse.json({ ticker_count: 1, entry_count: 0, alert_count: 0, material_count: 0, content: 'ok' });
       }),
     );
     render(<DigestPanel />);
-    const tickerInput = screen.getByPlaceholderText('AAPL, MSFT, GOOGL');
-    fireEvent.change(tickerInput, { target: { value: 'AAPL' } });
-    const lookbackInput = screen.getByDisplayValue('7');
-    fireEvent.change(lookbackInput, { target: { value: '30' } });
+    fireEvent.change(screen.getByPlaceholderText('AAPL, MSFT, GOOGL'), { target: { value: 'AAPL' } });
+    fireEvent.change(screen.getByDisplayValue('7'), { target: { value: '30' } });
     fireEvent.click(screen.getByText('Run Digest'));
 
     await waitFor(() => {
@@ -245,12 +273,9 @@ describe('DigestPanel', () => {
   });
 
   it('continues digest when watchlist save fails', async () => {
-    server.use(
-      http.put('/api/watchlists/:name', () => HttpResponse.json({ detail: 'fail' }, { status: 500 })),
-    );
+    server.use(http.put('/api/watchlists/:name', () => HttpResponse.json({ detail: 'fail' }, { status: 500 })));
     render(<DigestPanel />);
-    const input = screen.getByPlaceholderText('AAPL, MSFT, GOOGL');
-    fireEvent.change(input, { target: { value: 'AAPL' } });
+    fireEvent.change(screen.getByPlaceholderText('AAPL, MSFT, GOOGL'), { target: { value: 'AAPL' } });
     fireEvent.click(screen.getByText('Run Digest'));
 
     await waitFor(() => {
@@ -268,8 +293,7 @@ describe('DigestPanel', () => {
     );
     render(<DigestPanel />);
     await waitFor(() => {
-      const input = screen.getByPlaceholderText('AAPL, MSFT, GOOGL') as HTMLInputElement;
-      expect(input.value).toBe('TSLA, GOOG');
+      expect((screen.getByPlaceholderText('AAPL, MSFT, GOOGL') as HTMLInputElement).value).toBe('TSLA, GOOG');
     });
   });
 
@@ -299,7 +323,7 @@ describe('DigestPanel', () => {
       http.put('/api/watchlists/:name/activate', ({ params }) => {
         activated = true;
         return HttpResponse.json({
-          active: params.name as string,
+          active: String(params.name),
           watchlist: { tickers: ['MSFT', 'GOOG'] },
         });
       }),
@@ -310,8 +334,7 @@ describe('DigestPanel', () => {
     });
     fireEvent.click(screen.getByText('tech'));
     await waitFor(() => {
-      const input = screen.getByPlaceholderText('AAPL, MSFT, GOOGL') as HTMLInputElement;
-      expect(input.value).toBe('MSFT, GOOG');
+      expect((screen.getByPlaceholderText('AAPL, MSFT, GOOGL') as HTMLInputElement).value).toBe('MSFT, GOOG');
     });
   });
 
@@ -319,7 +342,7 @@ describe('DigestPanel', () => {
     let callCount = 0;
     server.use(
       http.get('/api/watchlists', () => {
-        callCount++;
+        callCount += 1;
         if (callCount <= 1) {
           return HttpResponse.json({
             active: 'default',
@@ -343,8 +366,7 @@ describe('DigestPanel', () => {
       expect(screen.getByText('Watchlist:')).toBeInTheDocument();
     });
     fireEvent.click(screen.getByText('+ New'));
-    const nameInput = screen.getByPlaceholderText('name');
-    fireEvent.change(nameInput, { target: { value: 'growth' } });
+    fireEvent.change(screen.getByPlaceholderText('name'), { target: { value: 'growth' } });
     fireEvent.click(screen.getByText('✓'));
     await waitFor(() => {
       expect(screen.getByText('growth')).toBeInTheDocument();
@@ -355,7 +377,7 @@ describe('DigestPanel', () => {
     let callCount = 0;
     server.use(
       http.get('/api/watchlists', () => {
-        callCount++;
+        callCount += 1;
         if (callCount <= 1) {
           return HttpResponse.json({
             active: 'default',

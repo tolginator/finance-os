@@ -1,21 +1,110 @@
 import { http, HttpResponse } from 'msw';
 
 export const handlers = [
-  http.get('/api/health', () => {
-    return HttpResponse.json({ status: 'ok' });
-  }),
+  http.get('/api/health', () => HttpResponse.json({ status: 'ok' })),
 
-  http.get('/api/agents', () => {
-    return HttpResponse.json([
+  http.get('/api/filesystem/browse', () =>
+    HttpResponse.json({
+      current: '/home/user',
+      parent: '/home',
+      entries: [
+        { name: 'Documents', path: '/home/user/Documents', is_dir: true },
+        { name: 'portfolio.qif', path: '/home/user/portfolio.qif', is_dir: false },
+      ],
+    }),
+  ),
+
+  http.get('/api/agents', () =>
+    HttpResponse.json([
       { name: 'earnings_interpreter', description: 'Analyzes earnings call transcripts for sentiment and guidance' },
       { name: 'macro_regime', description: 'Classifies macro regime from FRED indicators' },
+      { name: 'macro_outlook', description: 'Computes asset-class tilts from macro regime' },
       { name: 'filing_analyst', description: 'Searches and analyzes SEC filings' },
       { name: 'quant_signal', description: 'Generates composite quant signals from multiple inputs' },
       { name: 'thesis_guardian', description: 'Evaluates investment theses against observed data' },
       { name: 'risk_analyst', description: 'Assesses portfolio risk with VaR, CVaR, and scenario analysis' },
       { name: 'adversarial', description: 'Challenges investment theses adversarially' },
-    ]);
+    ]),
+  ),
+
+  http.get('/api/household', () =>
+    HttpResponse.json({
+      exists: true,
+      household: {
+        name: 'Test Household',
+        members: [],
+        liquidity_reserve_floor: '25000',
+        tax_year: null,
+        accounts: [
+          {
+            name: 'Primary Brokerage',
+            account_type: 'taxable',
+            owner: null,
+            beneficiary: null,
+            institution: null,
+            tax_lots: [
+              {
+                ticker: 'VTI',
+                shares: '10',
+                cost_basis_per_share: '250.00',
+                purchase_date: '2024-01-10',
+              },
+            ],
+            cash_holdings: [
+              {
+                amount: '5000',
+                valuation_date: '2025-02-14',
+                is_money_market: true,
+                ticker: null,
+                counts_toward_liquidity_reserve: true,
+              },
+            ],
+            withdrawal_restrictions: [],
+          },
+        ],
+      },
+    }),
+  ),
+
+  http.post('/api/household/import/qif/preview', async ({ request }) => {
+    const body = (await request.json()) as { qif_content: string; household_name: string };
+    return HttpResponse.json({
+      accounts: [
+        {
+          name: 'Investment Account',
+          account_type: 'taxable',
+          tax_lots: [
+            {
+              ticker: 'VTI',
+              shares: '100',
+              cost_basis_per_share: '200.00',
+              purchase_date: '2024-01-15',
+            },
+          ],
+          cash_holdings: [],
+        },
+      ],
+      warnings: body.qif_content.includes('warning') ? [{ line: 7, message: 'Parser warning' }] : [],
+      position_only: false,
+    });
   }),
+
+  http.post('/api/household/qif_source', () =>
+    HttpResponse.json({ qif_source_path: '/path/to/test.qif' }),
+  ),
+
+  http.put('/api/household/excluded_accounts', () =>
+    HttpResponse.json({ excluded_accounts: [] }),
+  ),
+
+  http.post('/api/agents/macro_regime', () =>
+    HttpResponse.json({
+      regime: 'Balanced slowdown',
+      indicators_fetched: 6,
+      indicators_with_data: 5,
+      content: 'Macro regime classification completed.',
+    }),
+  ),
 
   http.post('/api/digest', async ({ request }) => {
     const body = (await request.json()) as Record<string, unknown>;
@@ -29,197 +118,43 @@ export const handlers = [
     });
   }),
 
-  // --- Watchlists ---
-
-  http.get('/api/watchlists', () => {
-    return HttpResponse.json({
+  http.get('/api/watchlists', () =>
+    HttpResponse.json({
       active: 'default',
       watchlists: { default: { tickers: [] } },
       active_watchlist: { tickers: [] },
-    });
-  }),
+    }),
+  ),
 
-  http.put('/api/watchlists/:name', () => {
-    return HttpResponse.json({ tickers: ['AAPL', 'MSFT'] });
-  }),
-
-  http.post('/api/watchlists', () => {
-    return HttpResponse.json({ tickers: [] }, { status: 201 });
-  }),
-
-  http.delete('/api/watchlists/:name', () => {
-    return new HttpResponse(null, { status: 204 });
-  }),
+  http.put('/api/watchlists/:name', () => HttpResponse.json({ tickers: ['AAPL', 'MSFT'] })),
+  http.post('/api/watchlists', () => HttpResponse.json({ tickers: [] }, { status: 201 })),
+  http.delete('/api/watchlists/:name', () => new HttpResponse(null, { status: 204 })),
 
   http.put('/api/watchlists/:name/activate', ({ params }) => {
-    const name = params.name as string;
+    const name = String(params.name);
     return HttpResponse.json({
       active: name,
       watchlist: { tickers: ['AAPL', 'MSFT'] },
     });
   }),
 
-  // --- Agent endpoints ---
-
-  http.post('/api/agents/earnings_interpreter', () => {
-    return HttpResponse.json({
-      content: 'Earnings analysis report',
-      tone: 'cautiously optimistic',
-      net_sentiment: 0.65,
-      confidence: 'high',
-      guidance_direction: 'raised',
-      guidance_count: 3,
-      key_phrase_count: 12,
-    });
-  }),
-
-  http.post('/api/agents/macro_regime', () => {
-    return HttpResponse.json({
-      content: 'Macro regime dashboard',
-      regime: 'expansion',
-      indicators_fetched: 5,
-      indicators_with_data: 4,
-    });
-  }),
-
-  http.post('/api/agents/filing_analyst', () => {
-    return HttpResponse.json({
-      content: 'Filing search results',
-      cik: '0000320193',
-      form_type: '10-K',
-      filing_count: 5,
-    });
-  }),
-
-  http.post('/api/agents/quant_signal', () => {
-    return HttpResponse.json({
-      content: 'Signal report',
-      agent: 'quant_signal',
-      composite: { score: 0.72, direction: 'long' },
-      signals: [{ name: 'momentum', value: 0.8 }],
-    });
-  }),
-
-  http.post('/api/agents/thesis_guardian', () => {
-    return HttpResponse.json({
-      content: 'Thesis evaluation report',
-      theses_checked: 2,
-      alerts_generated: 1,
-      critical_alerts: 0,
-    });
-  }),
-
-  http.post('/api/agents/risk_analyst', () => {
-    return HttpResponse.json({
-      content: 'Risk analysis report',
-    });
-  }),
-
-  http.post('/api/agents/adversarial', () => {
-    return HttpResponse.json({
-      content: 'Adversarial challenge report',
-      conviction_score: 'medium',
-      counter_count: 4,
-      blind_spot_count: 2,
-    });
-  }),
-
-  // --- Pipeline ---
-
-  http.post('/api/pipeline', () => {
-    return HttpResponse.json({
-      results: [{ task_id: 'task-1', agent_name: 'macro_regime', success: true, duration_ms: 1200, content: 'Macro regime dashboard', metadata: {}, error: null }],
+  http.post('/api/pipeline', () =>
+    HttpResponse.json({
+      results: [
+        {
+          task_id: 'task-1',
+          agent_name: 'macro_regime',
+          success: true,
+          duration_ms: 1200,
+          content: 'Macro regime dashboard',
+          metadata: {},
+          error: null,
+        },
+      ],
       total_duration_ms: 1500,
       successful: 1,
       failed: 0,
       memo: null,
-    });
-  }),
-
-  // --- Knowledge Graph ---
-
-  http.post('/api/kg/extract', () => {
-    return HttpResponse.json({
-      entities: [
-        { entity_id: 'company:apple inc', name: 'Apple Inc', entity_type: 'company', ticker: 'AAPL', cik: null, metadata: {} },
-        { entity_id: 'company:intel corp', name: 'Intel Corp', entity_type: 'company', ticker: 'INTC', cik: null, metadata: {} },
-      ],
-      relationships: [
-        { source_id: 'company:apple inc', target_id: 'company:intel corp', rel_type: 'supplies_to', evidence: 'Intel supplies chips', source_doc: '', confidence: '0.8', metadata: {} },
-      ],
-      entity_count: 2,
-      relationship_count: 1,
-    });
-  }),
-
-  http.post('/api/kg/query/related', () => {
-    return HttpResponse.json({
-      entity_id: 'company:apple inc',
-      related: [
-        { entity_id: 'company:intel corp', name: 'Intel Corp', entity_type: 'company', ticker: 'INTC', cik: null, metadata: {} },
-      ],
-      count: 1,
-    });
-  }),
-
-  http.post('/api/kg/query/supply-chain', () => {
-    return HttpResponse.json({
-      entity_id: 'company:apple inc',
-      direction: 'upstream',
-      chain: [
-        { entity_id: 'company:tsmc', name: 'TSMC', entity_type: 'company', ticker: 'TSM', cik: null, metadata: {} },
-      ],
-      count: 1,
-    });
-  }),
-
-  http.post('/api/kg/query/shared-risks', () => {
-    return HttpResponse.json({
-      entity_ids: ['company:apple inc', 'company:intel corp'],
-      shared_risks: [
-        { entity_id: 'risk:chip-shortage', name: 'Global chip shortage', entity_type: 'risk', ticker: null, cik: null, metadata: {} },
-      ],
-      count: 1,
-    });
-  }),
-
-  http.get('/api/kg/stats', () => {
-    return HttpResponse.json({
-      entity_count: 15,
-      relationship_count: 22,
-      entities_by_type: { company: 10, risk: 3, sector: 2 },
-      relationships_by_type: { supplies_to: 12, competes_with: 6, exposed_to: 4 },
-    });
-  }),
-
-  // --- Ticker Lookup ---
-
-  http.get('/api/ticker/:symbol/summary', ({ params }) => {
-    const symbol = String(params.symbol).toUpperCase();
-    return HttpResponse.json({
-      symbol,
-      name: `${symbol} Inc.`,
-      sector: 'Technology',
-      industry: 'Consumer Electronics',
-      market_cap: '3000000000000',
-      currency: 'USD',
-      current_price: '198.50',
-      previous_close: '197.25',
-      fifty_two_week_high: '220.00',
-      fifty_two_week_low: '155.00',
-      earnings_date: '2025-07-30',
-      description: `${symbol} designs and manufactures consumer electronics.`,
-    });
-  }),
-
-  http.get('/api/ticker/:symbol/transcript', ({ params }) => {
-    const symbol = String(params.symbol).toUpperCase();
-    return HttpResponse.json({
-      symbol,
-      available: true,
-      transcript: `This is the latest earnings call transcript for ${symbol}. Revenue grew 15% year over year.`,
-      period: 'Q1 2025',
-      source: 'yfinance',
-    });
-  }),
+    }),
+  ),
 ];

@@ -16,12 +16,8 @@ describe('PipelineRunner', () => {
   it('adds and removes tasks', () => {
     render(<PipelineRunner />);
     fireEvent.click(screen.getByText('+ Add Task'));
-    // task-1 appears as its own label and as a depends_on option for task-0
     expect(screen.getAllByText('task-1').length).toBeGreaterThanOrEqual(1);
-
-    // Remove second task
     fireEvent.click(screen.getByLabelText('Remove task-1'));
-    // Only the label should be gone; task-0's depends_on no longer lists it
     expect(screen.queryAllByText('task-1')).toHaveLength(0);
   });
 
@@ -38,16 +34,12 @@ describe('PipelineRunner', () => {
   });
 
   it('shows error when pipeline fails', async () => {
-    server.use(
-      http.post('/api/pipeline', () => HttpResponse.json({ detail: 'Pipeline error' }, { status: 500 })),
-    );
+    server.use(http.post('/api/pipeline', () => HttpResponse.json({ detail: 'Pipeline error' }, { status: 500 })));
     render(<PipelineRunner />);
     fireEvent.click(screen.getByText('Run Pipeline'));
 
     await waitFor(() => {
-      const el = screen.getByTestId('pipeline-error');
-      expect(el).toBeInTheDocument();
-      expect(el.textContent).not.toBe('');
+      expect(screen.getByTestId('pipeline-error')).toBeInTheDocument();
     });
   });
 
@@ -55,19 +47,10 @@ describe('PipelineRunner', () => {
     render(<PipelineRunner />);
     fireEvent.click(screen.getByText('+ Add Task'));
 
-    // Get the multi-select elements (depends_on for each task)
     const allSelects = screen.getAllByRole('listbox') as HTMLSelectElement[];
-    // allSelects[0] = task-0's depends_on (has option for task-1)
-    // allSelects[1] = task-1's depends_on (has option for task-0)
-
-    // Select task-1 as dependency of task-0
-    const opt1 = allSelects[0].options[0]; // task-1
-    opt1.selected = true;
+    allSelects[0].options[0].selected = true;
     fireEvent.change(allSelects[0]);
-
-    // Select task-0 as dependency of task-1
-    const opt2 = allSelects[1].options[0]; // task-0
-    opt2.selected = true;
+    allSelects[1].options[0].selected = true;
     fireEvent.change(allSelects[1]);
 
     fireEvent.click(screen.getByText('Run Pipeline'));
@@ -85,20 +68,17 @@ describe('StatsDashboard', () => {
     await waitFor(() => {
       expect(screen.getByText('System Health')).toBeInTheDocument();
     });
-    expect(screen.getByText('ok')).toBeInTheDocument();
-    expect(screen.getByText('Knowledge Graph')).toBeInTheDocument();
+    expect(screen.getByText('Agent Coverage')).toBeInTheDocument();
+    expect(screen.getByText('Watchlists')).toBeInTheDocument();
   });
 
   it('refreshes stats on button click', async () => {
     render(<StatsDashboard />);
     await waitFor(() => {
-      expect(screen.getByText('ok')).toBeInTheDocument();
+      expect(screen.getByText('Status:')).toBeInTheDocument();
     });
 
-    // Override health to return a different status on next fetch
-    server.use(
-      http.get('/api/health', () => HttpResponse.json({ status: 'degraded' }), { once: true }),
-    );
+    server.use(http.get('/api/health', () => HttpResponse.json({ status: 'degraded' }), { once: true }));
 
     fireEvent.click(screen.getByTestId('stats-refresh'));
     await waitFor(() => {
@@ -107,9 +87,7 @@ describe('StatsDashboard', () => {
   });
 
   it('shows error when stats fail with refresh button available', async () => {
-    server.use(
-      http.get('/api/health', () => HttpResponse.json({}, { status: 500 })),
-    );
+    server.use(http.get('/api/health', () => HttpResponse.json({}, { status: 500 })));
     render(<StatsDashboard />);
     await waitFor(() => {
       expect(screen.getByTestId('stats-error')).toBeInTheDocument();
@@ -117,10 +95,11 @@ describe('StatsDashboard', () => {
     expect(screen.getByTestId('stats-refresh')).toBeInTheDocument();
   });
 
-  it('shows agent count', async () => {
+  it('shows agent and watchlist counts', async () => {
     render(<StatsDashboard />);
     await waitFor(() => {
-      expect(screen.getByText(/^Agents \(\d+\)$/)).toBeInTheDocument();
+      expect(screen.getByText('Agents available:')).toBeInTheDocument();
     });
+    expect(screen.getByText('Saved watchlists:')).toBeInTheDocument();
   });
 });

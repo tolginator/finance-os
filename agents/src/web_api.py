@@ -23,7 +23,7 @@ from functools import lru_cache
 from typing import Any
 
 import uvicorn
-from fastapi import FastAPI, Path, Request
+from fastapi import FastAPI, HTTPException, Path, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -55,8 +55,7 @@ from src.application.contracts.household import (
     GetHouseholdResponse,
     ImportPreviewRequest,
     ImportPreviewResponse,
-    UpdateHouseholdRequest,
-    UpdateHouseholdResponse,
+    QifImportPreviewRequest,
 )
 from src.application.contracts.knowledge_graph import (
     ExtractEntitiesRequest,
@@ -74,9 +73,7 @@ from src.application.registry import AGENT_CATALOG, create_pipeline_service
 from src.application.services.agent_service import AgentService
 from src.application.services.digest_service import DigestService
 from src.application.services.household_service import (
-    HouseholdCorruptError,
     HouseholdService,
-    StaleRevisionError,
 )
 from src.application.services.kg_service import KnowledgeGraphService
 from src.application.watchlists import WatchlistNotFoundError, WatchlistStore
@@ -144,22 +141,6 @@ async def watchlist_not_found_handler(
 ) -> JSONResponse:
     """Map WatchlistNotFoundError to 404."""
     return JSONResponse(status_code=404, content={"detail": str(exc)})
-
-
-@app.exception_handler(StaleRevisionError)
-async def stale_revision_handler(
-    _request: Request, exc: StaleRevisionError,
-) -> JSONResponse:
-    """Map StaleRevisionError to 409 Conflict."""
-    return JSONResponse(status_code=409, content={"detail": str(exc)})
-
-
-@app.exception_handler(HouseholdCorruptError)
-async def household_corrupt_handler(
-    _request: Request, exc: HouseholdCorruptError,
-) -> JSONResponse:
-    """Map HouseholdCorruptError to 500 — corrupt file preserved for recovery."""
-    return JSONResponse(status_code=500, content={"detail": str(exc)})
 
 
 # --- Health & Info ---
@@ -393,20 +374,139 @@ async def get_household() -> Any:
     return GetHouseholdResponse(household=household, exists=exists).model_dump(mode="json")
 
 
-@app.put("/household", response_model=UpdateHouseholdResponse)
-async def update_household(request: UpdateHouseholdRequest) -> Any:
-    """Update the household portfolio (optimistic concurrency via expected_revision)."""
-    household, summary = await asyncio.to_thread(_household_service.save, request)
-    return UpdateHouseholdResponse(
-        household=household, journal_entry=summary,
-    ).model_dump(mode="json")
-
-
 @app.post("/household/import/csv/preview", response_model=ImportPreviewResponse)
 async def preview_csv_import(request: ImportPreviewRequest) -> Any:
     """Parse CSV content and return proposed accounts without persisting."""
     result = await asyncio.to_thread(_household_service.preview_csv_import, request)
     return result.model_dump(mode="json")
+
+
+@app.post("/household/import/qif/preview", response_model=ImportPreviewResponse)
+async def import_qif_preview(req: QifImportPreviewRequest) -> Any:
+    """Parse QIF file and preview proposed accounts."""
+    from src.application.services.qif_import import preview_qif_import
+
+    return preview_qif_import(req.qif_content, req.household_name).model_dump(mode="json")
+
+
+# ---------------------------------------------------------------------------
+# Filesystem browse (for server-side file picker)
+# ---------------------------------------------------------------------------
+
+
+class FileBrowseEntry(BaseModel):
+    """A single file or directory entry."""
+
+    name: str
+    path: str
+    is_dir: bool
+
+
+class FileBrowseResponse(BaseModel):
+    """Directory listing for the file picker."""
+
+    current: str
+    parent: str | None
+    entries: list[FileBrowseEntry]
+
+
+@app.get("/filesystem/browse", response_model=FileBrowseResponse)
+async def browse_filesystem(path: str = "~", filter: str = "") -> Any:
+    """List files/directories at the given path for the file picker."""
+    from pathlib import Path as PathLib
+
+    resolved = PathLib(path).expanduser().resolve()
+    if not resolved.is_dir():
+        raise HTTPException(status_code=400, detail=f"Not a directory: {resolved}")
+
+    entries: list[FileBrowseEntry] = []
+    try:
+        for item in sorted(resolved.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower())):
+            if item.name.startswith("."):
+                continue
+            if filter and item.is_file() and not item.name.lower().endswith(filter.lower()):
+                continue
+            entries.append(FileBrowseEntry(name=item.name, path=str(item), is_dir=item.is_dir()))
+    except PermissionError:
+        raise HTTPException(status_code=403, detail=f"Permission denied: {resolved}")
+
+    parent = str(resolved.parent) if resolved.parent != resolved else None
+    result = FileBrowseResponse(current=str(resolved), parent=parent, entries=entries)
+    return result.model_dump(mode="json")
+
+
+class QifSourceRequest(BaseModel):
+    """Request for POST /household/qif_source."""
+
+    path: str = Field(min_length=1, description="Filesystem path to QIF file")
+
+
+class QifSourceResponse(BaseModel):
+    """Response for GET/POST/DELETE /household/qif_source."""
+
+    qif_source_path: str = Field(default="", description="Current linked QIF file path")
+
+
+@app.get("/household/qif_source", response_model=QifSourceResponse)
+async def get_qif_source() -> Any:
+    """Return the currently linked QIF source file path."""
+    from src.application.config import AppConfig
+
+    cfg = AppConfig()
+    return QifSourceResponse(qif_source_path=cfg.qif_source_path).model_dump(mode="json")
+
+
+@app.post("/household/qif_source", response_model=QifSourceResponse)
+async def set_qif_source(req: QifSourceRequest) -> Any:
+    """Link a QIF file so it auto-loads on startup."""
+    from pathlib import Path as PathLib
+
+    from src.application.config import update_config_value
+
+    resolved = PathLib(req.path).expanduser()
+    if not resolved.is_file():
+        raise HTTPException(status_code=400, detail=f"File not found: {resolved}")
+    update_config_value("qif_source_path", str(resolved))
+    return QifSourceResponse(qif_source_path=str(resolved)).model_dump(mode="json")
+
+
+@app.delete("/household/qif_source", response_model=QifSourceResponse)
+async def clear_qif_source() -> Any:
+    """Unlink the QIF source file."""
+    from src.application.config import update_config_value
+
+    update_config_value("qif_source_path", None)
+    return QifSourceResponse(qif_source_path="").model_dump(mode="json")
+
+
+class ExcludedAccountsRequest(BaseModel):
+    """Request for PUT /household/excluded_accounts."""
+
+    excluded_accounts: list[str] = Field(description="Account names to exclude from analysis")
+
+
+class ExcludedAccountsResponse(BaseModel):
+    """Response for GET/PUT /household/excluded_accounts."""
+
+    excluded_accounts: list[str] = Field(default_factory=list)
+
+
+@app.get("/household/excluded_accounts", response_model=ExcludedAccountsResponse)
+async def get_excluded_accounts() -> Any:
+    """Return the list of excluded account names."""
+    from src.application.config import AppConfig
+
+    cfg = AppConfig()
+    return ExcludedAccountsResponse(excluded_accounts=cfg.excluded_accounts).model_dump(mode="json")
+
+
+@app.put("/household/excluded_accounts", response_model=ExcludedAccountsResponse)
+async def set_excluded_accounts(req: ExcludedAccountsRequest) -> Any:
+    """Update the list of excluded account names."""
+    from src.application.config import update_config_value
+
+    update_config_value("excluded_accounts", req.excluded_accounts)
+    return ExcludedAccountsResponse(excluded_accounts=req.excluded_accounts).model_dump(mode="json")
 
 
 # --- Watchlists ---

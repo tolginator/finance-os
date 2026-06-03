@@ -1,54 +1,26 @@
-"""Household portfolio persistence — load, save, journal, import.
+"""Household portfolio service — QIF file is the single source of truth.
 
-Storage location: ~/.config/finance-os/household.json
-Journal location: ~/.config/finance-os/household-journal.jsonl
-
-Uses OS-level file locking (``fcntl.flock``) to protect against
-concurrent writes from Web API, MCP server, and CLI processes.
+The QIF file is read-only input. Portfolio data is computed fresh from
+the QIF file on every request — no intermediate household.json replica.
+Config stores only the QIF file path and account exclusion list.
 """
 
-import json
 import logging
-from datetime import datetime
+from datetime import date
 from pathlib import Path
 
 from pydantic import ValidationError
 
-from src.application.config import CONFIG_DIR
+from src.application.config import AppConfig
 from src.application.contracts.household import (
     Account,
     Household,
     ImportPreviewRequest,
     ImportPreviewResponse,
     ImportWarning,
-    UpdateHouseholdRequest,
 )
-from src.core.file_io import FileLockContext, atomic_write
 
 logger = logging.getLogger(__name__)
-
-HOUSEHOLD_FILE = CONFIG_DIR / "household.json"
-JOURNAL_FILE = CONFIG_DIR / "household-journal.jsonl"
-LOCK_FILE = CONFIG_DIR / "household.lock"
-
-
-# ---------------------------------------------------------------------------
-# Exceptions
-# ---------------------------------------------------------------------------
-
-class HouseholdCorruptError(Exception):
-    """Raised when household.json exists but cannot be parsed.
-
-    The corrupt file is preserved (renamed with a timestamp suffix) so the
-    user can recover manually.
-    """
-
-
-class StaleRevisionError(Exception):
-    """Raised when a write's expected_revision doesn't match the current revision.
-
-    Callers should surface this as HTTP 409 Conflict.
-    """
 
 
 # ---------------------------------------------------------------------------
@@ -56,77 +28,57 @@ class StaleRevisionError(Exception):
 # ---------------------------------------------------------------------------
 
 class HouseholdService:
-    """Manages household portfolio persistence with optimistic concurrency.
+    """Computes household portfolio by parsing the QIF source file.
 
-    All reads and writes use an OS-level advisory lock (``fcntl.flock``)
-    so that Web API, MCP, and CLI processes serialise access to the same
-    file.  Inside each process the lock file descriptor is held only for
-    the duration of the critical section.
+    No file persistence — the QIF file is the single source of truth.
+    Config stores ``qif_source_path`` and ``excluded_accounts``.
     """
-
-    def __init__(self, path: Path | None = None) -> None:
-        self._path = path or HOUSEHOLD_FILE
-        self._journal_path = path.parent / "household-journal.jsonl" if path else JOURNAL_FILE
-        self._lock_path = path.parent / "household.lock" if path else LOCK_FILE
 
     # -- public API --------------------------------------------------------
 
     def load(self) -> tuple[Household, bool]:
-        """Load the household from disk.
+        """Parse the QIF source file and return the computed household.
 
         Returns:
-            (household, exists) — ``exists`` is False when no file was
-            found and a default household is returned.
+            (household, exists) — ``exists`` is False when no QIF source
+            is configured or the file is missing.
         """
-        with self._flock():
-            return self._load_unlocked()
+        try:
+            cfg = AppConfig()
+        except Exception:
+            logger.warning("Failed to load config", exc_info=True)
+            return self._default_household(), False
 
-    def save(self, request: UpdateHouseholdRequest) -> tuple[Household, str]:
-        """Persist an updated household, enforcing optimistic concurrency.
+        qif_path_str = cfg.qif_source_path
+        if not qif_path_str:
+            return self._default_household(), False
 
-        Args:
-            request: The update payload including ``expected_revision``.
+        qif_path = Path(qif_path_str).expanduser()
+        if not qif_path.is_file():
+            logger.warning("QIF source path configured but file not found: %s", qif_path)
+            return self._default_household(), False
 
-        Returns:
-            (saved_household, journal_summary)
+        try:
+            from src.application.services.qif_import import preview_qif_import
 
-        Raises:
-            StaleRevisionError: ``expected_revision`` doesn't match current.
-        """
-        with self._flock():
-            current, _exists = self._load_unlocked()
+            qif_content = qif_path.read_text(encoding="utf-8", errors="replace")
+            preview = preview_qif_import(qif_content)
 
-            if request.expected_revision != current.revision:
-                raise StaleRevisionError(
-                    f"Expected revision {request.expected_revision}, "
-                    f"but current is {current.revision}"
-                )
+            excluded = set(cfg.excluded_accounts)
+            accounts = [a for a in preview.accounts if a.name not in excluded]
 
-            updated = Household(
-                name=request.name,
-                accounts=request.accounts,
-                cash_flow_assumptions=request.cash_flow_assumptions,
-                liquidity_reserve_floor=request.liquidity_reserve_floor,
-                schema_version=current.schema_version,
-                revision=current.revision + 1,
-                updated_at=datetime.now(),
+            household = Household(
+                name="My Household",
+                accounts=accounts,
             )
-
-            self._write_atomic(updated)
-
-            summary = (
-                f"Updated household '{updated.name}' "
-                f"(rev {current.revision} → {updated.revision}, "
-                f"{len(updated.accounts)} accounts)"
+            logger.info(
+                "Loaded %d accounts from QIF: %s (excluded %d)",
+                len(accounts), qif_path, len(excluded),
             )
-            self._append_journal(
-                action="update",
-                base_revision=current.revision,
-                new_revision=updated.revision,
-                summary=summary,
-            )
-
-            return updated, summary
+            return household, True
+        except Exception:
+            logger.warning("Failed to parse QIF: %s", qif_path, exc_info=True)
+            return self._default_household(), False
 
     def preview_csv_import(self, request: ImportPreviewRequest) -> ImportPreviewResponse:
         """Parse CSV content and return proposed accounts without persisting.
@@ -246,7 +198,7 @@ class HouseholdService:
                         )
                     )
                     basis = Decimal("0")
-                    pdate = datetime.now().date()
+                    pdate = date.today()
                 else:
                     try:
                         basis = Decimal(basis_raw)
@@ -323,7 +275,7 @@ class HouseholdService:
                         )
                         continue
                 else:
-                    val_date = datetime.now().date()
+                    val_date = date.today()
 
                 mm_ticker = row.get("ticker", "").strip().upper() or None
 
@@ -358,75 +310,17 @@ class HouseholdService:
             position_only=position_only,
         )
 
-    # -- internals ---------------------------------------------------------
-
-    def _flock(self) -> FileLockContext:
-        """Return a context manager that holds an OS-level advisory lock."""
-        return FileLockContext(self._lock_path)
-
-    def _load_unlocked(self) -> tuple[Household, bool]:
-        """Load without acquiring the lock (caller must hold it)."""
-        if not self._path.is_file():
-            return self._default_household(), False
-
-        raw_text = self._path.read_text(encoding="utf-8")
-        try:
-            raw = json.loads(raw_text)
-        except json.JSONDecodeError as exc:
-            self._preserve_corrupt_file()
-            raise HouseholdCorruptError(
-                f"household.json is not valid JSON: {exc}"
-            ) from exc
-
-        try:
-            return Household.model_validate(raw), True
-        except ValidationError as exc:
-            self._preserve_corrupt_file()
-            raise HouseholdCorruptError(
-                f"household.json has invalid schema: {exc}"
-            ) from exc
-
-    def _write_atomic(self, household: Household) -> None:
-        """Atomically write household to disk (temp file + rename)."""
-        content = json.dumps(
-            household.model_dump(mode="json"),
-            indent=2,
-            ensure_ascii=False,
-            default=str,
-        ).encode("utf-8")
-        atomic_write(self._path, content)
-
-    def _preserve_corrupt_file(self) -> None:
-        """Rename a corrupt household.json so the user can recover it."""
-        if self._path.is_file():
-            ts = datetime.now().strftime("%Y%m%dT%H%M%S")
-            backup = self._path.with_suffix(f".corrupt.{ts}.json")
-            self._path.rename(backup)
-            logger.error(
-                "Corrupt household.json preserved as %s", backup,
-            )
-
-    def _append_journal(
+    def preview_qif_import(
         self,
-        action: str,
-        base_revision: int,
-        new_revision: int,
-        summary: str,
-    ) -> None:
-        """Append a line to the change journal (best-effort)."""
-        entry = {
-            "timestamp": datetime.now().isoformat(),
-            "action": action,
-            "base_revision": base_revision,
-            "new_revision": new_revision,
-            "summary": summary,
-        }
-        try:
-            self._journal_path.parent.mkdir(parents=True, exist_ok=True)
-            with self._journal_path.open("a", encoding="utf-8") as f:
-                f.write(json.dumps(entry, default=str) + "\n")
-        except OSError:
-            logger.warning("Failed to write household journal entry", exc_info=True)
+        qif_content: str,
+        household_name: str = "My Household",
+    ) -> ImportPreviewResponse:
+        """Parse QIF content and return proposed accounts."""
+        from src.application.services.qif_import import preview_qif_import
+
+        return preview_qif_import(qif_content, household_name)
+
+    # -- internals ---------------------------------------------------------
 
     @staticmethod
     def _default_household() -> Household:

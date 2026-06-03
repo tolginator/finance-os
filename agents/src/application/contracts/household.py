@@ -7,11 +7,18 @@ holdings, and cash-flow assumptions for a wealthy-family household.
 All monetary values use ``decimal.Decimal`` — never ``float``.
 """
 
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal
 from enum import StrEnum
+from typing import Annotated
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, PlainSerializer, field_validator, model_validator
+
+# Decimal type that always serializes as fixed-point (never scientific notation)
+FixedDecimal = Annotated[
+    Decimal,
+    PlainSerializer(lambda v: format(v, "f"), return_type=str),
+]
 
 # ---------------------------------------------------------------------------
 # Enums
@@ -26,6 +33,10 @@ class AccountType(StrEnum):
     FOUR01K = "401k"
     HSA = "hsa"
     TRUST = "trust"
+    FIVE29 = "529"
+    INHERITED_IRA = "inherited_ira"
+    INHERITED_ROTH = "inherited_roth"
+    CUSTODIAL = "custodial"
 
 
 class AssetClass(StrEnum):
@@ -54,6 +65,32 @@ class CashFlowType(StrEnum):
 # Core domain models
 # ---------------------------------------------------------------------------
 
+class HouseholdMember(BaseModel):
+    """A person in the household (account owner, spouse, dependent)."""
+
+    name: str = Field(min_length=1, description="Display name")
+    date_of_birth: date | None = Field(
+        default=None,
+        description="Date of birth (needed for RMD, contribution eligibility)",
+    )
+    is_primary: bool = Field(
+        default=False,
+        description="True for the primary account holder / decision-maker",
+    )
+
+    def age_at(self, as_of: date) -> int | None:
+        """Age in whole years as of a given date, or None if DOB unknown."""
+        if self.date_of_birth is None:
+            return None
+        years = as_of.year - self.date_of_birth.year
+        if (as_of.month, as_of.day) < (
+            self.date_of_birth.month,
+            self.date_of_birth.day,
+        ):
+            years -= 1
+        return years
+
+
 class TaxLot(BaseModel):
     """A single tax lot within a position.
 
@@ -62,8 +99,8 @@ class TaxLot(BaseModel):
     """
 
     ticker: str = Field(description="ETF ticker symbol (uppercase)")
-    shares: Decimal = Field(gt=0, description="Number of shares in this lot")
-    cost_basis_per_share: Decimal = Field(
+    shares: FixedDecimal = Field(gt=0, description="Number of shares in this lot")
+    cost_basis_per_share: FixedDecimal = Field(
         ge=0, description="Per-share cost basis at purchase"
     )
     purchase_date: date = Field(description="Date the lot was acquired")
@@ -80,7 +117,7 @@ class CashHolding(BaseModel):
     Cash is a first-class asset class for allocation math.
     """
 
-    amount: Decimal = Field(ge=0, description="Dollar amount")
+    amount: FixedDecimal = Field(ge=0, description="Dollar amount")
     valuation_date: date = Field(description="As-of date for this balance")
     is_money_market: bool = Field(
         default=False,
@@ -96,20 +133,56 @@ class CashHolding(BaseModel):
     )
 
 
+class WithdrawalRestriction(BaseModel):
+    """Withdrawal constraint on an account (early penalty, RMD, etc.)."""
+
+    description: str = Field(min_length=1)
+    penalty_pct: FixedDecimal | None = Field(
+        default=None,
+        ge=0,
+        le=100,
+        description="Early withdrawal penalty percentage (e.g. 10 for 10%)",
+    )
+    penalty_free_age: int | None = Field(
+        default=None,
+        ge=0,
+        description="Age at which penalty no longer applies",
+    )
+    rmd_start_age: int | None = Field(
+        default=None,
+        ge=0,
+        description="Age at which required minimum distributions begin",
+    )
+
+
 class Account(BaseModel):
     """A single brokerage or retirement account."""
 
     name: str = Field(min_length=1, description="Human-readable account label")
     account_type: AccountType
+    owner: str | None = Field(
+        default=None,
+        description="Name of the HouseholdMember who owns this account",
+    )
+    beneficiary: str | None = Field(
+        default=None,
+        description="Beneficiary name (for inherited/custodial accounts)",
+    )
+    institution: str | None = Field(
+        default=None, description="Brokerage or custodian name"
+    )
     tax_lots: list[TaxLot] = Field(default_factory=list)
     cash_holdings: list[CashHolding] = Field(default_factory=list)
+    withdrawal_restrictions: list[WithdrawalRestriction] = Field(
+        default_factory=list
+    )
 
 
 class CashFlowAssumption(BaseModel):
     """A recurring cash-flow assumption for simulation / planning."""
 
     description: str = Field(min_length=1)
-    amount_annual: Decimal = Field(
+    amount_annual: FixedDecimal = Field(
         gt=0, description="Annual dollar amount (always positive; direction from type)"
     )
     flow_type: CashFlowType
@@ -143,30 +216,28 @@ class CashFlowAssumption(BaseModel):
 class Household(BaseModel):
     """Root data model for a household's investment portfolio.
 
-    Persisted to ``~/.config/finance-os/household.json``.
-    ``schema_version`` tracks file-format migrations.
-    ``revision`` is an optimistic-concurrency token incremented on every save.
+    Computed on the fly from the read-only QIF source file.
+    No persistence — the QIF file is the single source of truth.
     """
 
     name: str = Field(min_length=1, description="Household label")
+    members: list[HouseholdMember] = Field(default_factory=list)
     accounts: list[Account] = Field(default_factory=list)
     cash_flow_assumptions: list[CashFlowAssumption] = Field(default_factory=list)
-    liquidity_reserve_floor: Decimal = Field(
+    liquidity_reserve_floor: FixedDecimal = Field(
         default=Decimal("0"),
         ge=0,
         description="Minimum cash/short-term balance to maintain (Total NAV basis)",
     )
+    tax_year: int | None = Field(
+        default=None,
+        ge=2000,
+        le=2100,
+        description="Current tax year for contribution limits and RMD calc",
+    )
     schema_version: int = Field(
-        default=1,
+        default=2,
         description="File-format version for future migrations",
-    )
-    revision: int = Field(
-        default=0,
-        description="Optimistic-concurrency token — incremented on every save",
-    )
-    updated_at: datetime = Field(
-        default_factory=datetime.now,
-        description="Timestamp of last persisted change",
     )
 
 
@@ -180,32 +251,8 @@ class GetHouseholdResponse(BaseModel):
     household: Household
     exists: bool = Field(
         default=True,
-        description="False when no household.json exists yet (returns defaults)",
+        description="False when no QIF source is configured (returns defaults)",
     )
-
-
-class UpdateHouseholdRequest(BaseModel):
-    """Request for PUT /household.
-
-    Clients supply the business fields; server owns schema_version,
-    revision, and updated_at.  ``expected_revision`` is the concurrency
-    check — the server rejects the write if it doesn't match.
-    """
-
-    name: str = Field(min_length=1)
-    accounts: list[Account]
-    cash_flow_assumptions: list[CashFlowAssumption] = Field(default_factory=list)
-    liquidity_reserve_floor: Decimal = Field(default=Decimal("0"), ge=0)
-    expected_revision: int = Field(
-        description="Must match current revision on disk, or 409 Conflict"
-    )
-
-
-class UpdateHouseholdResponse(BaseModel):
-    """Response for PUT /household."""
-
-    household: Household
-    journal_entry: str = Field(description="Summary written to the change journal")
 
 
 class ImportPreviewRequest(BaseModel):
@@ -216,6 +263,13 @@ class ImportPreviewRequest(BaseModel):
     """
 
     csv_content: str = Field(min_length=1, description="Raw CSV file content")
+
+
+class QifImportPreviewRequest(BaseModel):
+    """Request for POST /household/import/qif/preview."""
+
+    qif_content: str = Field(min_length=1, description="Raw QIF file content")
+    household_name: str = Field(default="My Household", min_length=1)
 
 
 class ImportWarning(BaseModel):
